@@ -1,0 +1,15 @@
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Dependencies
+node_modules/
+
+# Screenshots / Local captures
+/*.png
+!icons/*.png
+
+# Tool caches & temp
+.claude/
+supabase/.temp/
+.env*

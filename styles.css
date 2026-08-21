@@ -1,0 +1,2993 @@
+/* ============================================================
+   OPEN ANALYTICS (oa-design) — OFFICIAL OPENPANEL DESIGN SYSTEM
+   The design language of getopen.so / OpenLabs-so/oa-design
+   - One ink (#292929), derived neutrals via color-mix
+   - Squircles with continuous-curvature corners & shape() clip-path
+   - Weight stops at 500 (no bold anywhere)
+   - Binary shadows (resting vs floating)
+   - One accent (#305dde / #296ff0)
+   ============================================================ */
+
+:root {
+  --ink: #292929;
+
+  /* stage and surfaces */
+  --bg-page: #ffffff;
+  --background: #f6f6f6; /* the grey stage between plates */
+  --card: #ffffff;
+  --popover: #ffffff;
+  --foreground: var(--ink);
+  --card-foreground: var(--ink);
+
+  /* ink-derived neutrals: the percentages ARE the system */
+  --border: color-mix(in srgb, var(--ink) 12%, transparent);
+  --border-inner: color-mix(in srgb, var(--ink) 10%, transparent);
+  --border-hover: color-mix(in srgb, var(--ink) 18%, transparent);
+  --input: color-mix(in srgb, var(--ink) 14%, transparent);
+  --accent: color-mix(in srgb, var(--ink) 5%, transparent); /* hover wash */
+  --accent-foreground: var(--ink);
+  --muted: color-mix(in srgb, var(--ink) 5%, transparent);
+  --muted-foreground: #6d6d6d;
+  --ink-primary: var(--ink);
+  --ink-secondary: #6d6d6d;
+  --ink-muted: #969696;
+
+  /* the one accent, and its focus ring */
+  --primary: #305dde;
+  --primary-foreground: #ffffff;
+  --ring: #3ba6f1;
+  --accent-blue: #296ff0;
+  --accent-emerald: #10b981;
+  --line-secondary: color-mix(in srgb, var(--ink) 18%, transparent);
+
+  /* secondary controls: flat grey, no border */
+  --secondary: #e9e9e9;
+  --secondary-foreground: var(--ink);
+
+  /* radius: one base, multiplied */
+  --radius: 0.625rem;
+  --radius-outer-sm: 26px;
+  --radius-inner-sm: 22px;
+  --radius-outer-lg: 50px;
+  --radius-inner-lg: 44px;
+  --radius-pill: 9999px;
+
+  /* elevation is binary: resting or floating */
+  --shadow-resting: 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-floating: 0 1px 2px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.08);
+
+  --font-sans: "Inter Tight", "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  --transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* ------------------------------------------------------------
+     Camadas — uma escala só, para o palpite de z-index acabar aqui.
+     Regra: as barras presas à tela (dock, barra de frames, HUD de zoom)
+     ficam acima de tudo. Nada passa por cima delas.
+     Dentro do canvas a ordem é a mesma, porque .canvas-view cria um
+     stacking context próprio: o que está lá dentro só compete entre si.
+     ------------------------------------------------------------ */
+  --z-nav: 50;
+  --z-dropdown: 100;
+  --z-canvas: 500;      /* a tela do canvas inteira */
+  --z-canvas-float: 520; /* toolbar de texto e dica: flutuam, mas cedem passagem */
+  --z-sticky-bar: 600;  /* barra de frames e HUD de zoom */
+  --z-dock: 700;        /* a dock do rodapé */
+  --z-modal: 10000;     /* modais e backdrops ficam sempre acima de tudo */
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-page);
+  color: var(--foreground);
+  line-height: 1.5;
+  font-weight: 400;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  padding-bottom: 120px;
+  overflow-x: clip;
+}
+
+/* ------------------------------------------------------------
+   TOP FIXED NAVBAR & PROJECT SELECTOR DROPDOWN
+   ------------------------------------------------------------ */
+.navbar-wrapper {
+  position: relative;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-page);
+  z-index: var(--z-nav);
+}
+
+.navbar {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.navbar__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+}
+
+.brand-logo-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--accent-blue);
+  text-decoration: none;
+  transition: transform var(--transition);
+}
+
+.brand-logo-btn:hover {
+  transform: scale(1.08);
+}
+
+.brand-sep {
+  color: var(--border-hover);
+  font-size: 14px;
+  transform: rotate(12deg);
+}
+
+.brand-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 9px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-primary);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all var(--transition);
+  user-select: none;
+}
+
+.brand-chip:hover, .brand-chip.active {
+  background: var(--bg-subtle);
+  border-color: var(--border);
+  transform: translateY(-0.5px);
+}
+
+.chip-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+
+/* Dropdown Menu (App vs Site) */
+.project-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 42px;
+  width: 260px;
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0,0,0,0.04);
+  padding: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  z-index: var(--z-dropdown);
+  animation: dropdown-pop 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.project-dropdown.open {
+  display: flex;
+}
+
+@keyframes dropdown-pop {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.dropdown-header {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 10px 4px;
+}
+
+.project-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.project-option:hover {
+  background: var(--bg-subtle);
+  transform: translateX(2px);
+}
+
+.project-option.selected {
+  background: #EFF6FF;
+}
+
+.project-option__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.project-option__icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.project-option__title {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-primary);
+}
+
+.project-option__sub {
+  font-size: 11px;
+  color: var(--ink-secondary);
+}
+
+.project-option__badge {
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: #E0F2FE;
+  color: #0369A1;
+}
+
+.navbar__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #F3F4F6;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  cursor: pointer;
+  transition: transform var(--transition);
+}
+
+.avatar:hover {
+  transform: scale(1.06);
+}
+
+/* ------------------------------------------------------------
+   MAIN CONTAINER
+   ------------------------------------------------------------ */
+.app-container {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 32px 24px;
+}
+
+/* ------------------------------------------------------------
+   PAGE HEADER & DATE PILL DROPDOWN
+   ------------------------------------------------------------ */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.page-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink-primary);
+}
+
+.scope-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  font-size: 11.5px;
+  font-weight: 500;
+  background: #EFF6FF;
+  color: var(--accent-blue);
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  transition: all var(--transition);
+}
+
+.date-selector-wrapper {
+  position: relative;
+}
+
+.date-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-primary);
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all var(--transition);
+  user-select: none;
+}
+
+.date-pill:hover, .date-pill.active {
+  background: var(--bg-subtle);
+  border-color: var(--border-hover);
+  transform: translateY(-0.5px);
+}
+
+/* Date Dropdown Popover */
+.date-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 180px;
+  background: #FFFFFF;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0,0,0,0.04);
+  padding: 4px;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  z-index: var(--z-dropdown);
+  animation: dropdown-pop 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.date-dropdown.open {
+  display: flex;
+}
+
+.date-option {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-primary);
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.date-option:hover {
+  background: var(--bg-subtle);
+  transform: translateX(2px);
+}
+
+.date-option.selected {
+  background: #EFF6FF;
+  color: var(--accent-blue);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------
+   KPI STAT CARDS (EXACT OPENPANEL NESTED SQUIRCLE)
+   ------------------------------------------------------------ */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.nested-stat-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 26px;
+  padding: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  user-select: none;
+  transition: transform var(--transition), box-shadow var(--transition), border-color 300ms ease;
+}
+
+.nested-stat-card:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 16px -2px rgba(0, 0, 0, 0.06);
+  border-color: var(--border-hover);
+}
+
+.nested-stat-card.active-kpi-card {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 1.5px rgba(37, 99, 235, 0.3), 0 4px 12px -2px rgba(37, 99, 235, 0.1);
+  background: #FFFFFF;
+}
+
+.nested-stat-card.active-kpi-card .stat-header span:first-child {
+  color: #2563EB;
+  font-weight: 500;
+}
+
+.stat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+}
+
+.info-icon {
+  font-size: 13px;
+  color: var(--ink-muted);
+  cursor: help;
+}
+
+.stat-inner-box {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-inner);
+  border-radius: 20px;
+  padding: 12px 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--ink-primary);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------
+   MAIN HERO CHART CARD (OPENPANEL REPLICA WITH EDGE FADE)
+   ------------------------------------------------------------ */
+.nested-chart-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-outer-lg);
+  padding: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  margin-bottom: 16px;
+}
+
+.chart-inner-box {
+  position: relative;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-inner);
+  border-radius: var(--radius-inner-lg);
+  padding: 24px 28px 18px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+}
+
+/* Dotted Grid com Máscara de Desvanecimento nas Bordas (Topo, Laterais e Fundo) */
+.chart-grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(#CBD5E1 1.2px, transparent 1.2px);
+  background-size: 20px 20px;
+  background-position: center;
+  mask-image: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 1) 45%, rgba(0, 0, 0, 0.2) 80%, rgba(0, 0, 0, 0) 98%);
+  -webkit-mask-image: radial-gradient(ellipse at 50% 50%, rgba(0, 0, 0, 1) 45%, rgba(0, 0, 0, 0.2) 80%, rgba(0, 0, 0, 0) 98%);
+  pointer-events: none;
+}
+
+.chart-stage {
+  position: relative;
+  width: 100%;
+  height: 310px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.chart-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.chart-area-primary.base-curve {
+  opacity: 1;
+  transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), d 300ms ease;
+  pointer-events: none;
+}
+
+.chart-line-secondary.base-curve {
+  fill: none;
+  stroke: var(--line-secondary);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+  transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), d 300ms ease;
+}
+
+.chart-line-primary.base-curve {
+  fill: none;
+  stroke: var(--accent-blue);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 1;
+  transition: opacity 650ms cubic-bezier(0.16, 1, 0.3, 1), d 300ms ease;
+}
+
+/* Grupo de Spotlight (Dissipação suave e lenta) */
+#chart-spotlight-group {
+  opacity: 0;
+  transition: opacity 550ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+/* Quando o mouse está SOBRE o gráfico: transição suave e calma da cor atenuando */
+.chart-stage.is-hovering .chart-line-secondary.base-curve {
+  opacity: 0.18;
+}
+
+.chart-stage.is-hovering .chart-line-primary.base-curve {
+  opacity: 0.22;
+}
+
+.chart-stage.is-hovering .chart-area-primary.base-curve {
+  opacity: 0.28;
+}
+
+.chart-stage.is-hovering #chart-spotlight-group {
+  opacity: 1;
+}
+
+/* Camada com Destaque de Spotlight e Brilho Difuso */
+.highlight-curve.chart-line-primary {
+  fill: none;
+  stroke: #2563EB;
+  stroke-width: 2.8;
+  filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.45)) drop-shadow(0 2px 6px rgba(37, 99, 235, 0.35));
+}
+
+.highlight-curve.chart-line-secondary {
+  fill: none;
+  stroke: #64748B;
+  stroke-width: 2.4;
+  filter: drop-shadow(0 0 8px rgba(100, 116, 139, 0.3));
+}
+
+.highlight-curve.chart-area-primary {
+  pointer-events: none;
+}
+
+.chart-guide {
+  stroke: #94A3B8;
+  stroke-width: 1.2;
+  stroke-dasharray: 4 4;
+  opacity: 0;
+  transition: opacity 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.chart-point-primary {
+  fill: var(--accent-blue);
+  stroke: #FFFFFF;
+  stroke-width: 2.5;
+  r: 5.5;
+  opacity: 0;
+  filter: drop-shadow(0 0 10px rgba(37, 99, 235, 0.7)) drop-shadow(0 2px 5px rgba(37, 99, 235, 0.5));
+  transition: opacity 350ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.chart-point-secondary {
+  fill: var(--line-secondary);
+  stroke: #FFFFFF;
+  stroke-width: 2.5;
+  r: 4.5;
+  opacity: 0;
+  transition: opacity 350ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+/* Tooltip floating card (OpenPanel style com entrada e saída suave) */
+.chart-tooltip {
+  position: absolute;
+  top: 40px;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  margin-top: -12px;
+  background: #0F172A;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #FFFFFF;
+  border-radius: 12px;
+  padding: 9px 13px;
+  font-size: 12px;
+  box-shadow: 0 14px 30px -4px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0,0,0,0.1);
+  pointer-events: none;
+  z-index: 20;
+  min-width: 145px;
+  transition: opacity 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tooltip-time {
+  font-size: 11px;
+  color: #94A3B8;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+
+.tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 3px;
+}
+
+.tooltip-row:last-child {
+  margin-bottom: 0;
+}
+
+.tooltip-indicator {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.tooltip-indicator.secondary {
+  background: #64748B;
+}
+
+.tooltip-indicator.primary {
+  background: #3B82F6;
+}
+
+.tooltip-label {
+  color: #CBD5E1;
+  font-size: 11.5px;
+}
+
+.tooltip-value {
+  color: #FFFFFF;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Pill preta flutuante no fundo do gráfico com transição suave */
+.chart-bottom-pill {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111827;
+  color: #FFFFFF;
+  padding: 4px 14px;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  z-index: 25;
+  transition: opacity 300ms cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.chart-axis {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+  padding-inline: 12px;
+  position: relative;
+}
+
+.axis-tick {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #9CA3AF;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  transition: opacity 200ms ease, color 150ms ease;
+  cursor: pointer;
+  user-select: none;
+}
+
+.axis-tick.hidden-by-pill {
+  opacity: 0 !important;
+}
+
+/* ------------------------------------------------------------
+   RICH MULTI-CARD BREAKDOWN GRID (OPENPANEL 3-COLUMN)
+   ------------------------------------------------------------ */
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.nested-breakdown-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-outer-sm);
+  padding: 4px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+  height: 255px;
+  box-sizing: border-box;
+}
+
+.nested-breakdown-card:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 16px -2px rgba(0, 0, 0, 0.06);
+  border-color: var(--border-hover);
+}
+
+.breakdown-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px 6px;
+  flex-shrink: 0;
+}
+
+.breakdown-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: rgba(17, 24, 39, 0.85);
+}
+
+.see-all-link {
+  font-size: 12px;
+  color: var(--ink-secondary);
+  text-decoration: none;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  transition: color var(--transition), transform var(--transition);
+}
+
+.see-all-link:hover {
+  color: var(--ink-primary);
+  transform: translateX(1px);
+}
+
+.breakdown-inner-box {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-inner);
+  border-radius: var(--radius-inner-sm);
+  padding: 10px 12px;
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.breakdown-inner-box::-webkit-scrollbar {
+  width: 4px;
+}
+
+.breakdown-inner-box::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.breakdown-inner-box::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.14);
+  border-radius: 9999px;
+}
+
+.breakdown-inner-box::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.data-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.data-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: background var(--transition);
+}
+
+.data-row:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.data-row__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink-primary);
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-blue);
+  flex-shrink: 0;
+}
+
+.brand-logo-img {
+  width: 18px;
+  height: 18px;
+  border-radius: 4.5px;
+  object-fit: cover;
+  flex-shrink: 0;
+  display: inline-block;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.brand-svg-badge {
+  width: 18px;
+  height: 18px;
+  border-radius: 4.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 11px;
+}
+
+.data-row__right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.data-count {
+  color: var(--ink-primary);
+  font-weight: 500;
+}
+
+.data-pct {
+  color: var(--ink-muted);
+  font-size: 11.5px;
+  min-width: 28px;
+  text-align: right;
+}
+
+/* ------------------------------------------------------------
+   EXACT OPENPANEL MODAL (NO BLUR, LIGHT OVERLAY, SQUIRCLE POP)
+   Fixed Constant Height & Smooth Inner Layout
+   ------------------------------------------------------------ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.22); /* Light dim without heavy blur */
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  padding: 24px;
+  opacity: 0;
+  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal-overlay.open {
+  display: flex;
+  opacity: 1;
+}
+
+.openpanel-modal {
+  width: 100%;
+  max-width: 520px;
+  height: 530px; /* ALTURA FIXA CONSTANTE */
+  max-height: 90vh;
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 38px; /* Border radius aumentado para squircle profundo */
+  box-shadow: 0 24px 54px -10px rgba(0, 0, 0, 0.18), 0 4px 14px rgba(0, 0, 0, 0.04);
+  padding: 26px 28px 22px 28px;
+  transform: scale(0.92) translateY(12px);
+  transition: transform 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.modal-overlay.open .openpanel-modal {
+  transform: scale(1) translateY(0);
+}
+
+.openpanel-modal__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-shrink: 0;
+  margin-bottom: 14px;
+}
+
+.openpanel-modal__title {
+  font-size: 17.5px;
+  font-weight: 500;
+  color: #111827;
+  letter-spacing: -0.015em;
+  margin-bottom: 2px;
+}
+
+.openpanel-modal__sub {
+  font-size: 12.5px;
+  color: #6B7280;
+}
+
+.openpanel-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #F3F4F6;
+  border: none;
+  color: #6B7280;
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+
+.openpanel-close-btn:hover {
+  background: #E5E7EB;
+  color: #111827;
+  transform: scale(1.08);
+}
+
+/* Modal Search Bar */
+.openpanel-search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+.openpanel-search-input {
+  width: 100%;
+  padding: 9px 14px 9px 36px;
+  font-size: 13px;
+  font-family: inherit;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 14px;
+  color: var(--ink-primary);
+  outline: none;
+  transition: all var(--transition);
+}
+
+.openpanel-search-input:focus {
+  background: #FFFFFF;
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.openpanel-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 14px;
+  height: 14px;
+  color: #9CA3AF;
+  pointer-events: none;
+}
+
+/* Modal Items List (Expands to fill remaining height) */
+.openpanel-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1; /* Ocupa exatamente o espaço restante */
+  overflow-y: auto;
+  padding-right: 4px;
+  min-height: 0; /* Previne overflow flexbox */
+}
+
+.openpanel-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  color: #111827;
+  transition: background var(--transition);
+  flex-shrink: 0;
+}
+
+.openpanel-list-item:hover, .openpanel-list-item.selected {
+  background: #F4F4F5;
+}
+
+.openpanel-item__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.openpanel-item__right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.openpanel-item__val {
+  font-weight: 500;
+  color: #111827;
+  min-width: 44px;
+  text-align: right;
+}
+
+.openpanel-item__pct {
+  color: #9CA3AF;
+  font-size: 12.5px;
+  min-width: 32px;
+  text-align: right;
+}
+
+.openpanel-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid #F3F4F6;
+  font-size: 12px;
+  color: #6B7280;
+  flex-shrink: 0;
+  margin-top: auto;
+}
+
+.openpanel-page-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  color: #374151;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.openpanel-page-btn:hover:not(:disabled) {
+  background: #F3F4F6;
+  border-color: #D1D5DB;
+}
+
+.openpanel-page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------
+   MINIMALIST TRANSLUCENT FLOATING DOCK (ONLY ICONS)
+   ------------------------------------------------------------ */
+.dock-wrapper {
+  position: fixed;
+  bottom: 24px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: var(--z-dock);
+}
+
+.dock {
+  pointer-events: auto;
+  background: #18181B;
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.42), 
+              0 2px 6px rgba(0, 0, 0, 0.15), 
+              inset 0 1px 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.dock-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #9CA3AF;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.dock-icon-btn:hover {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.05);
+}
+
+.dock-icon-btn.active {
+  color: #000000;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.dock-icon-btn.active:hover {
+  color: #000000;
+  background: #FFFFFF;
+  transform: scale(1.05);
+}
+
+.dock-divider {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.18);
+  margin-inline: 2px;
+}
+
+/* ------------------------------------------------------------
+   RESPONSIVE DESIGN
+   ------------------------------------------------------------ */
+@media (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .breakdown-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .app-container {
+    padding: 20px 14px;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .breakdown-grid {
+    grid-template-columns: 1fr;
+  }
+  .chart-axis {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------
+   ESTADO VAZIO (SEM DADO REAL / ZERO)
+   Regra: nunca inventar número. Se não há dado, dizer que não há.
+   -------------------------------------------------- */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 18px 10px;
+  text-align: center;
+  min-height: 96px;
+}
+
+.empty-state__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: rgba(0, 0, 0, 0.035);
+  color: var(--ink-muted);
+}
+
+.empty-state__title {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  line-height: 1.35;
+}
+
+.empty-state__hint {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-muted);
+  line-height: 1.4;
+  max-width: 230px;
+}
+
+/* KPI zerado: número apagado em vez de preto cheio, pra não competir com dado real */
+.stat-value.is-zero {
+  color: var(--ink-muted);
+}
+
+/* --------------------------------------------------
+   CANVAS INFINITO
+   Pan e zoom reais: a camada .canvas-world recebe o transform e
+   o fundo pontilhado acompanha via background-position/size.
+   -------------------------------------------------- */
+.canvas-view {
+  position: fixed;
+  inset: 0;
+  display: none;
+  overflow: hidden;
+  background: var(--bg, #FFFFFF);
+  z-index: var(--z-canvas);
+  cursor: grab;
+  touch-action: none;
+}
+
+.canvas-view.is-open {
+  display: block;
+}
+
+.canvas-view.is-panning {
+  cursor: grabbing;
+}
+
+.canvas-view.is-space-grab {
+  cursor: grab !important;
+}
+
+.canvas-view.is-space-grabbing {
+  cursor: grabbing !important;
+}
+
+/* Caixa de seleção múltipla (Marquee Selection / Lasso) */
+.canvas-marquee-box {
+  position: absolute;
+  background: rgba(37, 99, 235, 0.12);
+  border: 1.5px solid #3B82F6;
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 10000;
+}
+
+/* Pontinhos infinitos: mesma linguagem visual do gráfico */
+.canvas-dots {
+  position: absolute;
+  inset: 0;
+  /* Ponto pequeno e de baixo contraste: a malha some quando você olha o design */
+  background-image: radial-gradient(rgba(100, 116, 139, 0.3) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: 0 0;
+  pointer-events: none;
+}
+
+.canvas-world {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+/* Controles flutuantes, acima da dock */
+.canvas-hud {
+  position: fixed;
+  bottom: 80px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: var(--z-sticky-bar);
+}
+
+.canvas-hud__group {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: #FFFFFF;
+  isolation: isolate;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 12px 28px -10px rgba(0, 0, 0, 0.22);
+}
+
+.canvas-hud__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-secondary);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.canvas-hud__btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ink-primary);
+}
+
+.canvas-hud__zoom {
+  min-width: 52px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.canvas-hud__zoom:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.canvas-hud__sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(0, 0, 0, 0.09);
+  margin: 0 3px;
+}
+
+.canvas-hint {
+  position: fixed;
+  top: 84px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--ink-muted);
+  pointer-events: none;
+  z-index: var(--z-canvas-float);
+  transition: opacity var(--transition);
+}
+
+.canvas-hint.is-hidden {
+  opacity: 0;
+}
+
+/* ------------------------------------------------------------
+   EDITOR DE POSTS: BARRA DE FERRAMENTAS NO TOPO
+   Mesmo vidro escuro da dock do rodapé, só que ancorada em cima.
+   ------------------------------------------------------------ */
+.canvas-topbar {
+  position: fixed;
+  top: 24px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+  z-index: var(--z-sticky-bar);
+}
+
+.canvas-topbar__group {
+  position: relative;
+  pointer-events: auto;
+  background: #18181B;
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.42),
+              0 2px 6px rgba(0, 0, 0, 0.15),
+              inset 0 1px 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.canvas-topbar__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #9CA3AF;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.canvas-topbar__btn:hover:not(:disabled) {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.12);
+  transform: scale(1.05);
+}
+
+.canvas-topbar__btn.active {
+  color: #000000;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.canvas-topbar__btn.active:hover {
+  color: #000000;
+  background: #FFFFFF;
+  transform: scale(1.05);
+}
+
+/* Sem frame selecionado não há o que duplicar ou apagar */
+.canvas-topbar__btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.canvas-topbar__sep {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.18);
+  margin-inline: 2px;
+}
+
+.canvas-topbar__label {
+  padding: 0 12px 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.5);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Menu de formatos: cai do botão "+", ancorado à esquerda do pill */
+.canvas-formats {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  min-width: 236px;
+  background: #18181B;
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.42),
+              inset 0 1px 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.canvas-formats.is-open {
+  display: flex;
+}
+
+.canvas-formats__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #FFFFFF;
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.canvas-formats__item:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* Miniatura na proporção real do formato, para bater o olho e reconhecer */
+.canvas-formats__ratio {
+  flex: none;
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.canvas-formats__ratio::before {
+  content: '';
+  display: block;
+  width: 100%;
+  aspect-ratio: var(--ratio);
+  border: 1.5px solid rgba(255, 255, 255, 0.55);
+  border-radius: 3px;
+}
+
+.canvas-formats__dim {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------
+   FRAME (prancheta do post)
+   Vive em coordenadas reais: 1 unidade do mundo = 1px do PNG final.
+   ------------------------------------------------------------ */
+.canvas-frame {
+  position: absolute;
+  z-index: 1;
+  background: #FFFFFF;
+  cursor: grab;
+  box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.3),
+              0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.canvas-frame.is-dragging {
+  cursor: grabbing;
+  box-shadow: 0 26px 52px -16px rgba(0, 0, 0, 0.4);
+}
+
+.canvas-frame__bg-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  overflow: hidden;
+  transition: background 0.15s ease, filter 0.15s ease;
+}
+
+.canvas-frame__bg-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  transition: background-color 0.15s ease;
+}
+
+/* Contorno e rótulo compensam o zoom (--inv = 1/escala), como no Figma:
+   a espessura na tela fica constante em qualquer nível de zoom */
+.canvas-frame.is-selected {
+  outline: calc(2px * var(--inv, 1)) solid #2563EB;
+  outline-offset: 0;
+}
+
+.canvas-frame__label {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  padding-bottom: 8px;
+  transform-origin: 0 100%;
+  transform: scale(var(--inv, 1));
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-secondary);
+  /* Halo branco para o rótulo não se perder dentro da malha de pontos */
+  text-shadow: 0 0 4px #FFFFFF, 0 0 8px #FFFFFF;
+  white-space: nowrap;
+  user-select: none;
+  pointer-events: none;
+}
+
+.canvas-frame.is-selected .canvas-frame__label {
+  color: #2563EB;
+}
+
+.canvas-frame__label b {
+  font-weight: 500;
+  color: inherit;
+}
+
+.canvas-frame__label span {
+  opacity: 0.6;
+}
+
+/* ------------------------------------------------------------
+   LIGAÇÕES ENTRE FRAMES (a cordinha do carrossel)
+   ------------------------------------------------------------ */
+/* Caixa enorme e origem deslocada (ver LINK_ORIGIN no app.js): o que transborda
+   de um SVG é desenhado, mas não recebe clique. Assim a corda fica clicável. */
+.canvas-links {
+  position: absolute;
+  left: -50000px;
+  top: -50000px;
+  width: 100000px;
+  height: 100000px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.canvas-link {
+  pointer-events: auto;
+}
+
+/* non-scaling-stroke: a espessura fica constante na tela em qualquer zoom */
+.canvas-link__line {
+  fill: none;
+  stroke: #94A3B8;
+  stroke-width: 2;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+  transition: stroke var(--transition);
+}
+
+/* Faixa larga e invisível por cima do traço: alarga a área de clique */
+.canvas-link__hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 22;
+  vector-effect: non-scaling-stroke;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.canvas-link:hover .canvas-link__line {
+  stroke: #2563EB;
+  stroke-width: 2.5;
+}
+
+.canvas-link.is-selected .canvas-link__line {
+  stroke: #2563EB;
+  stroke-width: 3;
+}
+
+/* Botão de desatar, no meio da corda */
+.canvas-link__cut {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition);
+}
+
+.canvas-link:hover .canvas-link__cut,
+.canvas-link.is-selected .canvas-link__cut {
+  opacity: 1;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+/* O grupo de fora recebe o translate pela física; o de dentro cuida da escala,
+   para o botão ter sempre o mesmo tamanho na tela */
+.canvas-link__cut-inner {
+  transform: scale(var(--inv, 1));
+}
+
+.canvas-link__cut circle {
+  fill: #FFFFFF;
+  stroke: #2563EB;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.canvas-link__cut path {
+  stroke: #2563EB;
+  stroke-width: 2;
+  stroke-linecap: round;
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.canvas-link__cut:hover circle {
+  fill: #DC2626;
+  stroke: #DC2626;
+}
+
+.canvas-link__cut:hover path {
+  stroke: #FFFFFF;
+}
+
+/* Corda em construção, enquanto o mouse ainda está arrastando */
+.canvas-link__ghost {
+  stroke: #2563EB;
+  stroke-dasharray: 7 5;
+  opacity: 0.75;
+}
+
+/* ------------------------------------------------------------
+   PORTAS DE LIGAÇÃO
+   ------------------------------------------------------------ */
+.canvas-frame__port {
+  position: absolute;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  margin: -6.5px 0 0 -6.5px;
+  border-radius: 50%;
+  background: #FFFFFF;
+  border: 2px solid #2563EB;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  /* Compensa o zoom: a bolinha tem sempre o mesmo tamanho na tela */
+  transform: scale(var(--inv, 1));
+  opacity: 0;
+  transition: opacity var(--transition);
+  z-index: 4;
+}
+
+.canvas-frame__port--out {
+  left: 100%;
+  cursor: crosshair;
+}
+
+.canvas-frame__port--in {
+  left: 0;
+  background: #E2E8F0;
+  border-color: #94A3B8;
+  pointer-events: none;
+}
+
+.canvas-frame:hover .canvas-frame__port,
+.canvas-frame.is-selected .canvas-frame__port {
+  opacity: 1;
+}
+
+.canvas-frame__port--out:hover {
+  transform: scale(calc(var(--inv, 1) * 1.35));
+}
+
+/* Frame sob o cursor enquanto a corda está sendo puxada */
+.canvas-frame.is-link-target {
+  outline: calc(3px * var(--inv, 1)) solid #2563EB;
+}
+
+/* Mesmo destaque, cor de recusa: a cadeia é um post só, então formato diferente
+   não entra na corrente */
+.canvas-frame.is-link-invalid {
+  outline: calc(3px * var(--inv, 1)) solid #EF4444;
+}
+
+/* Marca d'água do formato enquanto o frame está vazio */
+.canvas-frame__empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.13);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------
+   SNAP GUIDES & SAFE ZONES
+   ------------------------------------------------------------ */
+.canvas-frame__snap-guide {
+  position: absolute;
+  pointer-events: none;
+  z-index: 20;
+  opacity: 0;
+  transition: opacity 0.08s ease;
+}
+
+.canvas-frame__snap-guide.is-active {
+  opacity: 1;
+}
+
+.canvas-frame__snap-guide--v {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: calc(1px * var(--inv, 1));
+  background: #EC4899;
+  transform: translateX(-50%);
+}
+
+.canvas-frame__snap-guide--h {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: calc(1px * var(--inv, 1));
+  background: #EC4899;
+  transform: translateY(-50%);
+}
+
+/* Guias Magnéticas entre Frames no Canvas (Padrão Figma Smart Guides) */
+.canvas-world-guide {
+  position: absolute;
+  pointer-events: none;
+  z-index: 5000;
+  background: #EC4899;
+}
+
+.canvas-world-guide--v {
+  top: -50000px;
+  bottom: -50000px;
+  width: calc(1px * var(--inv, 1));
+  transform: translateX(-50%);
+}
+
+.canvas-world-guide--h {
+  left: -50000px;
+  right: -50000px;
+  height: calc(1px * var(--inv, 1));
+  transform: translateY(-50%);
+}
+
+/* ------------------------------------------------------------
+   SMART MEASUREMENT TOOL (FIGMA OPTION/ALT PIXEL DISTANCES)
+   ------------------------------------------------------------ */
+.canvas-measure-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 10000;
+}
+
+.canvas-measure-line {
+  position: absolute;
+  background: #EC4899;
+  pointer-events: none;
+}
+
+.canvas-measure-line--v {
+  width: calc(1px * var(--inv, 1));
+  transform: translateX(-50%);
+}
+
+.canvas-measure-line--h {
+  height: calc(1px * var(--inv, 1));
+  transform: translateY(-50%);
+}
+
+.canvas-measure-ext-line {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(236, 72, 153, 0.4);
+}
+
+.canvas-measure-ext-line--v {
+  width: calc(1px * var(--inv, 1));
+  transform: translateX(-50%);
+}
+
+.canvas-measure-ext-line--h {
+  height: calc(1px * var(--inv, 1));
+  transform: translateY(-50%);
+}
+
+.canvas-measure-badge {
+  position: absolute;
+  background: #EC4899;
+  color: #FFFFFF;
+  font-size: calc(11px * var(--inv, 1));
+  font-weight: 500;
+  font-family: var(--font-sans);
+  padding: calc(2px * var(--inv, 1)) calc(5px * var(--inv, 1));
+  border-radius: calc(3px * var(--inv, 1));
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  line-height: 1;
+  z-index: 10002;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.canvas-measure-target-box {
+  position: absolute;
+  border: calc(1px * var(--inv, 1)) solid #EC4899;
+  pointer-events: none;
+  z-index: 10001;
+}
+
+/* Safe Zone Overlay per format */
+.canvas-frame__safezone {
+  position: absolute;
+  inset: 0;
+  /* Rótulo que não cabe é aparado na borda do frame: sem isso ele escapa por
+     cima do frame vizinho e a fileira toda vira sopa de letrinhas */
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 15;
+}
+
+.canvas-view.show-guides .canvas-frame__safezone {
+  opacity: 1;
+}
+
+/* Longe demais: só a hachura e o tracejado sobrevivem — o texto viraria uma
+   etiqueta maior que o frame. Volta sozinho ao aproximar. */
+.canvas-view.is-zoomed-out .canvas-safezone__badge,
+.canvas-view.is-zoomed-out .canvas-safezone__label {
+  display: none;
+}
+
+.canvas-safezone__danger {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(239, 68, 68, 0.07),
+    rgba(239, 68, 68, 0.07) 10px,
+    rgba(239, 68, 68, 0.14) 10px,
+    rgba(239, 68, 68, 0.14) 20px
+  );
+  border-bottom: calc(1.5px * var(--inv, 1)) dashed rgba(239, 68, 68, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.canvas-safezone__danger--top {
+  top: 0;
+  border-bottom: calc(1.5px * var(--inv, 1)) dashed rgba(239, 68, 68, 0.7);
+}
+
+.canvas-safezone__danger--bottom {
+  bottom: 0;
+  border-top: calc(1.5px * var(--inv, 1)) dashed rgba(239, 68, 68, 0.7);
+  border-bottom: none;
+}
+
+.canvas-safezone__danger--right {
+  left: auto;
+  right: 0;
+  border-left: calc(1.5px * var(--inv, 1)) dashed rgba(239, 68, 68, 0.7);
+  border-bottom: none;
+  border-top: none;
+}
+
+.canvas-safezone__danger--left {
+  right: auto;
+  left: 0;
+  border-right: calc(1.5px * var(--inv, 1)) dashed rgba(239, 68, 68, 0.7);
+  border-bottom: none;
+  border-top: none;
+}
+
+.canvas-safezone__badge {
+  background: rgba(17, 24, 39, 0.88);
+  color: #F87171;
+  /* Uma linha só: a faixa é estreita, e sem isso o rótulo quebra em quatro
+     linhas e vira um bloco mais alto que a própria zona */
+  white-space: nowrap;
+  font-size: calc(11.5px * var(--inv, 1));
+  font-weight: 600;
+  padding: calc(4px * var(--inv, 1)) calc(8px * var(--inv, 1));
+  border-radius: calc(6px * var(--inv, 1));
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  backdrop-filter: blur(4px);
+  user-select: none;
+}
+
+/* Bloco solto num canto (o carimbo de duração do YouTube): não encosta em duas
+   bordas opostas, então as laterais que olham pra dentro é que ganham o tracejado */
+.canvas-safezone__danger--corner {
+  left: auto;
+  right: 0;
+  border: none;
+  border-top: calc(1.5px * var(--inv, 1)) dashed rgba(239, 68, 68, 0.7);
+  border-left: calc(1.5px * var(--inv, 1)) dashed rgba(239, 68, 68, 0.7);
+  border-top-left-radius: calc(6px * var(--inv, 1));
+}
+
+/* Badge das faixas laterais: gira o texto, mas mantém o mesmo corpo dos outros.
+   Antes vinha com font-size: 10px fixo no inline — como não passava pelo --inv
+   (que desfaz o zoom da câmera), virava um risco ilegível fora do zoom 100%. */
+.canvas-safezone__badge--v {
+  writing-mode: vertical-rl;
+  /* A faixa de margem tem 60px no espaço do frame: sem isso o badge deitado
+     fica mais alto que a faixa e vaza pra dentro da arte */
+  padding: calc(6px * var(--inv, 1)) calc(3px * var(--inv, 1));
+}
+
+.canvas-safezone__box {
+  position: absolute;
+  border: calc(1.5px * var(--inv, 1)) dashed rgba(16, 185, 129, 0.85);
+  background: rgba(16, 185, 129, 0.03);
+  border-radius: calc(8px * var(--inv, 1));
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: calc(8px * var(--inv, 1));
+}
+
+.canvas-safezone__label {
+  background: rgba(6, 78, 59, 0.88);
+  color: #34D399;
+  white-space: nowrap;
+  font-size: calc(11.5px * var(--inv, 1));
+  font-weight: 600;
+  padding: calc(4px * var(--inv, 1)) calc(10px * var(--inv, 1));
+  border-radius: calc(6px * var(--inv, 1));
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  backdrop-filter: blur(4px);
+  user-select: none;
+}
+
+/* ------------------------------------------------------------
+   SLOTS DO BATCH CREATE
+   Nó marcado como variável: continua mostrando o texto/imagem de exemplo (é ele
+   que sustenta o design) e ganha um contorno roxo com o nome da coluna.
+   ------------------------------------------------------------ */
+.canvas-text-node.has-bind,
+.canvas-image-node.has-bind {
+  outline: calc(1.5px * var(--inv, 1)) dashed rgba(139, 92, 246, 0.9);
+  outline-offset: calc(2px * var(--inv, 1));
+}
+
+.canvas-node__bind {
+  position: absolute;
+  /* Pendurado acima do nó, como o rótulo de frame do Figma */
+  bottom: 100%;
+  left: 0;
+  margin-bottom: calc(4px * var(--inv, 1));
+  background: #8B5CF6;
+  color: #fff;
+  white-space: nowrap;
+  font-size: calc(11px * var(--inv, 1));
+  font-weight: 500;
+  font-family: var(--font-sans);
+  padding: calc(2px * var(--inv, 1)) calc(6px * var(--inv, 1));
+  border-radius: calc(5px * var(--inv, 1));
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Longe demais o rótulo fica maior que o nó: mesma regra das safe zones */
+.canvas-view.is-zoomed-out .canvas-node__bind {
+  display: none;
+}
+
+/* ------------------------------------------------------------
+   TEXT NODES (DENTRO DOS FRAMES)
+   ------------------------------------------------------------ */
+.canvas-text-node {
+  position: absolute;
+  z-index: 2;
+  min-width: 20px;
+  min-height: 20px;
+  cursor: grab;
+}
+
+.canvas-text-node.is-dragging {
+  cursor: grabbing;
+}
+
+/* Em edição o bloco vira texto: cursor de escrever e seleção liberada */
+.canvas-text-node.is-editing,
+.canvas-text-node.is-editing .canvas-text-node__content {
+  cursor: text;
+}
+
+.canvas-text-node__content {
+  width: 100%;
+  height: 100%;
+  outline: none;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  /* Fora da edição o arrasto move o bloco, não pinta as letras de azul */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.canvas-text-node.is-editing .canvas-text-node__content {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* Selection ring (só aparece quando o node está focado/selecionado) */
+.canvas-text-node.is-selected {
+  outline: calc(2px * var(--inv, 1)) solid #2563EB;
+  outline-offset: 0;
+}
+
+/* Resize handles (só em estado selecionado) */
+.canvas-text-node__resize {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #FFFFFF;
+  border: 2px solid #2563EB;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(var(--inv, 1));
+  z-index: 5;
+}
+
+.canvas-text-node.is-selected .canvas-text-node__resize {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.canvas-text-node__resize--e {
+  right: -5px;
+  top: 50%;
+  margin-top: -5px;
+  cursor: ew-resize;
+}
+
+/* ------------------------------------------------------------
+   IMAGE NODES (DENTRO DOS FRAMES)
+   ------------------------------------------------------------ */
+.canvas-image-node {
+  position: absolute;
+  z-index: 2;
+  cursor: grab;
+  box-shadow: 0 0 0 0 transparent; /* base para transição suave */
+  transition: box-shadow 0.1s ease, border-radius 0.1s ease;
+  user-select: none;
+}
+
+.canvas-image-node.is-dragging {
+  cursor: grabbing;
+}
+
+.canvas-image-node__clip {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: auto;
+}
+
+.canvas-image-node__img {
+  position: absolute;
+  display: block;
+  box-sizing: border-box;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+  transition: opacity 0.1s ease, filter 0.1s ease, border-radius 0.1s ease;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.canvas-image-node.is-selected {
+  /* Box-shadow respeita o border-radius do elemento pai */
+  box-shadow: 0 0 0 calc(2px * var(--inv, 1)) #2563EB;
+}
+
+.canvas-image-node__resize {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #FFFFFF;
+  border: 2px solid #2563EB;
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(var(--inv, 1));
+  z-index: 10;
+}
+
+.canvas-image-node.is-selected:not(.is-cropping) .canvas-image-node__resize {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.canvas-image-node__resize--se {
+  right: -5px;
+  bottom: -5px;
+  cursor: nwse-resize;
+}
+
+/* ------------------------------------------------------------
+   MODO DE RECORTE DE IMAGEM (FIGMA / CANVA STYLE)
+   ------------------------------------------------------------ */
+.canvas-image-node.is-cropping {
+  cursor: move !important;
+  box-shadow: 0 0 0 calc(2px * var(--inv, 1)) #3B82F6, 0 0 24px rgba(59, 130, 246, 0.45) !important;
+  z-index: 30;
+}
+
+.canvas-image-node.is-cropping .canvas-image-node__clip {
+  box-shadow: inset 0 0 0 calc(1.5px * var(--inv, 1)) rgba(255, 255, 255, 0.95);
+  cursor: move;
+}
+
+/* Ghost Overlay: mostra a imagem completa sem corte ao redor em 38% de opacidade */
+.canvas-image-node__ghost {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+  opacity: 0.38;
+  display: none;
+  z-index: -1;
+}
+
+.canvas-image-node.is-cropping .canvas-image-node__ghost {
+  display: block;
+}
+
+.canvas-image-node__ghost-img {
+  position: absolute;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none;
+  max-width: none !important;
+  max-height: none !important;
+  filter: contrast(95%) brightness(75%);
+  outline: calc(1.5px * var(--inv, 1)) dashed rgba(255, 255, 255, 0.55);
+  border-radius: 4px;
+}
+
+/* 8 Alças de Recorte no estilo Figma */
+.canvas-crop-handle {
+  position: absolute;
+  display: none;
+  z-index: 35;
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+.canvas-image-node.is-cropping .canvas-crop-handle {
+  display: block;
+}
+
+/* Cantos L-shaped nítidos */
+.canvas-crop-handle--corner {
+  width: calc(16px * var(--inv, 1));
+  height: calc(16px * var(--inv, 1));
+  border-color: #FFFFFF;
+  border-style: solid;
+  border-width: 0;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.7));
+}
+
+.canvas-crop-handle--nw {
+  top: calc(-3px * var(--inv, 1));
+  left: calc(-3px * var(--inv, 1));
+  border-top-width: calc(3.5px * var(--inv, 1));
+  border-left-width: calc(3.5px * var(--inv, 1));
+  cursor: nwse-resize;
+}
+
+.canvas-crop-handle--ne {
+  top: calc(-3px * var(--inv, 1));
+  right: calc(-3px * var(--inv, 1));
+  border-top-width: calc(3.5px * var(--inv, 1));
+  border-right-width: calc(3.5px * var(--inv, 1));
+  cursor: nesw-resize;
+}
+
+.canvas-crop-handle--sw {
+  bottom: calc(-3px * var(--inv, 1));
+  left: calc(-3px * var(--inv, 1));
+  border-bottom-width: calc(3.5px * var(--inv, 1));
+  border-left-width: calc(3.5px * var(--inv, 1));
+  cursor: nesw-resize;
+}
+
+.canvas-crop-handle--se {
+  bottom: calc(-3px * var(--inv, 1));
+  right: calc(-3px * var(--inv, 1));
+  border-bottom-width: calc(3.5px * var(--inv, 1));
+  border-right-width: calc(3.5px * var(--inv, 1));
+  cursor: nwse-resize;
+}
+
+/* Barras laterais (Bordas) */
+.canvas-crop-handle--edge {
+  background: #FFFFFF;
+  border: 1px solid rgba(0,0,0,0.3);
+  border-radius: calc(3px * var(--inv, 1));
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.6));
+}
+
+.canvas-crop-handle--n {
+  top: calc(-3px * var(--inv, 1));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(26px * var(--inv, 1));
+  height: calc(5px * var(--inv, 1));
+  cursor: ns-resize;
+}
+
+.canvas-crop-handle--s {
+  bottom: calc(-3px * var(--inv, 1));
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(26px * var(--inv, 1));
+  height: calc(5px * var(--inv, 1));
+  cursor: ns-resize;
+}
+
+.canvas-crop-handle--w {
+  left: calc(-3px * var(--inv, 1));
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(5px * var(--inv, 1));
+  height: calc(26px * var(--inv, 1));
+  cursor: ew-resize;
+}
+
+.canvas-crop-handle--e {
+  right: calc(-3px * var(--inv, 1));
+  top: 50%;
+  transform: translateY(-50%);
+  width: calc(5px * var(--inv, 1));
+  height: calc(26px * var(--inv, 1));
+  cursor: ew-resize;
+}
+
+.canvas-crop-handle::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  z-index: 1;
+}
+
+/* Botão de Concluir com estilo primário no Crop HUD */
+.canvas-text-toolbar__btn--primary {
+  background: #2563EB !important;
+  color: #FFFFFF !important;
+  border-radius: var(--radius-pill) !important;
+  padding: 0 12px !important;
+  width: auto !important;
+  font-weight: 600 !important;
+  gap: 5px !important;
+}
+.canvas-text-toolbar__btn--primary:hover:not(:disabled) {
+  background: #1D4ED8 !important;
+  color: #FFFFFF !important;
+  transform: scale(1.04) !important;
+}
+
+/* ------------------------------------------------------------
+   TEXT TOOLBAR (HUD PARA FORMATAÇÃO DE TEXTO)
+   ------------------------------------------------------------ */
+.canvas-text-toolbar {
+  position: absolute;
+  top: -60px; /* Acima do frame/text node */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  background: #18181B;
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-pill);
+  /* 6px nas laterais: a folga da borda tem que bater com o círculo do botão */
+  padding: 4px 6px;
+  color: #9CA3AF;
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.42),
+              0 2px 6px rgba(0, 0, 0, 0.15),
+              inset 0 1px 1px 0 rgba(255, 255, 255, 0.16);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: var(--z-canvas-float);
+}
+
+/* Com duas linhas o pill viraria uma cápsula deformada: vira squircle */
+.canvas-text-toolbar:has(.canvas-text-toolbar__row--adv.is-open) {
+  border-radius: 26px;
+}
+
+.canvas-text-toolbar.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Linha 1 sempre visível; linha 2 (espaçamento e caixa) só quando pedida */
+.canvas-text-toolbar__row {
+  display: flex;
+  align-items: center;
+  /* Centralizada: as duas linhas têm larguras diferentes e a menor ficaria
+     encostada na esquerda, com um vão morto do outro lado */
+  justify-content: center;
+  gap: 4px;
+  color: #9CA3AF;
+}
+
+.canvas-text-toolbar__row--adv {
+  display: none;
+  /* Tudo que saiu da linha 1 cabe aqui: quebra em quantas linhas precisar em
+     vez de esticar a barra pela tela toda */
+  flex-wrap: wrap;
+  max-width: 560px;
+  row-gap: 6px;
+  /* A linha divisória recua das laterais para não bater na borda curva */
+  margin: 2px 8px 0;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: #9CA3AF;
+}
+
+.canvas-text-toolbar__row--adv.is-open {
+  display: flex;
+}
+
+/* Linha que quebra: o traço divisório sobraria pendurado no fim de uma linha,
+   então quem separa os grupos aqui é o próprio vão. */
+.canvas-text-toolbar__row--wrap {
+  column-gap: 12px;
+}
+
+.canvas-text-toolbar__row--wrap > .canvas-text-toolbar__sep {
+  display: none;
+}
+
+/* Grupo indivisível: mantém os irmãos juntos quando a linha quebra */
+.canvas-text-toolbar__group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.canvas-text-toolbar__field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* Simétrico: com folga só de um lado o número encostava no vizinho */
+  padding-inline: 2px;
+  color: #9CA3AF;
+}
+
+.canvas-text-toolbar__field > i,
+.canvas-text-toolbar__field > svg {
+  color: #9CA3AF;
+  stroke: #9CA3AF;
+  user-select: none;
+  transition: color var(--transition), stroke var(--transition);
+}
+
+.canvas-text-toolbar__field:hover > i,
+.canvas-text-toolbar__field:hover > svg {
+  color: #FFFFFF;
+  stroke: #FFFFFF;
+}
+
+.canvas-text-toolbar__select {
+  /* Sem a seta do sistema: o chevron é desenhado aqui para bater com o resto */
+  appearance: none;
+  -webkit-appearance: none;
+  background-color: rgba(255, 255, 255, 0.08);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23D1D5DB' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  background-size: 13px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  height: 32px;
+  padding: 0 28px 0 12px;
+  font-size: 12.5px;
+  font-family: inherit;
+  max-width: 152px;
+  outline: none;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.canvas-text-toolbar__select:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* O menu nativo abre com fundo do sistema: força texto legível nas opções */
+.canvas-text-toolbar__select option {
+  background: #16171C;
+  color: #fff;
+}
+
+.canvas-text-toolbar__select--sm {
+  max-width: 108px;
+}
+
+.canvas-text-toolbar__select:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.canvas-text-toolbar__input {
+  /* Spinner nativo fora: quem mexe no número são os botões − e + */
+  appearance: textfield;
+  -webkit-appearance: textfield;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  height: 32px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-family: inherit;
+  width: 66px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  transition: all var(--transition);
+}
+
+.canvas-text-toolbar__input::-webkit-outer-spin-button,
+.canvas-text-toolbar__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.canvas-text-toolbar__input:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Arrastar de lado muda o valor; clicar entra no modo digitação */
+.canvas-text-toolbar__input,
+.canvas-text-toolbar__field > i,
+.canvas-text-toolbar__field > svg {
+  cursor: ew-resize;
+}
+
+.canvas-text-toolbar__field > i,
+.canvas-text-toolbar__field > svg {
+  user-select: none;
+}
+
+.canvas-text-toolbar__input:focus {
+  cursor: text;
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* Mesmo botão da dock: círculo de 36, cinza que acende no hover */
+.canvas-text-toolbar__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #9CA3AF;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.canvas-text-toolbar__btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+  transform: scale(1.05);
+}
+
+/* Ativo é o inverso do dock: pastilha branca, ícone preto */
+.canvas-text-toolbar__btn.is-active {
+  background: rgba(255, 255, 255, 0.95);
+  color: #000000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.canvas-text-toolbar__btn.is-active:hover:not(:disabled) {
+  background: #FFFFFF;
+  color: #000000;
+}
+
+.canvas-text-toolbar__btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* B / I / U e Aa / AA / aa: a própria letra é o ícone */
+.canvas-text-toolbar__btn--type {
+  font-size: 14px;
+  line-height: 1;
+  font-family: inherit;
+}
+
+/* − e + do tamanho: o campo fica entre os dois, encostado */
+.canvas-text-toolbar__btn--step {
+  width: 28px;
+  height: 28px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* A cor precisa parecer uma amostra, não um controle de formulário */
+.canvas-text-toolbar__color {
+  display: flex;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: transform var(--transition);
+}
+
+.canvas-text-toolbar__color:hover {
+  transform: scale(1.06);
+}
+
+.canvas-text-toolbar__color input[type="color"] {
+  width: 200%;
+  height: 200%;
+  margin: -25%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Apagar é a única ação destrutiva da barra: vermelho só no hover */
+.canvas-text-toolbar__btn--danger:hover {
+  background: rgba(239, 68, 68, 0.22);
+  color: #FCA5A5;
+}
+
+/* O separador só separa se o vão ao redor dele for maior que o vão de dentro
+   do grupo: 4px entre irmãos, 9px em volta do traço. */
+.canvas-text-toolbar__sep {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.18);
+  margin-inline: 5px;
+  flex: none;
+}
+
+.canvas-text-toolbar__select--preset {
+  max-width: 116px;
+  font-weight: 500;
+  color: #F3F4F6;
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.canvas-text-toolbar__btn--sm {
+  width: 20px;
+  height: 20px;
+  font-size: 14px;
+  color: #9CA3AF;
+  padding: 0;
+  margin-left: 2px;
+  border-radius: 50%;
+}
+.canvas-text-toolbar__btn--sm:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+/* Suporte de exibição a fundo de marca-texto com padding e quebra elegante */
+.canvas-text-node__content span[data-run="1"],
+.canvas-text-node__content {
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  transition: background-color 0.1s ease, color 0.1s ease, text-shadow 0.1s ease;
+}
+
+/* ------------------------------------------------------------
+   BATCH CREATE MODAL (OFFICIAL OPENPANEL / OA-DESIGN MODAL)
+   ------------------------------------------------------------ */
+.canvas-batch-modal-oa {
+  max-width: 480px;
+  height: 520px; /* Proporção e squircle idênticos ao modal padrão */
+}
+
+.canvas-batch-body-oa {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 12px;
+  padding-right: 2px;
+}
+
+.canvas-batch-section-oa {
+  display: flex;
+  flex-direction: column;
+}
+
+.canvas-batch-title-oa {
+  font-size: 11.5px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #9CA3AF;
+  margin-bottom: 6px;
+}
+
+.canvas-batch-opt-oa {
+  text-transform: none;
+  font-weight: 400;
+  color: #9CA3AF;
+}
+
+/* Dropzones Padronizados (Mesma Forma, Borda, Padding e Geometria) */
+.canvas-batch-dropzone-oa {
+  background: #F9FAFB;
+  border: 1px dashed #E5E7EB;
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all var(--transition);
+  text-align: left;
+}
+
+.canvas-batch-dropzone-oa:hover,
+.canvas-batch-dropzone-oa.is-dragover {
+  background: #F4F4F5;
+  border-color: #CBD5E1;
+}
+
+.canvas-batch-dropzone-oa.has-file {
+  background: #F0FDF4;
+  border-style: solid;
+  border-color: #86EFAC;
+}
+
+.canvas-batch-dropzone-label-oa {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: #6B7280;
+  line-height: 1.35;
+  font-family: inherit;
+  flex: 1;
+  min-width: 0;
+}
+
+.canvas-batch-dropzone-label-oa strong {
+  color: #111827;
+  font-weight: 500;
+}
+
+.canvas-batch-images-tag-oa {
+  margin-left: auto;
+  font-size: 11px;
+  color: #7C3AED;
+  font-weight: 500;
+  background: #EDE9FE;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+/* Lista de Mapeamentos */
+.canvas-batch-list-oa {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.canvas-batch-empty-oa {
+  font-size: 12.5px;
+  font-weight: 400;
+  color: #9CA3AF;
+  padding: 12px;
+  background: #F9FAFB;
+  border-radius: 12px;
+  text-align: center;
+  font-family: inherit;
+}
+
+.canvas-batch-empty-oa code {
+  background: #E5E7EB;
+  color: #374151;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.canvas-batch-mapping-row-oa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: #F9FAFB;
+  border: 1px solid #F3F4F6;
+  border-radius: 12px;
+}
+
+.canvas-batch-mapping-target-oa {
+  font-family: inherit;
+  font-size: 13px;
+  color: #111827;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.canvas-batch-mapping-select-oa {
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  color: #374151;
+  font-size: 12.5px;
+  font-family: inherit;
+  font-weight: 400;
+  padding: 5px 10px;
+  border-radius: 8px;
+  outline: none;
+  transition: all var(--transition);
+  max-width: 180px;
+}
+
+.canvas-batch-mapping-select-oa:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* Botões do Rodapé Padronizados (Mesma Altura 32px e Raio 10px) */
+.openpanel-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  background: #F3F4F6;
+  border: none;
+  color: #374151;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.openpanel-btn-secondary:hover {
+  background: #E5E7EB;
+  color: #111827;
+}
+
+.openpanel-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  border-radius: 10px;
+  padding: 0 16px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  background: #111827;
+  color: #FFFFFF;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.openpanel-btn-primary:hover:not(:disabled) {
+  background: #000000;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.openpanel-btn-primary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.canvas-export-controls-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 8px;
+}
+
+.canvas-batch-progress-box {
+  background: #F9FAFB;
+  border: 1px solid #F3F4F6;
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.canvas-batch-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.canvas-batch-progress-track {
+  width: 100%;
+  height: 6px;
+  background: #E5E7EB;
+  border-radius: 9999px;
+  overflow: hidden;
+}
+
+.canvas-batch-progress-fill {
+  height: 100%;
+  background: #111827;
+  border-radius: 9999px;
+  transition: width 0.15s ease-out;
+}
+
+
+

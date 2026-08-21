@@ -1,0 +1,12 @@
+{
+  "name": "analytics-onboard",
+  "version": "1.0.0",
+  "description": "Minimalist High-Craft Analytics Hub for Apps & Onboarding",
+  "scripts": {
+    "dev": "npx serve -l 3000 .",
+    "start": "npx serve -l 3000 ."
+  },
+  "keywords": ["analytics", "onboarding", "minimalist", "supabase", "dashboard"],
+  "author": "André Felipe",
+  "license": "MIT"
+}

@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Open Analytics — Oração Diária</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="128x128" href="icons/logo.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Fontes do editor de carrossel: cada família aqui aparece no seletor do texto -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,300..800;1,300..800&family=Inter:ital,wght@0,300..800;1,300..800&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300;1,400;1,500;1,600;1,700;1,800&family=Space+Grotesk:wght@300..700&family=Bebas+Neue&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=DM+Serif+Display:ital@0;1&family=Lora:ital,wght@0,400..700;1,400..700&family=Caveat:wght@400..700&family=JetBrains+Mono:ital,wght@0,300..700;1,300..700&display=swap">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+
+  <!-- --------------------------------------------------
+       BARRA SUPERIOR (SELETOR APP VS SITE EM PT-BR)
+       -------------------------------------------------- -->
+  <div class="navbar-wrapper">
+    <header class="navbar">
+      <div class="navbar__left">
+        <a href="#" class="brand-logo-btn" title="Open Analytics">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+            <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="4"/>
+            <circle cx="12" cy="12" r="3" fill="currentColor"/>
+          </svg>
+        </a>
+        <span class="brand-sep">/</span>
+
+        <!-- Chip de Seleção de App vs Site -->
+        <div class="brand-chip" id="app-selector-btn">
+          <span class="chip-icon" id="header-chip-icon">📱</span>
+          <span id="selected-app-label">Oração Diária (App)</span>
+          <i data-lucide="chevrons-up-down" style="width: 14px; height: 14px; color: #9CA3AF;"></i>
+        </div>
+
+        <!-- Dropdown Popover de Projetos -->
+        <div class="project-dropdown" id="project-dropdown">
+          <div class="dropdown-header">Alternar Origem</div>
+          
+          <div class="project-option selected" id="opt-app" data-mode="app">
+            <div class="project-option__left">
+              <span class="project-option__icon">📱</span>
+              <div>
+                <div class="project-option__title">Oração Diária</div>
+                <div class="project-option__sub">App iOS & Onboarding</div>
+              </div>
+            </div>
+            <span class="project-option__badge">iOS</span>
+          </div>
+
+          <div class="project-option" id="opt-site" data-mode="site">
+            <div class="project-option__left">
+              <span class="project-option__icon">🌐</span>
+              <div>
+                <div class="project-option__title">oracaodiaria.space</div>
+                <div class="project-option__sub">Site & Lista de Espera</div>
+              </div>
+            </div>
+            <span class="project-option__badge" style="background: #ECFDF5; color: #047857;">Web</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="navbar__right">
+        <div class="avatar" title="André">
+          <span>🦁</span>
+        </div>
+      </div>
+    </header>
+  </div>
+
+  <main class="app-container">
+    <!-- --------------------------------------------------
+         TÍTULO DA PÁGINA & SELETOR DE DATA
+         -------------------------------------------------- -->
+    <div class="page-header">
+      <div class="page-title-group">
+        <h1 class="page-title" id="page-title">Visão Geral</h1>
+        <span class="scope-badge" id="scope-badge">
+          <i data-lucide="smartphone" style="width: 13px; height: 13px;"></i>
+          <span id="scope-badge-text">App iOS</span>
+        </span>
+      </div>
+
+      <!-- Seletor de Período com Dropdown -->
+      <div class="date-selector-wrapper">
+        <button class="date-pill" id="date-range-btn">
+          <span id="date-range-label">Hoje</span>
+          <i data-lucide="chevron-down" style="width: 14px; height: 14px; color: #6B7280;"></i>
+        </button>
+
+        <div class="date-dropdown" id="date-dropdown">
+          <div class="date-option selected" data-period="today">Hoje (Tempo Real)</div>
+          <div class="date-option" data-period="7d">Últimos 7 dias</div>
+          <div class="date-option" data-period="30d">Últimos 30 dias</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- --------------------------------------------------
+         FILEIRA DE 5 CARDS DE KPI (RENDERIZADOS PELO SUPABASE)
+         -------------------------------------------------- -->
+    <!-- --------------------------------------------------
+         KPI STAT CARDS (EXATO OPENPANEL NESTED SQUIRCLE)
+         -------------------------------------------------- -->
+    <section class="stats-grid">
+      <!-- 1. Visitantes Únicos (Ativo por padrão) -->
+      <div class="nested-stat-card active-kpi-card" id="kpi-card-1" data-kpi="visitors" title="Clique para ver no gráfico">
+        <div class="stat-header">
+          <span id="kpi-label-1">Visitantes (Inícios)</span>
+          <span class="info-icon" id="kpi-info-1" title="Usuários únicos que iniciaram o app/site">ⓘ</span>
+        </div>
+        <div class="stat-inner-box">
+          <div class="stat-value" id="kpi-val-1">--</div>
+        </div>
+      </div>
+
+      <!-- 2. Telas / Pageviews -->
+      <div class="nested-stat-card" id="kpi-card-2" data-kpi="pageviews" title="Clique para ver no gráfico">
+        <div class="stat-header">
+          <span id="kpi-label-2">Telas Vistas</span>
+          <span class="info-icon" id="kpi-info-2" title="Total de visualizações de telas/páginas">ⓘ</span>
+        </div>
+        <div class="stat-inner-box">
+          <div class="stat-value" id="kpi-val-2">--</div>
+        </div>
+      </div>
+
+      <!-- 3. Taxa de Abandono / Rejeição -->
+      <div class="nested-stat-card" id="kpi-card-3" data-kpi="bounce" title="Clique para ver no gráfico">
+        <div class="stat-header">
+          <span id="kpi-label-3">Taxa de Abandono</span>
+          <span class="info-icon" id="kpi-info-3" title="Taxa calculada de rejeição / abandono">ⓘ</span>
+        </div>
+        <div class="stat-inner-box">
+          <div class="stat-value" id="kpi-val-3">--</div>
+        </div>
+      </div>
+
+      <!-- 4. Tempo Médio -->
+      <div class="nested-stat-card" id="kpi-card-4" data-kpi="duration" title="Clique para ver no gráfico">
+        <div class="stat-header">
+          <span id="kpi-label-4">Tempo Médio</span>
+          <span class="info-icon" id="kpi-info-4" title="Tempo médio real gasto por sessão">ⓘ</span>
+        </div>
+        <div class="stat-inner-box">
+          <div class="stat-value" id="kpi-val-4">--</div>
+        </div>
+      </div>
+
+      <!-- 5. Compras / Waitlist -->
+      <div class="nested-stat-card" id="kpi-card-5" data-kpi="conversions" title="Clique para ver no gráfico">
+        <div class="stat-header">
+          <span id="kpi-label-5">Assinaturas</span>
+          <span class="info-icon" id="kpi-info-5" title="Conversões reais registradas">ⓘ</span>
+        </div>
+        <div class="stat-inner-box">
+          <div class="stat-value" id="kpi-val-5" style="color: #2563EB;">--</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------
+         GRÁFICO PRINCIPAL COM MATRIZ DE PONTOS & EDGE FADE
+         -------------------------------------------------- -->
+    <section class="nested-chart-card">
+      <div class="chart-inner-box">
+        <!-- Máscara de Desvanecimento nas Bordas (Topo, Laterais e Fundo Suaves) -->
+        <div class="chart-grid-overlay"></div>
+
+        <div class="chart-stage" id="chart-stage">
+          <!-- Tooltip escuro flutuante em PT-BR -->
+          <div class="chart-tooltip" id="chart-tooltip" style="opacity: 0;">
+            <div class="tooltip-time" id="tooltip-time">Hoje</div>
+            <div class="tooltip-row">
+              <div>
+                <span class="tooltip-indicator secondary"></span>
+                <span class="tooltip-label" id="tooltip-sec-label">telas vistas</span>
+              </div>
+              <span class="tooltip-value" id="tooltip-val-pageviews">0</span>
+            </div>
+            <div class="tooltip-row">
+              <div>
+                <span class="tooltip-indicator primary"></span>
+                <span class="tooltip-label" id="tooltip-pri-label">visitantes</span>
+              </div>
+              <span class="tooltip-value" id="tooltip-val-visitors">0</span>
+            </div>
+          </div>
+
+          <!-- Pill preta ativa no fundo do eixo que acompanha o cursor (Estilo OpenPanel) -->
+          <div class="chart-bottom-pill" id="chart-bottom-pill" style="opacity: 0;">
+            <span id="bottom-pill-text">Hoje, 15:00</span>
+          </div>
+
+          <!-- SVG Gráfico com Curvas Base Atenuadas + Spotlight Ativo ao Redor da Bolinha -->
+          <svg class="chart-svg" id="chart-svg" viewBox="0 0 1000 300" preserveAspectRatio="none">
+            <defs>
+              <!-- Gradiente da Área Azul -->
+              <linearGradient id="chart-area-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#2563EB" stop-opacity="0.16"/>
+                <stop offset="100%" stop-color="#2563EB" stop-opacity="0.0"/>
+              </linearGradient>
+
+              <!-- Máscara de Spotlight Dinâmica com Degradê Suave e Difuso -->
+              <mask id="chart-spotlight-mask">
+                <linearGradient id="spotlight-grad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1000" y2="0">
+                  <stop id="spot-s1" offset="0%" stop-color="black"/>
+                  <stop id="spot-s2" offset="30%" stop-color="black"/>
+                  <stop id="spot-s3" offset="45%" stop-color="white"/>
+                  <stop id="spot-s4" offset="55%" stop-color="white"/>
+                  <stop id="spot-s5" offset="70%" stop-color="black"/>
+                  <stop id="spot-s6" offset="100%" stop-color="black"/>
+                </linearGradient>
+                <rect x="0" y="0" width="1000" height="300" fill="url(#spotlight-grad)"/>
+              </mask>
+            </defs>
+
+            <!-- 1. Camada Base: Curvas com Opacidade Normal no Repouso / Atenuadas no Hover -->
+            <path class="chart-area-primary base-curve" id="chart-area-pri" d="" fill="url(#chart-area-grad)"></path>
+            <path class="chart-line-secondary base-curve" id="chart-path-sec" d=""></path>
+            <path class="chart-line-primary base-curve" id="chart-path-pri" d=""></path>
+
+            <!-- 2. Camada Destaque: Iluminada com 100% de Opacidade no Raio da Bolinha -->
+            <g mask="url(#chart-spotlight-mask)" id="chart-spotlight-group">
+              <path class="chart-area-primary highlight-curve" id="chart-area-pri-hi" d="" fill="url(#chart-area-grad)"></path>
+              <path class="chart-line-secondary highlight-curve" id="chart-path-sec-hi" d=""></path>
+              <path class="chart-line-primary highlight-curve" id="chart-path-pri-hi" d=""></path>
+            </g>
+
+            <!-- 3. Linha Guia e Pontos Indicadores -->
+            <line class="chart-guide" id="chart-guide" x1="0" y1="0" x2="0" y2="300" style="opacity: 0;"></line>
+            <circle class="chart-point-secondary" id="chart-pt-sec" cx="0" cy="0" style="opacity: 0;"></circle>
+            <circle class="chart-point-primary" id="chart-pt-pri" cx="0" cy="0" style="opacity: 0;"></circle>
+          </svg>
+        </div>
+
+        <!-- Eixo X Dinâmico com Labels Espaçadas -->
+        <div class="chart-axis" id="chart-axis">
+          <!-- Gerado dinamicamente via JS -->
+        </div>
+      </div>
+    </section>
+
+    <!-- --------------------------------------------------
+         GRID DE 6 CARDS DEDICADOS (EXATO OPENPANEL)
+         -------------------------------------------------- -->
+    <section class="breakdown-grid">
+      <!-- 1. Card: Funil / E-mails -->
+      <div class="nested-breakdown-card" id="card-breakdown-1">
+        <div class="breakdown-header">
+          <div class="breakdown-title">
+            <i data-lucide="git-commit" id="card-1-icon" style="width: 14px; height: 14px; color: #6B7280;"></i>
+            <span id="breakdown-card-1-title">Passos do Onboarding</span>
+          </div>
+          <button class="see-all-link" id="btn-expand-1">
+            <span>Ver todos</span>
+            <i data-lucide="chevron-right" style="width: 12px; height: 12px;"></i>
+          </button>
+        </div>
+        <div class="breakdown-inner-box">
+          <ul class="data-list" id="funnel-list">
+            <!-- Renderizado dinamicamente via app.js -->
+          </ul>
+        </div>
+      </div>
+
+      <!-- 2. Card: Origens de Tráfego -->
+      <div class="nested-breakdown-card" id="card-breakdown-2">
+        <div class="breakdown-header">
+          <div class="breakdown-title">
+            <i data-lucide="share-2" style="width: 14px; height: 14px; color: #6B7280;"></i>
+            <span id="breakdown-card-2-title">Origens & Canais</span>
+          </div>
+          <button class="see-all-link" id="btn-expand-2">
+            <span>Ver todos</span>
+            <i data-lucide="chevron-right" style="width: 12px; height: 12px;"></i>
+          </button>
+        </div>
+        <div class="breakdown-inner-box">
+          <ul class="data-list" id="referrers-list">
+            <!-- Renderizado dinamicamente via app.js -->
+          </ul>
+        </div>
+      </div>
+
+      <!-- 3. Card: Localização & Países -->
+      <div class="nested-breakdown-card" id="card-breakdown-3">
+        <div class="breakdown-header">
+          <div class="breakdown-title">
+            <i data-lucide="map-pin" style="width: 14px; height: 14px; color: #6B7280;"></i>
+            <span id="breakdown-card-3-title">Localização & Países</span>
+          </div>
+          <button class="see-all-link" id="btn-expand-3">
+            <span>Ver todos</span>
+            <i data-lucide="chevron-right" style="width: 12px; height: 12px;"></i>
+          </button>
+        </div>
+        <div class="breakdown-inner-box">
+          <ul class="data-list" id="geo-list">
+            <!-- Renderizado dinamicamente via app.js -->
+          </ul>
+        </div>
+      </div>
+
+      <!-- 4. Card: Dispositivos & Modelos -->
+      <div class="nested-breakdown-card" id="card-breakdown-4">
+        <div class="breakdown-header">
+          <div class="breakdown-title">
+            <i data-lucide="smartphone" style="width: 14px; height: 14px; color: #6B7280;"></i>
+            <span id="breakdown-card-4-title">Dispositivos</span>
+          </div>
+          <button class="see-all-link" id="btn-expand-4">
+            <span>Ver todos</span>
+            <i data-lucide="chevron-right" style="width: 12px; height: 12px;"></i>
+          </button>
+        </div>
+        <div class="breakdown-inner-box">
+          <ul class="data-list" id="devices-list">
+            <!-- Renderizado dinamicamente via app.js -->
+          </ul>
+        </div>
+      </div>
+
+      <!-- 5. Card: Navegadores & Sistemas -->
+      <div class="nested-breakdown-card" id="card-breakdown-5">
+        <div class="breakdown-header">
+          <div class="breakdown-title">
+            <i data-lucide="compass" style="width: 14px; height: 14px; color: #6B7280;"></i>
+            <span id="breakdown-card-5-title">Navegadores & SO</span>
+          </div>
+          <button class="see-all-link" id="btn-expand-5">
+            <span>Ver todos</span>
+            <i data-lucide="chevron-right" style="width: 12px; height: 12px;"></i>
+          </button>
+        </div>
+        <div class="breakdown-inner-box">
+          <ul class="data-list" id="browsers-list">
+            <!-- Renderizado dinamicamente via app.js -->
+          </ul>
+        </div>
+      </div>
+
+      <!-- 6. Card: Monetização & Conversão / E-mails -->
+      <div class="nested-breakdown-card" id="card-breakdown-6">
+        <div class="breakdown-header">
+          <div class="breakdown-title">
+            <i data-lucide="circle-dollar-sign" id="card-6-icon" style="width: 14px; height: 14px; color: #6B7280;"></i>
+            <span id="breakdown-card-6-title">Monetização & Conversão</span>
+          </div>
+          <button class="see-all-link" id="btn-expand-6">
+            <span>Ver todos</span>
+            <i data-lucide="chevron-right" style="width: 12px; height: 12px;"></i>
+          </button>
+        </div>
+        <div class="breakdown-inner-box" id="breakdown-card-6-content">
+          <!-- Renderizado dinamicamente via app.js -->
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- --------------------------------------------------
+       EXATO MODAL OPENPANEL (SEM BLUR PESADO, SQUIRCLE PURO)
+       -------------------------------------------------- -->
+  <div class="modal-overlay" id="generic-modal-overlay">
+    <div class="openpanel-modal">
+      <div class="openpanel-modal__header">
+        <div>
+          <h2 class="openpanel-modal__title" id="modal-title">E-mails Cadastrados</h2>
+          <div class="openpanel-modal__sub" id="modal-sub">Onde seus visitantes estão · Hoje</div>
+        </div>
+        <button class="openpanel-close-btn" id="modal-close-btn" title="Fechar (Esc)">
+          <i data-lucide="x" style="width: 14px; height: 14px;"></i>
+        </button>
+      </div>
+
+      <div class="openpanel-search-box">
+        <i data-lucide="search" class="openpanel-search-icon"></i>
+        <input type="text" id="modal-search-input" class="openpanel-search-input" placeholder="Pesquisar..." />
+      </div>
+
+      <ul class="openpanel-list" id="modal-list">
+        <!-- Renderizado dinamicamente via app.js -->
+      </ul>
+
+      <div class="openpanel-modal__footer" id="modal-footer-container">
+        <div style="display: flex; gap: 6px; align-items: center; margin-inline: auto;">
+          <button class="openpanel-page-btn" id="btn-prev-page">Anterior</button>
+          <span style="font-weight: 600; font-size: 12px; padding: 0 6px; color: #4B5563;" id="current-page-label">1 / 2</span>
+          <button class="openpanel-page-btn" id="btn-next-page">Próximo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------------
+       MODAL DE CRIAÇÃO EM LOTE (OPENPANEL / OA-DESIGN MODAL)
+       -------------------------------------------------- -->
+  <div class="modal-overlay" id="canvas-batch-modal">
+    <div class="openpanel-modal canvas-batch-modal-oa">
+      <div class="openpanel-modal__header">
+        <div>
+          <h2 class="openpanel-modal__title">Criar em Lote</h2>
+          <div class="openpanel-modal__sub">Conecte uma planilha para gerar variações do post</div>
+        </div>
+        <button class="openpanel-close-btn" id="canvas-batch-close" title="Fechar (Esc)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="canvas-batch-body-oa">
+        <!-- Dropzone 1: Arquivo CSV -->
+        <div class="canvas-batch-section-oa">
+          <div class="canvas-batch-title-oa">Arquivo de Dados</div>
+          <div class="canvas-batch-dropzone-oa" id="canvas-batch-dropzone">
+            <input type="file" id="canvas-batch-csv-input" accept=".csv,text/csv" style="display: none;">
+            <i data-lucide="file-spreadsheet" style="width: 18px; height: 18px; color: #6B7280; flex-shrink: 0;"></i>
+            <div class="canvas-batch-dropzone-label-oa" id="canvas-batch-dropzone-label">
+              <span>Arraste seu arquivo .csv ou clique aqui</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mapeamento de Variáveis -->
+        <div class="canvas-batch-section-oa">
+          <div class="canvas-batch-title-oa">Mapear Colunas</div>
+          <div class="canvas-batch-list-oa" id="canvas-batch-mappings-list">
+            <div class="canvas-batch-empty-oa">Suba um CSV para conectar às variáveis do post.</div>
+          </div>
+        </div>
+
+        <!-- Dropzone 2: Fotos Locais -->
+        <div class="canvas-batch-section-oa">
+          <div class="canvas-batch-title-oa">Fotos Locais <span class="canvas-batch-opt-oa">(opcional)</span></div>
+          <div class="canvas-batch-dropzone-oa" id="canvas-batch-images-dropzone">
+            <input type="file" id="canvas-batch-images-input" accept="image/*" multiple style="display: none;">
+            <i data-lucide="image" style="width: 18px; height: 18px; color: #6B7280; flex-shrink: 0;"></i>
+            <div class="canvas-batch-dropzone-label-oa" id="canvas-batch-images-label">
+              <span>Arraste as fotos locais ou clique para selecionar</span>
+            </div>
+            <span class="canvas-batch-images-tag-oa" id="canvas-batch-images-count" style="display: none;">0 fotos</span>
+          </div>
+        </div>
+
+        <!-- Opções de Exportação (Canva Style) -->
+        <div class="canvas-batch-section-oa">
+          <div class="canvas-batch-title-oa">Qualidade & Formato de Exportação</div>
+          <div class="canvas-export-controls-grid">
+            <select class="canvas-batch-mapping-select-oa" id="canvas-batch-scale" style="max-width: 100%;">
+              <option value="1">1x · 1080p (Padrão Feed)</option>
+              <option value="2" selected>2x · 2K Retina (Ultra Nítido)</option>
+              <option value="4">4x · 4K Ultra HD (Máxima Qualidade)</option>
+            </select>
+            <select class="canvas-batch-mapping-select-oa" id="canvas-batch-format" style="max-width: 100%;">
+              <option value="png" selected>PNG (Sem perdas)</option>
+              <option value="jpeg">JPG (Compacto)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Barra de Progresso Durante Exportação -->
+        <div class="canvas-batch-progress-box" id="canvas-batch-progress" style="display: none;">
+          <div class="canvas-batch-progress-header">
+            <span id="canvas-batch-progress-text">Gerando 1 de 20 posts...</span>
+            <span id="canvas-batch-progress-pct">5%</span>
+          </div>
+          <div class="canvas-batch-progress-track">
+            <div class="canvas-batch-progress-fill" id="canvas-batch-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rodapé -->
+      <div class="openpanel-modal__footer">
+        <button class="openpanel-btn-secondary" id="canvas-batch-cancel">Cancelar</button>
+        <button class="openpanel-btn-primary" id="canvas-batch-start-btn" disabled>
+          <span id="canvas-batch-start-label">Gerar Posts</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------------
+       MODAL DE EXPORTAÇÃO INDIVIDUAL / CARROSSEL (CANVA STYLE)
+       -------------------------------------------------- -->
+  <div class="modal-overlay" id="canvas-export-modal">
+    <div class="openpanel-modal canvas-batch-modal-oa" style="height: auto; max-height: 480px;">
+      <div class="openpanel-modal__header">
+        <div>
+          <h2 class="openpanel-modal__title">Exportar Design</h2>
+          <div class="openpanel-modal__sub">Baixe seu post ou carrossel em alta resolução</div>
+        </div>
+        <button class="openpanel-close-btn" id="canvas-export-close" title="Fechar (Esc)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="canvas-batch-body-oa" style="margin-bottom: 0;">
+        <!-- Tipo de Arquivo / Formato -->
+        <div class="canvas-batch-section-oa">
+          <div class="canvas-batch-title-oa">Tipo de Arquivo</div>
+          <select class="canvas-batch-mapping-select-oa" id="canvas-export-format" style="max-width: 100%;">
+            <option value="png" selected>PNG · Imagem de alta fidelidade sem perdas</option>
+            <option value="jpeg">JPG · Arquivo leve e compacto para web</option>
+          </select>
+        </div>
+
+        <!-- Tamanho / Resolução -->
+        <div class="canvas-batch-section-oa">
+          <div class="canvas-batch-title-oa">Tamanho / Resolução</div>
+          <select class="canvas-batch-mapping-select-oa" id="canvas-export-scale" style="max-width: 100%;">
+            <option value="1">1x · 1080p (Padrão Instagram)</option>
+            <option value="2" selected>2x · 2K Retina (Recomendado para Feed & Ads)</option>
+            <option value="4">4x · 4K Ultra HD (Máxima Resolução)</option>
+          </select>
+        </div>
+
+        <!-- Páginas / Frames a Exportar -->
+        <div class="canvas-batch-section-oa">
+          <div class="canvas-batch-title-oa">Frames a Exportar</div>
+          <select class="canvas-batch-mapping-select-oa" id="canvas-export-scope" style="max-width: 100%;">
+            <option value="current" selected>Apenas o frame selecionado</option>
+            <option value="all">Todos os frames do carrossel (.ZIP)</option>
+          </select>
+        </div>
+
+        <!-- Progresso de Download -->
+        <div class="canvas-batch-progress-box" id="canvas-export-progress" style="display: none;">
+          <div class="canvas-batch-progress-header">
+            <span id="canvas-export-progress-text">Exportando imagem...</span>
+            <span id="canvas-export-progress-pct">0%</span>
+          </div>
+          <div class="canvas-batch-progress-track">
+            <div class="canvas-batch-progress-fill" id="canvas-export-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Rodapé -->
+      <div class="openpanel-modal__footer">
+        <button class="openpanel-btn-secondary" id="canvas-export-cancel">Cancelar</button>
+        <button class="openpanel-btn-primary" id="canvas-export-submit-btn">
+          <span id="canvas-export-submit-label">Baixar</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------------
+       CANVAS INFINITO (PAN + ZOOM, FUNDO PONTILHADO)
+       -------------------------------------------------- -->
+  <div class="canvas-view" id="canvas-view">
+    <div class="canvas-dots" id="canvas-dots"></div>
+
+    <!-- Camada que recebe o transform: tudo aqui dentro vive no espaço infinito -->
+    <div class="canvas-world" id="canvas-world"></div>
+
+    <!-- Barra do editor: mesmo pill da dock, ancorado no topo -->
+    <div class="canvas-topbar">
+      <div class="canvas-topbar__group">
+        <button class="canvas-topbar__btn" id="canvas-add-frame" title="Adicionar frame">
+          <i data-lucide="plus" style="width: 17px; height: 17px;"></i>
+        </button>
+
+        <span class="canvas-topbar__sep"></span>
+
+        <button class="canvas-topbar__btn" id="canvas-add-text" title="Adicionar texto (T)" disabled>
+          <i data-lucide="type" style="width: 16px; height: 16px;"></i>
+        </button>
+        <button class="canvas-topbar__btn" id="canvas-add-image" title="Adicionar imagem" disabled>
+          <i data-lucide="image" style="width: 16px; height: 16px;"></i>
+        </button>
+        <input type="file" id="canvas-image-upload" accept="image/*" style="display: none">
+
+        <span class="canvas-topbar__sep"></span>
+
+        <button class="canvas-topbar__btn" id="canvas-dup-frame" title="Duplicar frame (⌘D)" disabled>
+          <i data-lucide="copy" style="width: 16px; height: 16px;"></i>
+        </button>
+        <button class="canvas-topbar__btn" id="canvas-del-frame" title="Apagar frame (Delete)" disabled>
+          <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
+        </button>
+
+        <span class="canvas-topbar__sep"></span>
+
+        <button class="canvas-topbar__btn" id="canvas-link-frames" title="Ligar em carrossel" disabled>
+          <i data-lucide="link" style="width: 16px; height: 16px;"></i>
+        </button>
+
+        <span class="canvas-topbar__sep"></span>
+
+        <!-- Snapping e Safe Zones -->
+        <button class="canvas-topbar__btn active" id="canvas-toggle-snap" title="Alinhamento magnético ao centro (Snap)">
+          <i data-lucide="magnet" style="width: 16px; height: 16px;"></i>
+        </button>
+        <button class="canvas-topbar__btn" id="canvas-toggle-guides" title="Zonas Seguras / Safe Zones das Redes Sociais">
+          <i data-lucide="layout-grid" style="width: 16px; height: 16px;"></i>
+        </button>
+
+        <span class="canvas-topbar__sep"></span>
+
+        <!-- Botão Criar em Lote (Batch Create) -->
+        <button class="canvas-topbar__btn" id="canvas-batch-btn" title="Criar em Lote (Batch Create com CSV)">
+          <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>
+        </button>
+
+        <!-- Botão Exportar Imagem (Canva Style) -->
+        <button class="canvas-topbar__btn" id="canvas-export-btn" title="Exportar Post / Carrossel (PNG, JPG, 4K)">
+          <i data-lucide="download" style="width: 16px; height: 16px;"></i>
+        </button>
+
+        <span class="canvas-topbar__sep"></span>
+
+        <span class="canvas-topbar__label" id="canvas-topbar-label">Nenhum frame</span>
+
+        <!-- Menu de formatos -->
+        <div class="canvas-formats" id="canvas-formats">
+          <button class="canvas-formats__item" data-format="ig-feed">
+            <span class="canvas-formats__ratio" style="--ratio: 0.8;"></span>
+            Instagram Feed
+            <span class="canvas-formats__dim">1080 × 1350</span>
+          </button>
+          <button class="canvas-formats__item" data-format="ig-square">
+            <span class="canvas-formats__ratio" style="--ratio: 1;"></span>
+            Post Quadrado
+            <span class="canvas-formats__dim">1080 × 1080</span>
+          </button>
+          <button class="canvas-formats__item" data-format="ig-story">
+            <span class="canvas-formats__ratio" style="--ratio: 0.5625;"></span>
+            Instagram Story
+            <span class="canvas-formats__dim">1080 × 1920</span>
+          </button>
+          <button class="canvas-formats__item" data-format="reels">
+            <span class="canvas-formats__ratio" style="--ratio: 0.5625;"></span>
+            Reels
+            <span class="canvas-formats__dim">1080 × 1920</span>
+          </button>
+          <button class="canvas-formats__item" data-format="story">
+            <span class="canvas-formats__ratio" style="--ratio: 0.5625;"></span>
+            TikTok
+            <span class="canvas-formats__dim">1080 × 1920</span>
+          </button>
+          <button class="canvas-formats__item" data-format="pinterest">
+            <span class="canvas-formats__ratio" style="--ratio: 0.6667;"></span>
+            Pinterest
+            <span class="canvas-formats__dim">1000 × 1500</span>
+          </button>
+          <button class="canvas-formats__item" data-format="yt-thumb">
+            <span class="canvas-formats__ratio" style="--ratio: 1.7778;"></span>
+            Thumbnail YouTube
+            <span class="canvas-formats__dim">1280 × 720</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="canvas-hud">
+      <div class="canvas-hud__group">
+        <button class="canvas-hud__btn" id="canvas-undo" title="Desfazer (⌘Z / Ctrl+Z)">
+          <i data-lucide="undo-2" style="width: 15px; height: 15px;"></i>
+        </button>
+        <button class="canvas-hud__btn" id="canvas-redo" title="Refazer (⌘Shift+Z / Ctrl+Y)">
+          <i data-lucide="redo-2" style="width: 15px; height: 15px;"></i>
+        </button>
+        <span class="canvas-hud__sep"></span>
+        <button class="canvas-hud__btn" id="canvas-zoom-out" title="Diminuir zoom">
+          <i data-lucide="minus" style="width: 15px; height: 15px;"></i>
+        </button>
+        <button class="canvas-hud__zoom" id="canvas-zoom-label" title="Voltar para 100%">100%</button>
+        <button class="canvas-hud__btn" id="canvas-zoom-in" title="Aumentar zoom">
+          <i data-lucide="plus" style="width: 15px; height: 15px;"></i>
+        </button>
+        <span class="canvas-hud__sep"></span>
+        <button class="canvas-hud__btn" id="canvas-recenter" title="Voltar ao centro">
+          <i data-lucide="locate-fixed" style="width: 15px; height: 15px;"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- --------------------------------------------------
+         BARRA FLUTUANTE DE EDIÇÃO DO FRAME (FUNDO, COR, GRADIENTE, FOTO)
+         -------------------------------------------------- -->
+    <div class="canvas-text-toolbar" id="canvas-frame-toolbar">
+      <div class="canvas-text-toolbar__row">
+        <!-- Modo do Fundo: Sólido vs Gradiente -->
+        <span class="canvas-text-toolbar__group" title="Modo de Preenchimento">
+          <button class="canvas-text-toolbar__btn is-active" id="canvas-frame-mode-solid" title="Cor sólida">
+            <i data-lucide="circle" style="width: 14px; height: 14px;"></i>
+          </button>
+          <button class="canvas-text-toolbar__btn" id="canvas-frame-mode-gradient" title="Gradiente de cores">
+            <i data-lucide="blend" style="width: 14px; height: 14px;"></i>
+          </button>
+        </span>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <!-- Controles de Cor Sólida -->
+        <span class="canvas-text-toolbar__group" id="canvas-frame-solid-group" title="Cor do Fundo">
+          <label class="canvas-text-toolbar__color" title="Escolher cor sólida">
+            <input type="color" id="canvas-frame-bg-color" value="#ffffff">
+          </label>
+        </span>
+
+        <!-- Controles de Gradiente Personalizado (Cor 1, Cor 2 e Direção) -->
+        <span class="canvas-text-toolbar__group" id="canvas-frame-grad-group" style="display: none;">
+          <label class="canvas-text-toolbar__color" title="Cor 1 do Gradiente">
+            <input type="color" id="canvas-frame-grad-c1" value="#18181b">
+          </label>
+          <label class="canvas-text-toolbar__color" title="Cor 2 do Gradiente">
+            <input type="color" id="canvas-frame-grad-c2" value="#09090b">
+          </label>
+          <select class="canvas-text-toolbar__select" id="canvas-frame-grad-dir" title="Direção do Gradiente" style="min-width: 75px;">
+            <option value="180deg">↓ Vertical</option>
+            <option value="135deg">↘ Diagonal</option>
+            <option value="90deg">→ Horizontal</option>
+            <option value="0deg">↑ Invertido</option>
+            <option value="radial">⊙ Radial</option>
+          </select>
+        </span>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <!-- Presets Rápidos de Gradiente -->
+        <select class="canvas-text-toolbar__select" id="canvas-frame-gradient-select" title="Presets de Gradientes" style="min-width: 105px;">
+          <option value="">Presets...</option>
+          <option value="#18181B|#09090B|180deg">Obsidian Dark</option>
+          <option value="#1C1917|#44403C|135deg">Warm Amber</option>
+          <option value="#0F172A|#020617|180deg">Midnight Navy</option>
+          <option value="#31102F|#1E1B4B|135deg">Sunset Glow</option>
+          <option value="#064E3B|#022C22|180deg">Forest Green</option>
+          <option value="#F3E8FF|#E0E7FF|135deg">Pastel Aura</option>
+          <option value="#FFFBEB|#FEF3C7|180deg">Golden Hour</option>
+          <option value="#111827|#374151|135deg">Zinc Minimal</option>
+        </select>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <!-- Foto de Fundo -->
+        <button class="canvas-text-toolbar__btn" id="canvas-frame-bg-img-btn" title="Adicionar imagem de fundo do computador">
+          <input type="file" id="canvas-frame-bg-file" accept="image/*" style="display: none;">
+          <i data-lucide="image" style="width: 15px; height: 15px;"></i>
+        </button>
+
+        <button class="canvas-text-toolbar__btn" id="canvas-frame-more" title="Mais opções (Overlay e Blur)">
+          <i data-lucide="sliders-horizontal" style="width: 15px; height: 15px;"></i>
+        </button>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <!-- Resetar Fundo para Branco -->
+        <button class="canvas-text-toolbar__btn" id="canvas-frame-bg-reset" title="Resetar para branco padrão">
+          <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
+        </button>
+      </div>
+
+      <!-- Segunda linha expansível: Overlay e Blur -->
+      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv canvas-text-toolbar__row--wrap" id="canvas-frame-advanced">
+        <span class="canvas-text-toolbar__group">
+          <span class="canvas-text-toolbar__field" title="Escurecimento / Overlay (%) [Para destacar textos]">
+            <i data-lucide="sun-medium" style="width: 14px; height: 14px;"></i>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-frame-overlay" value="0" min="0" max="100" step="5">
+          </span>
+
+          <span class="canvas-text-toolbar__field" title="Desfoque / Blur de fundo (px)">
+            <i data-lucide="aperture" style="width: 14px; height: 14px;"></i>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-frame-blur" value="0" min="0" max="50" step="1">
+          </span>
+        </span>
+
+        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--danger" id="canvas-frame-del-img" title="Remover imagem de fundo" style="display: none;">
+          <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+          <span style="font-size: 11.5px; margin-left: 4px;">Remover Foto</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="canvas-text-toolbar" id="canvas-image-toolbar">
+      <!-- Mesma divisão da barra de texto: o que se usa sempre fica à mostra -->
+      <div class="canvas-text-toolbar__row">
+        <button class="canvas-text-toolbar__btn" id="canvas-image-crop" title="Recortar / Zoom da imagem (Duplo clique ou Enter)">
+          <i data-lucide="crop" style="width: 15px; height: 15px;"></i>
+        </button>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <!-- Arredondamento e opacidade são da mesma família (o pixel em si):
+             andam colados, sem traço no meio -->
+        <span class="canvas-text-toolbar__group">
+          <span class="canvas-text-toolbar__field" title="Arredondamento das bordas (px) [Arraste para ajustar]">
+            <i data-lucide="square" style="width: 14px; height: 14px;"></i>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-image-radius" value="0" min="0" step="1">
+          </span>
+
+          <span class="canvas-text-toolbar__field" title="Opacidade (%) [Arraste para ajustar]">
+            <i data-lucide="droplet" style="width: 14px; height: 14px;"></i>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-image-opacity" value="100" min="0" max="100" step="5">
+          </span>
+        </span>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <button class="canvas-text-toolbar__btn" id="canvas-image-more" title="Mais opções (Camadas, Borda, Desfoque e Sombra)">
+          <i data-lucide="sliders-horizontal" style="width: 15px; height: 15px;"></i>
+        </button>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-image-bind" title="Virar variável do Batch Create">{}</button>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <button class="canvas-text-toolbar__btn" id="canvas-image-dup" title="Duplicar imagem (⌘D)">
+          <i data-lucide="copy" style="width: 15px; height: 15px;"></i>
+        </button>
+        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--danger" id="canvas-image-del" title="Apagar imagem (Delete)">
+          <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
+        </button>
+      </div>
+
+      <!-- Segunda linha: acabamento, que se mexe uma vez e esquece. Mesma receita
+           do painel do texto: quebra em linhas e o vão de 12px é quem separa -->
+      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv canvas-text-toolbar__row--wrap" id="canvas-image-advanced">
+        <!-- Ordem das Camadas / z-index -->
+        <span class="canvas-text-toolbar__group" title="Ordem das Camadas (z-index)">
+          <button class="canvas-text-toolbar__btn" id="canvas-image-send-back" title="Mandar para trás de tudo (⌘[)"><i data-lucide="arrow-down-to-line" style="width: 15px; height: 15px;"></i></button>
+          <button class="canvas-text-toolbar__btn" id="canvas-image-backward" title="Recuar uma camada ([)"><i data-lucide="arrow-down" style="width: 15px; height: 15px;"></i></button>
+          <button class="canvas-text-toolbar__btn" id="canvas-image-forward" title="Avançar uma camada (])"><i data-lucide="arrow-up" style="width: 15px; height: 15px;"></i></button>
+          <button class="canvas-text-toolbar__btn" id="canvas-image-bring-front" title="Trazer para frente de tudo (⌘])"><i data-lucide="arrow-up-to-line" style="width: 15px; height: 15px;"></i></button>
+        </span>
+
+        <!-- Borda: espessura e cor são um par, nunca quebram no meio -->
+        <span class="canvas-text-toolbar__group">
+          <span class="canvas-text-toolbar__field" title="Espessura da borda (px) [Arraste para ajustar]">
+            <i data-lucide="maximize" style="width: 14px; height: 14px;"></i>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-image-border-width" value="0" min="0" step="1">
+          </span>
+          <label class="canvas-text-toolbar__color" title="Cor da borda">
+            <input type="color" id="canvas-image-border-color" value="#000000">
+          </label>
+        </span>
+
+        <!-- Desfoque e sombra: os dois acabamentos de profundidade -->
+        <span class="canvas-text-toolbar__group">
+          <span class="canvas-text-toolbar__field" title="Desfoque / Blur (px) [Arraste para ajustar]">
+            <i data-lucide="aperture" style="width: 14px; height: 14px;"></i>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-image-blur" value="0" min="0" step="1">
+          </span>
+
+          <span class="canvas-text-toolbar__field" title="Sombra externa (px) [Arraste para ajustar]">
+            <i data-lucide="layers" style="width: 14px; height: 14px;"></i>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-image-shadow" value="0" min="0" step="1">
+          </span>
+        </span>
+      </div>
+    </div>
+
+    <!-- HUD de Recorte e Zoom da Imagem (Figma/Canva style) -->
+    <div class="canvas-text-toolbar" id="canvas-crop-toolbar">
+      <div class="canvas-text-toolbar__row">
+        <span class="canvas-text-toolbar__group">
+          <button class="canvas-text-toolbar__btn" id="canvas-crop-zoom-out" title="Diminuir zoom">
+            <i data-lucide="minus" style="width: 14px; height: 14px;"></i>
+          </button>
+          <span class="canvas-text-toolbar__field" title="Zoom da imagem (%) [Arraste ou use o scroll para ajustar]">
+            <i data-lucide="zoom-in" style="width: 14px; height: 14px;"></i>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-crop-zoom-val" value="100" min="100" max="500" step="5">
+          </span>
+          <button class="canvas-text-toolbar__btn" id="canvas-crop-zoom-in" title="Aumentar zoom">
+            <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+          </button>
+        </span>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <button class="canvas-text-toolbar__btn" id="canvas-crop-reset" title="Redefinir recorte (100% e centralizado)">
+          <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
+        </button>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--primary" id="canvas-crop-done" title="Concluir recorte (Enter / Esc)">
+          <i data-lucide="check" style="width: 14px; height: 14px;"></i>
+          <span>Pronto</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="canvas-text-toolbar" id="canvas-text-toolbar">
+      <!-- Linha 1: só o que se mexe o tempo todo — fonte, tamanho e cor -->
+      <div class="canvas-text-toolbar__row">
+        <!-- Famílias e pesos são preenchidos pelo JS a partir de FONTS -->
+        <select class="canvas-text-toolbar__select" id="canvas-text-font" title="Fonte"></select>
+        <select class="canvas-text-toolbar__select canvas-text-toolbar__select--sm" id="canvas-text-weight" title="Peso"></select>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-text-size-down" title="Diminuir">−</button>
+        <input type="number" class="canvas-text-toolbar__input" id="canvas-text-size" value="48" min="1" max="400" title="Tamanho da fonte [Arraste para ajustar]">
+        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-text-size-up" title="Aumentar">+</button>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <label class="canvas-text-toolbar__color" title="Cor do texto">
+          <input type="color" id="canvas-text-color" value="#000000">
+        </label>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <button class="canvas-text-toolbar__btn" id="canvas-text-more" title="Mais opções (Estilo, Negrito, Alinhamento, Espaçamento…)"><i data-lucide="sliders-horizontal" style="width: 15px; height: 15px;"></i></button>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-bind" title="Virar variável do Batch Create">{}</button>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <button class="canvas-text-toolbar__btn" id="canvas-text-dup" title="Duplicar texto (⌘D)"><i data-lucide="copy" style="width: 15px; height: 15px;"></i></button>
+        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--danger" id="canvas-text-del" title="Apagar texto (Delete)"><i data-lucide="trash-2" style="width: 15px; height: 15px;"></i></button>
+      </div>
+
+      <!-- Segunda linha: o que se mexe com menos frequência fica escondido até pedir -->
+      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv canvas-text-toolbar__row--wrap" id="canvas-text-advanced">
+        <!-- Preset / Estilos rápidos -->
+        <select class="canvas-text-toolbar__select canvas-text-toolbar__select--preset" id="canvas-text-preset" title="Estilo rápido de texto">
+          <option value="">Estilo...</option>
+          <option value="heading">👑 Título</option>
+          <option value="subheading">📝 Subtítulo</option>
+          <option value="body">📖 Corpo</option>
+          <option value="quote">✨ Citação</option>
+          <option value="badge">🏷️ Destaque</option>
+        </select>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <!-- Cada grupo é um bloco: a quebra de linha cai entre grupos, nunca no
+             meio de um trio de botões ou de um par de campos -->
+        <span class="canvas-text-toolbar__group">
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-bold" title="Negrito (⌘B)" style="font-weight: 800;">B</button>
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-italic" title="Itálico (⌘I)" style="font-style: italic; font-family: Georgia, serif;">I</button>
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-underline" title="Sublinhado (⌘U)" style="text-decoration: underline;">U</button>
+        </span>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <span class="canvas-text-toolbar__group">
+          <button class="canvas-text-toolbar__btn" id="canvas-text-align-left" title="Alinhar à esquerda"><i data-lucide="align-left" style="width: 15px; height: 15px;"></i></button>
+          <button class="canvas-text-toolbar__btn" id="canvas-text-align-center" title="Centralizar"><i data-lucide="align-center" style="width: 15px; height: 15px;"></i></button>
+          <button class="canvas-text-toolbar__btn" id="canvas-text-align-right" title="Alinhar à direita"><i data-lucide="align-right" style="width: 15px; height: 15px;"></i></button>
+        </span>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <span class="canvas-text-toolbar__group">
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-none" title="Como digitado">Aa</button>
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-upper" title="MAIÚSCULAS">AA</button>
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-lower" title="minúsculas">aa</button>
+        </span>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <span class="canvas-text-toolbar__group">
+          <span class="canvas-text-toolbar__field" title="Altura da linha (Line-height) [Arraste para ajustar]">
+            <i data-lucide="align-vertical-justify-center" style="width: 14px; height: 14px;"></i>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-text-lh" value="1.15" step="0.05" min="0.5" max="4">
+          </span>
+
+          <span class="canvas-text-toolbar__field" title="Espaço entre letras (Letter-spacing) [Arraste para ajustar]">
+            <i data-lucide="move-horizontal" style="width: 14px; height: 14px;"></i>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-text-ls" value="-0.02" step="0.01" min="-0.2" max="1">
+          </span>
+        </span>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <span class="canvas-text-toolbar__field" title="Opacidade do texto (%) [Arraste para ajustar]">
+          <i data-lucide="droplet" style="width: 14px; height: 14px;"></i>
+          <input type="number" class="canvas-text-toolbar__input" id="canvas-text-opacity" value="100" step="5" min="0" max="100">
+        </span>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <!-- Fundo / Marca-texto -->
+        <span class="canvas-text-toolbar__field" title="Cor de fundo / marca-texto">
+          <i data-lucide="highlighter" style="width: 14px; height: 14px;"></i>
+          <label class="canvas-text-toolbar__color canvas-text-toolbar__color--bg" title="Cor do fundo">
+            <input type="color" id="canvas-text-bg" value="#000000">
+          </label>
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--sm" id="canvas-text-bg-clear" title="Remover fundo">×</button>
+        </span>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <!-- Sombra de contraste -->
+        <button class="canvas-text-toolbar__btn" id="canvas-text-shadow" title="Sombra de legibilidade">
+          <i data-lucide="sun" style="width: 14px; height: 14px;"></i>
+        </button>
+
+        <span class="canvas-text-toolbar__sep"></span>
+
+        <!-- Ordem das Camadas / z-index -->
+        <span class="canvas-text-toolbar__group" title="Ordem das Camadas (z-index)">
+          <button class="canvas-text-toolbar__btn" id="canvas-text-send-back" title="Mandar para trás de tudo (⌘[)"><i data-lucide="arrow-down-to-line" style="width: 15px; height: 15px;"></i></button>
+          <button class="canvas-text-toolbar__btn" id="canvas-text-backward" title="Recuar uma camada ([)"><i data-lucide="arrow-down" style="width: 15px; height: 15px;"></i></button>
+          <button class="canvas-text-toolbar__btn" id="canvas-text-forward" title="Avançar uma camada (])"><i data-lucide="arrow-up" style="width: 15px; height: 15px;"></i></button>
+          <button class="canvas-text-toolbar__btn" id="canvas-text-bring-front" title="Trazer para frente de tudo (⌘])"><i data-lucide="arrow-up-to-line" style="width: 15px; height: 15px;"></i></button>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------------
+       DOCK FLUTUANTE TRANSLÚCIDO NO RODAPÉ (APENAS ÍCONES)
+       -------------------------------------------------- -->
+  <div class="dock-wrapper">
+    <nav class="dock">
+      <button class="dock-icon-btn active" id="dock-btn-app" title="Oração Diária (App iOS)">
+        <i data-lucide="smartphone" style="width: 17px; height: 17px;"></i>
+      </button>
+
+      <button class="dock-icon-btn" id="dock-btn-site" title="oracaodiaria.space (Site LP)">
+        <i data-lucide="globe" style="width: 17px; height: 17px;"></i>
+      </button>
+
+      <button class="dock-icon-btn" id="dock-btn-canvas" title="Canvas infinito">
+        <i data-lucide="frame" style="width: 17px; height: 17px;"></i>
+      </button>
+    </nav>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
