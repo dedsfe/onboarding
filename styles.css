@@ -1404,6 +1404,11 @@ body {
   transform: scale(0.92);
 }
 
+.canvas-hud__btn.is-active {
+  background: rgba(37, 99, 235, 0.14);
+  color: #2563EB;
+}
+
 .canvas-hud__zoom {
   min-width: 48px;
   height: 28px;
@@ -1699,12 +1704,27 @@ body {
   transform: scale(0.98);
 }
 
+.canvas-dropdown-item i,
+.canvas-dropdown-item svg {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  color: rgba(255, 255, 255, 0.55);
+  transition: color 120ms ease;
+}
+
+.canvas-dropdown-item:hover i,
+.canvas-dropdown-item:hover svg {
+  color: #FFFFFF;
+}
+
 .canvas-dropdown-meta {
   margin-left: auto;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.38);
   font-variant-numeric: tabular-nums;
-  font-weight: 400;
+  font-weight: 500;
+  letter-spacing: 0.02em;
 }
 
 /* Miniatura na proporção real do formato no dropdown */

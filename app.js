@@ -1725,6 +1725,7 @@
     // Barra do editor no topo
     const btnAddFrame = document.getElementById('canvas-add-frame');
     const btnAddText = document.getElementById('canvas-add-text');
+    const btnAddImage = document.getElementById('canvas-add-image');
     const btnDupFrame = document.getElementById('canvas-dup-frame');
     const btnDelFrame = document.getElementById('canvas-del-frame');
     const btnLinkFrames = document.getElementById('canvas-link-frames');
@@ -4970,7 +4971,6 @@
       const selectedFrames = getSelectedFrames();
       const hasFrames = selectedFrames.length > 0;
       const firstFrame = selectedFrames[0];
-      const btnAddImage = document.getElementById('canvas-add-image');
       if (btnAddText) btnAddText.disabled = !hasFrames;
       if (btnAddImage) btnAddImage.disabled = !hasFrames;
       if (btnDupFrame) btnDupFrame.disabled = !hasFrames;
@@ -5003,16 +5003,20 @@
       // Labels do menu de lote
       const bindsMenuLabel = document.getElementById('canvas-menu-binds-label');
       if (bindsMenuLabel) {
-        const areHidden = world.classList.contains('hide-bind-tags');
-        bindsMenuLabel.textContent = areHidden ? 'Mostrar Tags {{}}' : 'Ocultar Tags {{}}';
+        const areHidden = world.classList.contains('hide-binds');
+        bindsMenuLabel.textContent = 'Tags de Variáveis {{}}';
       }
-      const snapMenuLabel = document.getElementById('canvas-menu-snap-label');
-      if (snapMenuLabel) {
-        snapMenuLabel.textContent = `Snap Magnético: ${snapEnabled ? 'Ligado' : 'Desligado'}`;
+
+      // Estado dos botões de Preferência no HUD
+      const hudSnap = document.getElementById('canvas-hud-snap');
+      if (hudSnap) {
+        hudSnap.classList.toggle('is-active', snapEnabled);
+        hudSnap.title = `Snap Magnético: ${snapEnabled ? 'Ligado' : 'Desligado'}`;
       }
-      const guidesMenuLabel = document.getElementById('canvas-menu-guides-label');
-      if (guidesMenuLabel) {
-        guidesMenuLabel.textContent = `Safe Zones: ${showGuides ? 'Ligado' : 'Desligado'}`;
+      const hudGuides = document.getElementById('canvas-hud-guides');
+      if (hudGuides) {
+        hudGuides.classList.toggle('is-active', showGuides);
+        hudGuides.title = `Safe Zones das Redes: ${showGuides ? 'Ligado' : 'Desligado'}`;
       }
 
       // Habilita/desabilita menus
@@ -6406,7 +6410,6 @@
 
     if (btnAddText) btnAddText.addEventListener('click', () => addTextToSelectedFrame());
 
-    const btnAddImage = document.getElementById('canvas-add-image');
     const imageUpload = document.getElementById('canvas-image-upload');
 
     if (btnAddImage) {
@@ -6449,26 +6452,35 @@
 
     const btnToggleSnap = document.getElementById('canvas-toggle-snap');
     const btnToggleGuides = document.getElementById('canvas-toggle-guides');
+    const hudSnap = document.getElementById('canvas-hud-snap');
+    const hudGuides = document.getElementById('canvas-hud-guides');
 
-    if (btnToggleSnap) {
-      btnToggleSnap.classList.toggle('active', snapEnabled);
-      btnToggleSnap.addEventListener('click', () => {
-        snapEnabled = !snapEnabled;
-        btnToggleSnap.classList.toggle('active', snapEnabled);
-        localStorage.setItem('oa_canvas_snap', snapEnabled);
-      });
+    function toggleSnap() {
+      snapEnabled = !snapEnabled;
+      if (btnToggleSnap) btnToggleSnap.classList.toggle('active', snapEnabled);
+      if (hudSnap) {
+        hudSnap.classList.toggle('is-active', snapEnabled);
+        hudSnap.title = `Snap Magnético: ${snapEnabled ? 'Ligado' : 'Desligado'}`;
+      }
+      localStorage.setItem('oa_canvas_snap', snapEnabled);
     }
 
-    if (btnToggleGuides) {
-      btnToggleGuides.classList.toggle('active', showGuides);
+    function toggleGuides() {
+      showGuides = !showGuides;
+      if (btnToggleGuides) btnToggleGuides.classList.toggle('active', showGuides);
+      if (hudGuides) {
+        hudGuides.classList.toggle('is-active', showGuides);
+        hudGuides.title = `Safe Zones das Redes: ${showGuides ? 'Ligado' : 'Desligado'}`;
+      }
       view.classList.toggle('show-guides', showGuides);
-      btnToggleGuides.addEventListener('click', () => {
-        showGuides = !showGuides;
-        btnToggleGuides.classList.toggle('active', showGuides);
-        view.classList.toggle('show-guides', showGuides);
-        localStorage.setItem('oa_canvas_guides', showGuides);
-      });
+      localStorage.setItem('oa_canvas_guides', showGuides);
     }
+
+    if (btnToggleSnap) btnToggleSnap.addEventListener('click', toggleSnap);
+    if (hudSnap) hudSnap.addEventListener('click', toggleSnap);
+
+    if (btnToggleGuides) btnToggleGuides.addEventListener('click', toggleGuides);
+    if (hudGuides) hudGuides.addEventListener('click', toggleGuides);
 
     let showBinds = localStorage.getItem('oa_canvas_show_binds') !== 'false';
     const btnToggleBinds = document.getElementById('canvas-toggle-binds');

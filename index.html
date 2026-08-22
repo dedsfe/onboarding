@@ -678,10 +678,10 @@
     <!-- Barra do editor: Floating Frosted Glass Topbar (OA Design) -->
     <div class="canvas-topbar">
       <div class="canvas-topbar__group">
-        <!-- 1. Menu Adicionar Post (+) -->
+        <!-- Grupo 1: Criação de Conteúdo -->
         <div class="canvas-topbar__item-wrap">
-          <button class="canvas-topbar__btn" id="canvas-add-frame" title="Novo Post / Frame">
-            <i data-lucide="plus" style="width: 16px; height: 16px;"></i>
+          <button class="canvas-topbar__btn" id="canvas-add-frame" title="Novo Post">
+            <i data-lucide="plus" style="width: 15px; height: 15px;"></i>
             <span class="canvas-topbar__btn-label">Post</span>
           </button>
 
@@ -726,48 +726,47 @@
           </div>
         </div>
 
-        <!-- 2. Menu Inserir Elementos (Card Vertical) -->
         <div class="canvas-topbar__item-wrap">
           <button class="canvas-topbar__btn" id="canvas-insert-menu-btn" title="Inserir Texto, Imagem, Gradientes, Ícones ou Fontes">
             <i data-lucide="sparkles" style="width: 15px; height: 15px;"></i>
             <span class="canvas-topbar__btn-label">Inserir</span>
           </button>
 
-          <!-- Menu Vertical 2: Inserir Elementos -->
+          <!-- Menu Vertical 2: Inserir Elementos (Monocromático e Consistente) -->
           <div class="canvas-dropdown-card" id="canvas-insert-menu">
             <div class="canvas-dropdown-head">Inserir no Post</div>
             <button class="canvas-dropdown-item" data-action="add-text">
-              <i data-lucide="type" style="width: 16px; height: 16px; color: #818CF8;"></i>
+              <i data-lucide="type"></i>
               <span>Texto</span>
               <span class="canvas-dropdown-meta">T</span>
             </button>
             <button class="canvas-dropdown-item" data-action="add-image">
-              <i data-lucide="image" style="width: 16px; height: 16px; color: #34D399;"></i>
-              <span>Imagem do Computador</span>
+              <i data-lucide="image"></i>
+              <span>Imagem</span>
               <span class="canvas-dropdown-meta">Upload</span>
             </button>
             <div class="canvas-dropdown-divider"></div>
             <button class="canvas-dropdown-item" data-action="open-mesh">
-              <i data-lucide="blend" style="width: 16px; height: 16px; color: #F472B6;"></i>
+              <i data-lucide="blend"></i>
               <span>Gradientes Mesh</span>
-              <span class="canvas-dropdown-meta">Mesh</span>
             </button>
             <button class="canvas-dropdown-item" data-action="open-icons">
-              <i data-lucide="shapes" style="width: 16px; height: 16px; color: #FBBF24;"></i>
+              <i data-lucide="shapes"></i>
               <span>Ícones & Stickers</span>
               <span class="canvas-dropdown-meta">⇧I</span>
             </button>
             <button class="canvas-dropdown-item" data-action="open-fonts">
-              <i data-lucide="case-sensitive" style="width: 16px; height: 16px; color: #60A5FA;"></i>
+              <i data-lucide="case-sensitive"></i>
               <span>Fontes & Tipografia</span>
-              <span class="canvas-dropdown-meta">Fontes</span>
+              <span class="canvas-dropdown-meta">F</span>
             </button>
           </div>
         </div>
 
+        <!-- Separador de Grupo: Criação | Automação -->
         <span class="canvas-topbar__sep"></span>
 
-        <!-- 3. Menu Automação em Lote (CSV) (Card Vertical) -->
+        <!-- Grupo 2: Automação & Carrossel -->
         <div class="canvas-topbar__item-wrap">
           <button class="canvas-topbar__btn" id="canvas-batch-menu-btn" title="Automação em Lote (Planilha CSV, Fotos e Exportação)">
             <i data-lucide="wand-2" style="width: 15px; height: 15px;"></i>
@@ -775,53 +774,42 @@
             <span class="canvas-topbar__badge" id="canvas-batch-binds-count" style="display: none;">0</span>
           </button>
 
-          <!-- Menu Vertical 3: Automação em Lote -->
+          <!-- Menu Vertical 3: Automação em Lote (Puramente Lote) -->
           <div class="canvas-dropdown-card" id="canvas-batch-menu">
             <div class="canvas-dropdown-head">Automação em Lote</div>
             <button class="canvas-dropdown-item" data-action="batch-data">
-              <i data-lucide="table-2" style="width: 16px; height: 16px; color: #38BDF8;"></i>
+              <i data-lucide="table-2"></i>
               <span>Importar Planilha / CSV</span>
-              <span class="canvas-dropdown-meta">Dados</span>
             </button>
             <button class="canvas-dropdown-item" data-action="batch-photos">
-              <i data-lucide="images" style="width: 16px; height: 16px; color: #A78BFA;"></i>
+              <i data-lucide="images"></i>
               <span>Fotos do Lote</span>
-              <span class="canvas-dropdown-meta">Galeria</span>
             </button>
             <button class="canvas-dropdown-item" data-action="batch-export">
-              <i data-lucide="package" style="width: 16px; height: 16px; color: #F59E0B;"></i>
-              <span>Exportar Lote Completo</span>
-              <span class="canvas-dropdown-meta">ZIP</span>
+              <i data-lucide="package"></i>
+              <span>Exportar Lote (ZIP)</span>
             </button>
             <div class="canvas-dropdown-divider"></div>
             <button class="canvas-dropdown-item" data-action="toggle-binds">
-              <i data-lucide="eye" style="width: 15px; height: 15px; color: #9CA3AF;"></i>
-              <span id="canvas-menu-binds-label">Ocultar Tags {{}}</span>
+              <i data-lucide="eye"></i>
+              <span id="canvas-menu-binds-label">Tags de Variáveis {{}}</span>
               <span class="canvas-dropdown-meta">B</span>
-            </button>
-            <button class="canvas-dropdown-item" data-action="toggle-snap">
-              <i data-lucide="magnet" style="width: 15px; height: 15px; color: #9CA3AF;"></i>
-              <span id="canvas-menu-snap-label">Snap Magnético: Ligado</span>
-            </button>
-            <button class="canvas-dropdown-item" data-action="toggle-guides">
-              <i data-lucide="layout-grid" style="width: 15px; height: 15px; color: #9CA3AF;"></i>
-              <span id="canvas-menu-guides-label">Safe Zones: Desligado</span>
             </button>
           </div>
         </div>
 
-        <!-- 4. Ligar em Carrossel -->
         <button class="canvas-topbar__btn" id="canvas-link-frames" title="Ligar em Carrossel" disabled>
-          <i data-lucide="link" style="width: 15px; height: 15px;"></i>
+          <i data-lucide="link-2" style="width: 15px; height: 15px;"></i>
+          <span class="canvas-topbar__btn-label">Carrossel</span>
         </button>
 
+        <!-- Separador de Grupo: Automação | Ações Globais -->
         <span class="canvas-topbar__sep"></span>
 
-        <!-- Status de Salvamento Discreto (sem label redundante) -->
+        <!-- Grupo 3: Status & Exportação -->
         <span class="canvas-topbar__label" id="canvas-topbar-label" style="display: none;"></span>
         <span class="canvas-topbar__save" id="canvas-save-status"></span>
 
-        <!-- 5. Botão de Exportação Principal -->
         <button class="canvas-topbar__btn canvas-topbar__btn--primary" id="canvas-export-btn" title="Exportar Post / Carrossel (PNG, JPG, 4K)">
           <i data-lucide="download" style="width: 15px; height: 15px;"></i>
           <span class="canvas-topbar__btn-label">Exportar</span>
@@ -843,6 +831,7 @@
       </div>
     </div>
 
+    <!-- HUD Inferior de Controle do Canvas (Zoom, Histórico e Preferências de Visualização) -->
     <div class="canvas-hud">
       <div class="canvas-hud__group">
         <button class="canvas-hud__btn" id="canvas-undo" title="Desfazer (⌘Z / Ctrl+Z)">
@@ -859,9 +848,15 @@
         <button class="canvas-hud__btn" id="canvas-zoom-in" title="Aumentar zoom">
           <i data-lucide="plus" style="width: 15px; height: 15px;"></i>
         </button>
-        <span class="canvas-hud__sep"></span>
         <button class="canvas-hud__btn" id="canvas-recenter" title="Voltar ao centro">
           <i data-lucide="locate-fixed" style="width: 15px; height: 15px;"></i>
+        </button>
+        <span class="canvas-hud__sep"></span>
+        <button class="canvas-hud__btn is-active" id="canvas-hud-snap" title="Snap Magnético: Ligado">
+          <i data-lucide="magnet" style="width: 15px; height: 15px;"></i>
+        </button>
+        <button class="canvas-hud__btn" id="canvas-hud-guides" title="Safe Zones das Redes: Desligado">
+          <i data-lucide="layout-grid" style="width: 15px; height: 15px;"></i>
         </button>
       </div>
     </div>
