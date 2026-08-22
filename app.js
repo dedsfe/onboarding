@@ -2836,7 +2836,7 @@
             }
 
             if (selectGrad) selectGrad.value = '';
-            if (inputOverlay) inputOverlay.value = selFrame.bgOverlay != null ? selFrame.bgOverlay : (hasFrameBg(selFrame) ? 35 : 0);
+            if (inputOverlay) inputOverlay.value = selFrame.bgOverlay != null ? selFrame.bgOverlay : (selFrame.bgRecipe ? 0 : (hasFrameBg(selFrame) ? 35 : 0));
             if (inputBlur) inputBlur.value = selFrame.bgBlur || 0;
             if (btnDelImg) btnDelImg.style.display = hasFrameBg(selFrame) ? 'inline-flex' : 'none';
 
@@ -4810,7 +4810,8 @@
 
       // 1. Imagem de fundo com overlay & blur
       if (hasFrameBg(frame)) {
-        const overlayAlpha = (frame.bgOverlay != null ? frame.bgOverlay : 35) / 100;
+        const defaultOverlay = frame.bgRecipe ? 0 : 35;
+        const overlayAlpha = (frame.bgOverlay != null ? frame.bgOverlay : defaultOverlay) / 100;
         const blurPx = frame.bgBlur || 0;
         const bgSrc = frameBgSrc(frame);
 
@@ -7598,7 +7599,8 @@
             ctx.restore();
 
             // Overlay escuro
-            const overlayAlpha = (frame.bgOverlay != null ? frame.bgOverlay : 35) / 100;
+            const defaultOverlay = frame.bgRecipe ? 0 : 35;
+            const overlayAlpha = (frame.bgOverlay != null ? frame.bgOverlay : defaultOverlay) / 100;
             if (overlayAlpha > 0) {
               ctx.fillStyle = `rgba(0, 0, 0, ${overlayAlpha})`;
               ctx.fillRect(0, 0, frameW, frameH);
@@ -9117,7 +9119,8 @@
               frame.bgImage = null;
               frame.bg = null;
               frame.bgRecipe = { ...gradientStudioState };
-              if (frame.bgOverlay == null) frame.bgOverlay = 0;
+              frame.bgOverlay = 0;
+              frame.bgBlur = 0;
 
               applyFrameBackground(frame);
               save();
