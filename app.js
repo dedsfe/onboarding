@@ -8731,7 +8731,8 @@
         type: 'mesh', // 'mesh' | 'linear' | 'radial' | 'conic'
         colors: ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B'],
         noise: 16,
-        blur: 0,
+        blur: 0,       // Desfoque / Fusão Real de Cores (sem comer as bordas)
+        feather: 0,    // Suavizar Borda (esmaecimento da borda / vinheta)
         angle: 135,
         seed: 42
       };
@@ -8762,96 +8763,121 @@
         ctx.save();
 
         const colors = state.colors && state.colors.length > 0 ? state.colors : ['#2563EB', '#7C3AED', '#DB2777', '#F59E0B'];
+        const blurPx = Math.max(0, Number(state.blur) || 0);
+
+        // Se tiver blur de cores, renderizamos num canvas expandido (overscan) para não desbotar as bordas
+        const pad = blurPx > 0 ? Math.ceil(blurPx * 2.5) : 0;
+        const drawW = w + pad * 2;
+        const drawH = h + pad * 2;
+
+        const drawCanvas = document.createElement('canvas');
+        drawCanvas.width = drawW;
+        drawCanvas.height = drawH;
+        const dCtx = drawCanvas.getContext('2d');
 
         if (state.type === 'linear') {
           const rad = ((state.angle || 0) * Math.PI) / 180;
-          const cx = w / 2;
-          const cy = h / 2;
-          const len = Math.sqrt(w * w + h * h) / 2;
+          const cx = drawW / 2;
+          const cy = drawH / 2;
+          const len = Math.sqrt(drawW * drawW + drawH * drawH) / 2;
           const x0 = cx - Math.cos(rad) * len;
           const y0 = cy - Math.sin(rad) * len;
           const x1 = cx + Math.cos(rad) * len;
           const y1 = cy + Math.sin(rad) * len;
 
-          const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+          const grad = dCtx.createLinearGradient(x0, y0, x1, y1);
           const n = colors.length;
           colors.forEach((col, i) => {
             grad.addColorStop(n > 1 ? i / (n - 1) : 0, col);
           });
-          ctx.fillStyle = grad;
-          ctx.fillRect(0, 0, w, h);
+          dCtx.fillStyle = grad;
+          dCtx.fillRect(0, 0, drawW, drawH);
         } else if (state.type === 'radial') {
-          const cx = w / 2;
-          const cy = h / 2;
-          const radius = Math.max(w, h) * 0.75;
-          const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+          const cx = drawW / 2;
+          const cy = drawH / 2;
+          const radius = Math.max(drawW, drawH) * 0.75;
+          const grad = dCtx.createRadialGradient(cx, cy, 0, cx, cy, radius);
           const n = colors.length;
           colors.forEach((col, i) => {
             grad.addColorStop(n > 1 ? i / (n - 1) : 0, col);
           });
-          ctx.fillStyle = grad;
-          ctx.fillRect(0, 0, w, h);
+          dCtx.fillStyle = grad;
+          dCtx.fillRect(0, 0, drawW, drawH);
         } else if (state.type === 'conic') {
-          const cx = w / 2;
-          const cy = h / 2;
+          const cx = drawW / 2;
+          const cy = drawH / 2;
           const rad = ((state.angle || 0) * Math.PI) / 180;
-          if (typeof ctx.createConicGradient === 'function') {
-            const grad = ctx.createConicGradient(rad, cx, cy);
+          if (typeof dCtx.createConicGradient === 'function') {
+            const grad = dCtx.createConicGradient(rad, cx, cy);
             const n = colors.length;
             colors.forEach((col, i) => {
               grad.addColorStop(n > 1 ? i / (n - 1) : 0, col);
             });
-            ctx.fillStyle = grad;
-            ctx.fillRect(0, 0, w, h);
+            dCtx.fillStyle = grad;
+            dCtx.fillRect(0, 0, drawW, drawH);
           } else {
-            ctx.fillStyle = colors[0];
-            ctx.fillRect(0, 0, w, h);
+            dCtx.fillStyle = colors[0];
+            dCtx.fillRect(0, 0, drawW, drawH);
           }
         } else {
           // Mesh Fluido: Multi-ponto orgânico de alta saturação
           const baseSeed = Number(state.seed) || 42;
           const defaultPos = [
-            [w * 0.85, h * 0.15],
-            [w * 0.15, h * 0.85],
-            [w * 0.85, h * 0.85],
-            [w * 0.50, h * 0.45],
-            [w * 0.15, h * 0.15],
-            [w * 0.50, h * 0.90]
+            [drawW * 0.85, drawH * 0.15],
+            [drawW * 0.15, drawH * 0.85],
+            [drawW * 0.85, drawH * 0.85],
+            [drawW * 0.50, drawH * 0.45],
+            [drawW * 0.15, drawH * 0.15],
+            [drawW * 0.50, drawH * 0.90]
           ];
 
-          ctx.fillStyle = colors[0];
-          ctx.fillRect(0, 0, w, h);
+          dCtx.fillStyle = colors[0];
+          dCtx.fillRect(0, 0, drawW, drawH);
 
           colors.slice(1).forEach((col, i) => {
             const def = defaultPos[i % defaultPos.length];
-            const rx = (pseudoRandom(baseSeed + i * 17) - 0.5) * (w * 0.35);
-            const ry = (pseudoRandom(baseSeed + i * 29) - 0.5) * (h * 0.35);
-            const px = Math.max(0, Math.min(w, def[0] + rx));
-            const py = Math.max(0, Math.min(h, def[1] + ry));
-            const radius = Math.max(w, h) * (0.85 + pseudoRandom(baseSeed + i * 7) * 0.3);
+            const rx = (pseudoRandom(baseSeed + i * 17) - 0.5) * (drawW * 0.35);
+            const ry = (pseudoRandom(baseSeed + i * 29) - 0.5) * (drawH * 0.35);
+            const px = Math.max(0, Math.min(drawW, def[0] + rx));
+            const py = Math.max(0, Math.min(drawH, def[1] + ry));
+            const radius = Math.max(drawW, drawH) * (0.85 + pseudoRandom(baseSeed + i * 7) * 0.3);
 
-            const g = ctx.createRadialGradient(px, py, 0, px, py, radius);
+            const g = dCtx.createRadialGradient(px, py, 0, px, py, radius);
             g.addColorStop(0, col);
             g.addColorStop(0.65, col + 'AA');
             g.addColorStop(1, 'transparent');
-            ctx.fillStyle = g;
-            ctx.fillRect(0, 0, w, h);
+            dCtx.fillStyle = g;
+            dCtx.fillRect(0, 0, drawW, drawH);
           });
         }
 
-        // 2. Aplica Blur se > 0
-        if (state.blur > 0) {
-          const blurCanvas = document.createElement('canvas');
-          blurCanvas.width = w;
-          blurCanvas.height = h;
-          const bCtx = blurCanvas.getContext('2d');
-          bCtx.filter = `blur(${state.blur}px)`;
-          bCtx.drawImage(targetCanvas, 0, 0, w, h);
-          ctx.clearRect(0, 0, w, h);
-          ctx.drawImage(blurCanvas, 0, 0, w, h);
+        // Aplica o Blur Real de Cores no canvas expandido
+        if (blurPx > 0) {
+          const blurredCanvas = document.createElement('canvas');
+          blurredCanvas.width = drawW;
+          blurredCanvas.height = drawH;
+          const bCtx = blurredCanvas.getContext('2d');
+          bCtx.filter = `blur(${blurPx}px)`;
+          bCtx.drawImage(drawCanvas, 0, 0);
+          // Recorta o centro exato para targetCanvas sem afetar as bordas
+          ctx.drawImage(blurredCanvas, pad, pad, w, h, 0, 0, w, h);
+        } else {
+          ctx.drawImage(drawCanvas, pad, pad, w, h, 0, 0, w, h);
         }
 
-        // 3. Aplica Ruído / Noise Grain se > 0
+        // 2. Esmaecer Bordas / Feather (se > 0)
+        if (state.feather > 0) {
+          const fCanvas = document.createElement('canvas');
+          fCanvas.width = w;
+          fCanvas.height = h;
+          const fCtx = fCanvas.getContext('2d');
+          fCtx.filter = `blur(${state.feather}px)`;
+          fCtx.drawImage(targetCanvas, 0, 0, w, h);
+          ctx.clearRect(0, 0, w, h);
+          ctx.drawImage(fCanvas, 0, 0, w, h);
+        }
+
+        // 3. Aplica Ruído / Noise Grain (se > 0)
         if (state.noise > 0) {
           const noiseAmount = (state.noise / 100) * 0.45;
           const noiseTile = document.createElement('canvas');
@@ -8941,13 +8967,22 @@
                 <input type="range" class="canvas-grad-range-input-oa" id="canvas-grad-noise-input" min="0" max="50" value="${gradientStudioState.noise}">
               </div>
 
-              <!-- Slider Blur -->
+              <!-- Slider Blur Real (Desfoque de Cores) -->
               <div class="canvas-grad-slider-group-oa">
                 <div class="canvas-grad-slider-header-oa">
-                  <span>Desfoque / Suavização (Blur)</span>
+                  <span>Desfoque de Cores (Blur)</span>
                   <span class="canvas-grad-slider-val-oa" id="canvas-grad-blur-val">${gradientStudioState.blur}px</span>
                 </div>
-                <input type="range" class="canvas-grad-range-input-oa" id="canvas-grad-blur-input" min="0" max="60" value="${gradientStudioState.blur}">
+                <input type="range" class="canvas-grad-range-input-oa" id="canvas-grad-blur-input" min="0" max="80" value="${gradientStudioState.blur}">
+              </div>
+
+              <!-- Slider Feather (Suavizar Bordas) -->
+              <div class="canvas-grad-slider-group-oa">
+                <div class="canvas-grad-slider-header-oa">
+                  <span>Esmaecer Bordas (Feather)</span>
+                  <span class="canvas-grad-slider-val-oa" id="canvas-grad-feather-val">${gradientStudioState.feather}px</span>
+                </div>
+                <input type="range" class="canvas-grad-range-input-oa" id="canvas-grad-feather-input" min="0" max="60" value="${gradientStudioState.feather}">
               </div>
 
               <!-- Slider Ângulo (visível se linear/conic) -->
@@ -9010,13 +9045,24 @@
           });
         }
 
-        // Blur Input
+        // Blur Input (Desfoque de Cores)
         const blurInput = document.getElementById('canvas-grad-blur-input');
         const blurVal = document.getElementById('canvas-grad-blur-val');
         if (blurInput && blurVal) {
           blurInput.addEventListener('input', (e) => {
             gradientStudioState.blur = Number(e.target.value);
             blurVal.textContent = `${gradientStudioState.blur}px`;
+            updateLiveStudioPreview();
+          });
+        }
+
+        // Feather Input (Esmaecer Bordas)
+        const featherInput = document.getElementById('canvas-grad-feather-input');
+        const featherVal = document.getElementById('canvas-grad-feather-val');
+        if (featherInput && featherVal) {
+          featherInput.addEventListener('input', (e) => {
+            gradientStudioState.feather = Number(e.target.value);
+            featherVal.textContent = `${gradientStudioState.feather}px`;
             updateLiveStudioPreview();
           });
         }
