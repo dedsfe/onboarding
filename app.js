@@ -2344,6 +2344,13 @@
     if (btnAlignCenter) btnAlignCenter.addEventListener('click', () => applyTextToolbarAction(c => c.align = 'center'));
     if (btnAlignRight) btnAlignRight.addEventListener('click', () => applyTextToolbarAction(c => c.align = 'right'));
 
+    const btnTextPosCenterH = document.getElementById('canvas-text-pos-center-h');
+    const btnTextPosCenterV = document.getElementById('canvas-text-pos-center-v');
+    const btnTextPosCenterBoth = document.getElementById('canvas-text-pos-center-both');
+    if (btnTextPosCenterH) btnTextPosCenterH.addEventListener('click', () => alignSelectedNodes('center-h'));
+    if (btnTextPosCenterV) btnTextPosCenterV.addEventListener('click', () => alignSelectedNodes('center-v'));
+    if (btnTextPosCenterBoth) btnTextPosCenterBoth.addEventListener('click', () => alignSelectedNodes('center-both'));
+
     if (inputLh) inputLh.addEventListener('input', (e) => {
       const v = Number(e.target.value);
       if (!v) return;
@@ -2685,6 +2692,13 @@
     if (btnImageBackward) btnImageBackward.addEventListener('click', () => sendChildBackward());
     if (btnImageForward) btnImageForward.addEventListener('click', () => bringChildForward());
     if (btnImageBringFront) btnImageBringFront.addEventListener('click', () => bringChildToFront());
+
+    const btnImagePosCenterH = document.getElementById('canvas-image-pos-center-h');
+    const btnImagePosCenterV = document.getElementById('canvas-image-pos-center-v');
+    const btnImagePosCenterBoth = document.getElementById('canvas-image-pos-center-both');
+    if (btnImagePosCenterH) btnImagePosCenterH.addEventListener('click', () => alignSelectedNodes('center-h'));
+    if (btnImagePosCenterV) btnImagePosCenterV.addEventListener('click', () => alignSelectedNodes('center-v'));
+    if (btnImagePosCenterBoth) btnImagePosCenterBoth.addEventListener('click', () => alignSelectedNodes('center-both'));
 
     if (imageToolbar) imageToolbar.addEventListener('mousedown', (e) => {
       if (!e.target.closest('input')) e.preventDefault();
