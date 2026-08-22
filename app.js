@@ -5519,13 +5519,250 @@
     });
 
     /* --------------------------------------------------
-       Copiar e Colar (⌘V / Ctrl+V) de Imagens
-       Aceita imagens copiadas da área de transferência (print, Finder, Unsplash, etc.)
+       Copiar e Colar Universal (⌘C / ⌘V / Ctrl+C / Ctrl+V / ⌘X / Ctrl+X)
+       Suporta nós de texto, fotos, posts/frames inteiros e imagens externas entre abas/browsers
        -------------------------------------------------- */
+    function copySelectedElements() {
+      const isTyping = document.activeElement && 
+        (document.activeElement.isContentEditable || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+      if (isTyping) return null;
+
+      let payload = null;
+
+      if (selectedChildNodes.length > 0) {
+        const nodes = selectedChildNodes.map(sel => {
+          const frame = frames.find(f => f.id === sel.frameId);
+          const child = (frame && frame.children) ? frame.children.find(c => c.id === sel.childId) : null;
+          if (!child) return null;
+          const copy = JSON.parse(JSON.stringify(child));
+          if (copy.type === 'image') {
+            ensureImageProps(copy);
+            if (copy.assetId && assetCache.has(copy.assetId)) {
+              copy.src = assetCache.get(copy.assetId);
+            }
+          }
+          return copy;
+        }).filter(Boolean);
+
+        if (nodes.length > 0) {
+          payload = {
+            type: 'oa-canvas-clipboard',
+            kind: 'nodes',
+            version: 1,
+            source: 'AnalyticsOnboard',
+            nodes
+          };
+        }
+      } else if (selectedFrameIds.size > 0) {
+        const framesToCopy = getSelectedFrames();
+        if (framesToCopy.length > 0) {
+          payload = {
+            type: 'oa-canvas-clipboard',
+            kind: 'frames',
+            version: 1,
+            source: 'AnalyticsOnboard',
+            frames: framesToCopy.map(f => {
+              const copy = JSON.parse(JSON.stringify(f));
+              (copy.children || []).forEach(c => {
+                if (c.type === 'image') {
+                  ensureImageProps(c);
+                  if (c.assetId && assetCache.has(c.assetId)) {
+                    c.src = assetCache.get(c.assetId);
+                  }
+                }
+              });
+              return copy;
+            })
+          };
+        }
+      }
+
+      if (payload) {
+        const jsonStr = JSON.stringify(payload);
+        try {
+          localStorage.setItem('oa_clipboard_data', jsonStr);
+        } catch {}
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(jsonStr).catch(() => {});
+        }
+        return jsonStr;
+      }
+      return null;
+    }
+
+    function pasteClipboardPayload(pastedText) {
+      let data = null;
+      if (pastedText && typeof pastedText === 'string') {
+        try {
+          if (pastedText.includes('oa-canvas-clipboard')) {
+            data = JSON.parse(pastedText);
+          }
+        } catch {}
+      }
+      if (!data || data.type !== 'oa-canvas-clipboard') {
+        try {
+          const local = localStorage.getItem('oa_clipboard_data');
+          if (local && local.includes('oa-canvas-clipboard')) {
+            data = JSON.parse(local);
+          }
+        } catch {}
+      }
+      if (!data || data.type !== 'oa-canvas-clipboard') return false;
+
+      const worldPt = screenToWorld(lastMouseScreen.x, lastMouseScreen.y);
+
+      if (data.kind === 'nodes' && Array.isArray(data.nodes) && data.nodes.length > 0) {
+        let targetFrame = [...frames].reverse().find(f => 
+          worldPt.x >= f.x && worldPt.x <= f.x + f.w &&
+          worldPt.y >= f.y && worldPt.y <= f.y + f.h
+        ) || frames.find(f => f.id === selectedId) || frames[0];
+
+        if (!targetFrame) {
+          targetFrame = makeFrame('ig-feed', Math.round(worldPt.x - 540), Math.round(worldPt.y - 675));
+          frames.push(targetFrame);
+          renderFrame(targetFrame);
+          selectFrame(targetFrame.id);
+        }
+
+        const frameEl = frameElOf(targetFrame);
+        if (!frameEl) return false;
+
+        const minX = Math.min(...data.nodes.map(n => n.x || 0));
+        const minY = Math.min(...data.nodes.map(n => n.y || 0));
+        const isMouseOverTarget = (worldPt.x >= targetFrame.x && worldPt.x <= targetFrame.x + targetFrame.w &&
+                                   worldPt.y >= targetFrame.y && worldPt.y <= targetFrame.y + targetFrame.h);
+
+        const baseLocalX = isMouseOverTarget ? Math.round(worldPt.x - targetFrame.x) : null;
+        const baseLocalY = isMouseOverTarget ? Math.round(worldPt.y - targetFrame.y) : null;
+
+        const newSelections = [];
+        data.nodes.forEach(orig => {
+          const copy = JSON.parse(JSON.stringify(orig));
+          copy.id = childSeq++;
+          if (isMouseOverTarget && baseLocalX !== null) {
+            copy.x = baseLocalX + ((orig.x || 0) - minX);
+            copy.y = baseLocalY + ((orig.y || 0) - minY);
+          } else {
+            copy.x = (orig.x || 0) + 24;
+            copy.y = (orig.y || 0) + 24;
+          }
+          if (copy.type === 'image') ensureImageProps(copy);
+
+          targetFrame.children = targetFrame.children || [];
+          targetFrame.children.push(copy);
+          renderChildNode(copy, targetFrame, frameEl);
+          newSelections.push({ frameId: targetFrame.id, childId: copy.id });
+        });
+
+        selectedFrameIds.clear();
+        selectedId = null;
+        selectedChildNodes = newSelections;
+        selectedTextNode = newSelections.length > 0 ? newSelections[0] : { frameId: null, childId: null };
+        world.querySelectorAll('.canvas-text-node, .canvas-image-node').forEach(el => {
+          const cId = Number(el.dataset.id);
+          el.classList.toggle('is-selected', selectedChildNodes.some(n => n.childId === cId));
+        });
+        world.querySelectorAll('.canvas-frame').forEach(el => el.classList.remove('is-selected'));
+
+        updateTextToolbar();
+        save();
+        return true;
+      }
+
+      if (data.kind === 'frames' && Array.isArray(data.frames) && data.frames.length > 0) {
+        const minX = Math.min(...data.frames.map(f => f.x || 0));
+        const minY = Math.min(...data.frames.map(f => f.y || 0));
+        const newFrameIds = new Set();
+
+        data.frames.forEach(orig => {
+          const copy = JSON.parse(JSON.stringify(orig));
+          copy.id = frameSeq++;
+          copy.name = orig.name ? `${orig.name} (cópia)` : '';
+          
+          copy.x = Math.round(worldPt.x + ((orig.x || 0) - minX));
+          copy.y = Math.round(worldPt.y + ((orig.y || 0) - minY));
+
+          copy.children = (orig.children || []).map(c => {
+            const chCopy = { ...c, id: childSeq++ };
+            if (c.type === 'image') ensureImageProps(chCopy);
+            return chCopy;
+          });
+
+          frames.push(copy);
+          renderFrame(copy);
+          newFrameIds.add(copy.id);
+        });
+
+        selectedChildNodes = [];
+        selectedTextNode = { frameId: null, childId: null };
+        selectedFrameIds = newFrameIds;
+        selectedId = [...newFrameIds][0];
+        world.querySelectorAll('.canvas-frame').forEach((el) => {
+          const fId = Number(el.dataset.id);
+          el.classList.toggle('is-selected', selectedFrameIds.has(fId));
+        });
+        world.querySelectorAll('.canvas-text-node, .canvas-image-node').forEach(el => el.classList.remove('is-selected'));
+
+        updateTopbar();
+        updateFrameMeta();
+        save();
+        return true;
+      }
+
+      return false;
+    }
+
+    document.addEventListener('copy', (e) => {
+      if (!view.classList.contains('is-open')) return;
+      const isTyping = document.activeElement && 
+        (document.activeElement.isContentEditable || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+      if (isTyping) return;
+
+      const payloadStr = copySelectedElements();
+      if (payloadStr) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.clipboardData) {
+          e.clipboardData.setData('text/plain', payloadStr);
+        }
+      }
+    });
+
+    document.addEventListener('cut', (e) => {
+      if (!view.classList.contains('is-open')) return;
+      const isTyping = document.activeElement && 
+        (document.activeElement.isContentEditable || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+      if (isTyping) return;
+
+      const payloadStr = copySelectedElements();
+      if (payloadStr) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.clipboardData) {
+          e.clipboardData.setData('text/plain', payloadStr);
+        }
+        if (selectedChildNodes.length > 0) deleteTextNode();
+        else if (selectedFrameIds.size > 0) deleteFrame(selectedId);
+      }
+    });
+
     document.addEventListener('paste', (e) => {
       if (!view.classList.contains('is-open')) return;
 
-      const items = (e.clipboardData || window.clipboardData).items;
+      const isEditingText = document.activeElement && 
+        (document.activeElement.isContentEditable || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+
+      const plainText = (e.clipboardData || window.clipboardData)?.getData('text/plain')?.trim() || '';
+
+      // 1. Tenta colar nós/frames nativos copiados entre abas
+      if (!isEditingText && pasteClipboardPayload(plainText)) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      // 2. Colar imagens (prints de tela, arquivos do computador ou links)
+      const items = (e.clipboardData || window.clipboardData)?.items;
       if (!items) return;
 
       let handledImage = false;
@@ -5565,7 +5802,6 @@
                   w = MAX_W;
                 }
 
-                // Se o mouse estiver sobre o frame alvo, cola sob o mouse; senão no centro do frame
                 let localX, localY;
                 if (worldPt.x >= targetFrame.x && worldPt.x <= targetFrame.x + targetFrame.w &&
                     worldPt.y >= targetFrame.y && worldPt.y <= targetFrame.y + targetFrame.h) {
@@ -5586,14 +5822,9 @@
         }
       }
 
-      // Se não for imagem binária mas for um link copiado de imagem (Unsplash, CDN, etc) enquanto não edita texto
-      const isEditingText = document.activeElement && 
-        (document.activeElement.isContentEditable || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
-
-      if (!handledImage && !isEditingText) {
-        const text = (e.clipboardData || window.clipboardData).getData('text/plain').trim();
-        const isImageUrl = /^(https?:\/\/.*\.(?:png|jpg|jpeg|webp|svg|gif)(\?.*)?)$/i.test(text) ||
-                           /^https?:\/\/(images\.unsplash\.com|cdn\.pixabay\.com|images\.pexels\.com)\/.*$/i.test(text);
+      if (!handledImage && !isEditingText && plainText) {
+        const isImageUrl = /^(https?:\/\/.*\.(?:png|jpg|jpeg|webp|svg|gif)(\?.*)?)$/i.test(plainText) ||
+                           /^https?:\/\/(images\.unsplash\.com|cdn\.pixabay\.com|images\.pexels\.com)\/.*$/i.test(plainText);
         if (isImageUrl) {
           e.preventDefault();
           const worldPt = screenToWorld(lastMouseScreen.x, lastMouseScreen.y);
@@ -5612,7 +5843,7 @@
           const img = new Image();
           img.crossOrigin = 'anonymous';
           img.onload = () => {
-            let rawData = text;
+            let rawData = plainText;
             try {
               const cvs = document.createElement('canvas');
               cvs.width = img.naturalWidth || img.width;
@@ -5621,7 +5852,7 @@
               ctx.drawImage(img, 0, 0);
               rawData = cvs.toDataURL('image/png');
             } catch {
-              rawData = text;
+              rawData = plainText;
             }
             const origW = img.naturalWidth || img.width;
             const origH = img.naturalHeight || img.height;
@@ -5636,7 +5867,7 @@
             let localY = Math.round((targetFrame.h - h) / 2);
             addImageNode(targetFrame, rawData, origW, origH, localX, localY);
           };
-          img.src = text;
+          img.src = plainText;
         }
       }
     });
@@ -5891,6 +6122,16 @@
         e.stopPropagation();
         if (hasChildren) deleteTextNode();
         else if (selectedLinkId !== null) deleteLink(selectedLinkId);
+        else if (hasFrames) deleteFrame(selectedId);
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c') {
+        if (!hasChildren && !hasFrames) return;
+        copySelectedElements();
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'x') {
+        if (!hasChildren && !hasFrames) return;
+        e.preventDefault();
+        e.stopPropagation();
+        copySelectedElements();
+        if (hasChildren) deleteTextNode();
         else if (hasFrames) deleteFrame(selectedId);
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'd') {
         if (!hasChildren && !hasFrames) return;
@@ -6370,15 +6611,28 @@
         if (child.bind && overrides[child.bind] !== undefined) {
           const val = String(overrides[child.bind]).toLowerCase().trim();
           if (batchData.localImages && batchData.localImages.has(val)) {
+            console.log('[EXPORT-DBG] child', child.id, 'bind', child.bind, '-> localImage');
             return batchData.localImages.get(val);
           }
-          if (overrides[child.bind]) return overrides[child.bind];
+          if (overrides[child.bind]) {
+            console.log('[EXPORT-DBG] child', child.id, 'bind', child.bind, '-> override value:', String(overrides[child.bind]).slice(0, 80));
+            return overrides[child.bind];
+          }
         }
-        if (child.src) return child.src;
+        if (child.src) {
+          console.log('[EXPORT-DBG] child', child.id, '-> child.src');
+          return child.src;
+        }
         if (child.assetId) {
-          if (assetCache.has(child.assetId)) return assetCache.get(child.assetId);
-          return await getAsset(child.assetId);
+          if (assetCache.has(child.assetId)) {
+            console.log('[EXPORT-DBG] child', child.id, '-> assetCache', child.assetId);
+            return assetCache.get(child.assetId);
+          }
+          const fromDb = await getAsset(child.assetId);
+          console.log('[EXPORT-DBG] child', child.id, '-> IDB', child.assetId, fromDb ? 'OK len=' + fromDb.length : 'NULL');
+          return fromDb;
         }
+        console.log('[EXPORT-DBG] child', child.id, '-> NOTHING');
         return null;
       }
 
@@ -6491,10 +6745,12 @@
 
         // 2. Nós filhos
         const children = frame.children || [];
+        console.log('[EXPORT-DBG] frame', frame.id, 'children:', children.map(c => c.type + '#' + c.id).join(', '), '| overrides:', JSON.stringify(overrides).slice(0, 200));
         for (const child of children) {
           if (child.type === 'image') {
             const src = await resolveChildImageSrc(child, overrides);
             const img = await loadExportImage(src);
+            console.log('[EXPORT-DBG] child', child.id, 'img loaded?', !!img);
             if (img) {
               ctx.save();
               ctx.globalAlpha = (child.opacity != null ? child.opacity : 100) / 100;
