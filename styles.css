@@ -3296,6 +3296,263 @@ body {
   color: #9CA3AF;
 }
 
+.canvas-library-modal-oa {
+  max-width: 680px;
+  width: 92%;
+}
+
+.canvas-lib-view-container-oa {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 56vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+/* --- GRADIENTES MESH --- */
+.canvas-mesh-panel-oa {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.canvas-mesh-preview-box-oa {
+  flex: 1;
+  min-width: 220px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.canvas-mesh-canvas-oa {
+  width: 100%;
+  max-width: 220px;
+  aspect-ratio: 4 / 5;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: block;
+}
+
+.canvas-mesh-controls-oa {
+  flex: 1.3;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.canvas-mesh-colors-row-oa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.canvas-mesh-color-pick-oa {
+  flex: 1;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #E5E7EB;
+  cursor: pointer;
+  padding: 0;
+}
+
+.canvas-mesh-presets-grid-oa {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.canvas-mesh-preset-card-oa {
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 6px;
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.canvas-mesh-preset-card-oa:hover {
+  border-color: #8B5CF6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(139, 92, 246, 0.1);
+}
+
+.canvas-mesh-preset-thumb-oa {
+  width: 100%;
+  height: 48px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.canvas-mesh-preset-name-oa {
+  font-size: 11px;
+  font-weight: 500;
+  color: #374151;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* --- FONTES & TIPOGRAFIA --- */
+.canvas-font-chips-oa {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.canvas-font-chips-oa::-webkit-scrollbar { display: none; }
+
+.canvas-font-chip-oa {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid #E5E7EB;
+  background: #FFFFFF;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: #4B5563;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition);
+}
+
+.canvas-font-chip-oa:hover {
+  background: #F9FAFB;
+  color: #111827;
+}
+
+.canvas-font-chip-oa.is-active {
+  background: #111827;
+  color: #FFFFFF;
+  border-color: #111827;
+}
+
+.canvas-font-dropzone-oa {
+  border: 1.5px dashed #D1D5DB;
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: center;
+  background: #F9FAFB;
+  color: #6B7280;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.canvas-font-dropzone-oa:hover,
+.canvas-font-dropzone-oa.is-dragover {
+  border-color: #8B5CF6;
+  background: #F5F3FF;
+  color: #7C3AED;
+}
+
+.canvas-font-list-oa {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.canvas-font-card-oa {
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: all var(--transition);
+}
+
+.canvas-font-card-oa:hover {
+  border-color: #D1D5DB;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.canvas-font-info-oa {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.canvas-font-header-row-oa {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.canvas-font-title-oa {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.canvas-font-badge-oa {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #F3F4F6;
+  color: #6B7280;
+  text-transform: capitalize;
+}
+
+.canvas-font-preview-text-oa {
+  font-size: 15px;
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-top: 2px;
+}
+
+.canvas-font-action-btn-oa {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 7px;
+  border: 1px solid #E5E7EB;
+  background: #FFFFFF;
+  color: #111827;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition);
+}
+
+.canvas-font-action-btn-oa:hover {
+  background: #F3F4F6;
+}
+
+.canvas-font-action-btn-oa.is-installed {
+  background: #ECFDF5;
+  color: #059669;
+  border-color: #A7F3D0;
+  cursor: default;
+}
+
 /* ------------------------------------------------------------
    MODAIS SEPARADOS: DADOS / FOTOS / EXPORTAR
    ------------------------------------------------------------ */
@@ -3521,339 +3778,5 @@ body {
   border-radius: 9999px;
   transition: width 0.15s ease-out;
 }
-
-/* ------------------------------------------------------------
-   CENTRAL DE PLUGINS & RECURSOS (FIGMA STYLE)
-   ------------------------------------------------------------ */
-.canvas-plugins-modal-oa {
-  width: 90%;
-  max-width: 680px;
-  max-height: 82vh;
-  display: flex;
-  flex-direction: column;
-  background: #FFFFFF;
-  border-radius: 16px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  border: 1px solid #E5E7EB;
-  overflow: hidden;
-}
-
-.canvas-plugins-header-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: #F5F3FF;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.canvas-plugins-body-oa {
-  padding: 16px 20px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow: hidden;
-  flex: 1;
-}
-
-.canvas-plugins-tabs-oa {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  scrollbar-width: none;
-}
-.canvas-plugins-tabs-oa::-webkit-scrollbar { display: none; }
-
-.canvas-plugins-tab-oa {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid #E5E7EB;
-  background: #FFFFFF;
-  color: #4B5563;
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all var(--transition);
-}
-
-.canvas-plugins-tab-oa:hover {
-  background: #F9FAFB;
-  border-color: #D1D5DB;
-  color: #111827;
-}
-
-.canvas-plugins-tab-oa.active {
-  background: #111827;
-  border-color: #111827;
-  color: #FFFFFF;
-}
-
-.canvas-plugins-content-oa {
-  flex: 1;
-  overflow-y: auto;
-  max-height: 52vh;
-  padding-right: 4px;
-}
-
-/* Barra de Busca & Filtros do Plugin */
-.canvas-plugins-toolbar-oa {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.canvas-plugins-search-wrap {
-  flex: 1;
-  min-width: 200px;
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.canvas-plugins-search-wrap svg {
-  position: absolute;
-  left: 10px;
-  color: #9CA3AF;
-  pointer-events: none;
-}
-
-.canvas-plugins-search-input {
-  width: 100%;
-  padding: 7px 12px 7px 32px;
-  border: 1px solid #E5E7EB;
-  border-radius: 8px;
-  font-size: 13px;
-  font-family: inherit;
-  outline: none;
-  background: #F9FAFB;
-  color: #111827;
-  transition: all var(--transition);
-}
-
-.canvas-plugins-search-input:focus {
-  background: #FFFFFF;
-  border-color: #8B5CF6;
-  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.12);
-}
-
-/* Plugin de Ícones */
-.canvas-plugins-icons-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
-  gap: 8px;
-}
-
-.canvas-plugins-icon-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 4px;
-  background: #FFFFFF;
-  border: 1px solid #F3F4F6;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.canvas-plugins-icon-item:hover {
-  background: #F5F3FF;
-  border-color: #DDD6FE;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-}
-
-.canvas-plugins-icon-item span {
-  font-size: 10.5px;
-  color: #6B7280;
-  text-overflow: ellipsis;
-  overflow: hidden;
-  white-space: nowrap;
-  max-width: 60px;
-}
-
-/* Plugin de Fotos */
-.canvas-plugins-photos-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 10px;
-}
-
-.canvas-plugins-photo-card {
-  position: relative;
-  height: 120px;
-  border-radius: 10px;
-  overflow: hidden;
-  background: #E5E7EB;
-  cursor: pointer;
-  border: 1px solid #E5E7EB;
-  transition: all var(--transition);
-}
-
-.canvas-plugins-photo-card img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.canvas-plugins-photo-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  opacity: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 8px;
-  transition: opacity 0.15s ease;
-}
-
-.canvas-plugins-photo-card:hover .canvas-plugins-photo-overlay {
-  opacity: 1;
-}
-
-.canvas-plugins-photo-btn {
-  width: 100%;
-  padding: 5px 8px;
-  background: #FFFFFF;
-  border: none;
-  border-radius: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #111827;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-}
-
-.canvas-plugins-photo-btn:hover {
-  background: #F3F4F6;
-}
-
-/* Plugin de Paletas */
-.canvas-plugins-palettes-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-}
-
-.canvas-plugins-palette-card {
-  border: 1px solid #E5E7EB;
-  border-radius: 12px;
-  padding: 12px;
-  background: #FFFFFF;
-  cursor: pointer;
-  transition: all var(--transition);
-}
-
-.canvas-plugins-palette-card:hover {
-  border-color: #8B5CF6;
-  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.1);
-  transform: translateY(-2px);
-}
-
-.canvas-plugins-palette-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1F2937;
-  margin-bottom: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.canvas-plugins-swatches {
-  display: flex;
-  height: 36px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.canvas-plugins-swatch {
-  flex: 1;
-  height: 100%;
-}
-
-/* Plugin de QR Code */
-.canvas-plugins-qrcode-wrap {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-  padding: 10px 0;
-}
-
-.canvas-plugins-qrcode-preview {
-  width: 180px;
-  height: 180px;
-  background: #F9FAFB;
-  border: 1px solid #E5E7EB;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px;
-}
-
-.canvas-plugins-qrcode-form {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* Plugin de Versículos / Frases */
-.canvas-plugins-quotes-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.canvas-plugins-quote-item {
-  border: 1px solid #E5E7EB;
-  border-radius: 10px;
-  padding: 12px 14px;
-  background: #FFFFFF;
-  cursor: pointer;
-  transition: all var(--transition);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.canvas-plugins-quote-item:hover {
-  border-color: #8B5CF6;
-  background: #F5F3FF;
-}
-
-.canvas-plugins-quote-text {
-  font-size: 13px;
-  color: #1F2937;
-  line-height: 1.45;
-  font-style: italic;
-}
-
-.canvas-plugins-quote-ref {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: #8B5CF6;
-}
-
 
 

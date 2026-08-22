@@ -471,8 +471,8 @@
     <div class="openpanel-modal canvas-library-modal-oa">
       <div class="openpanel-modal__header">
         <div>
-          <h2 class="openpanel-modal__title">Biblioteca</h2>
-          <div class="openpanel-modal__sub">275 mil ícones e stickers — clique para inserir no frame</div>
+          <h2 class="openpanel-modal__title">Biblioteca & Recursos</h2>
+          <div class="openpanel-modal__sub" id="canvas-library-sub">Ícones, stickers, gradientes mesh e tipografia para o Canvas</div>
         </div>
         <button class="openpanel-close-btn" id="canvas-library-close" title="Fechar (Esc)">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -483,10 +483,12 @@
       </div>
 
       <div class="canvas-batch-body-oa">
-        <div class="canvas-lib-controls-oa">
+        <div class="canvas-lib-controls-oa" id="canvas-library-controls">
           <div class="canvas-lib-tabs-oa">
             <button type="button" class="canvas-lib-tab-oa is-active" data-tab="icons">Ícones</button>
             <button type="button" class="canvas-lib-tab-oa" data-tab="stickers">Stickers</button>
+            <button type="button" class="canvas-lib-tab-oa" data-tab="gradients">Gradientes</button>
+            <button type="button" class="canvas-lib-tab-oa" data-tab="fonts">Fontes</button>
           </div>
           <input type="text" class="canvas-lib-search-oa" id="canvas-library-search" placeholder="Buscar… (ex: coração, seta, cruz)" autocomplete="off">
           <label class="canvas-lib-color-oa" id="canvas-library-color-wrap" title="Cor do ícone">
@@ -495,11 +497,12 @@
         </div>
 
         <div class="canvas-lib-grid-oa" id="canvas-library-grid"></div>
+        <div class="canvas-lib-view-container-oa" id="canvas-library-view" style="display: none;"></div>
         <div class="canvas-batch-hint-oa" id="canvas-library-hint"></div>
       </div>
 
       <div class="openpanel-modal__footer">
-        <span class="canvas-batch-foot-info-oa">Ícones via Iconify · stickers Twemoji, Noto, Fluent e OpenMoji</span>
+        <span class="canvas-batch-foot-info-oa" id="canvas-library-footer-info">Ícones via Iconify · Gradientes via @mesh-gradient · 2.096 Fontes via Fontsource</span>
         <button class="openpanel-btn-secondary" id="canvas-library-cancel">Fechar</button>
       </div>
     </div>
@@ -663,60 +666,6 @@
   </div>
 
   <!-- --------------------------------------------------
-       MODAL DE PLUGINS & RECURSOS (FIGMA STYLE)
-       -------------------------------------------------- -->
-  <div class="modal-overlay" id="canvas-plugins-modal">
-    <div class="openpanel-modal canvas-plugins-modal-oa">
-      <div class="openpanel-modal__header">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div class="canvas-plugins-header-icon">
-            <i data-lucide="blocks" style="width: 18px; height: 18px; color: #8B5CF6;"></i>
-          </div>
-          <div>
-            <h2 class="openpanel-modal__title">Plugins & Recursos</h2>
-            <div class="openpanel-modal__sub">Ícones vetoriais, fotos gratuitas, QR Code e paletas de cores</div>
-          </div>
-        </div>
-        <button class="openpanel-close-btn" id="canvas-plugins-close" title="Fechar (Esc)">
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-
-      <div class="canvas-plugins-body-oa">
-        <!-- Barra de Abas / Seleção de Plugins -->
-        <div class="canvas-plugins-tabs-oa">
-          <button class="canvas-plugins-tab-oa active" data-plugin="icons">
-            <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
-            <span>Ícones</span>
-          </button>
-          <button class="canvas-plugins-tab-oa" data-plugin="photos">
-            <i data-lucide="image" style="width: 14px; height: 14px;"></i>
-            <span>Fotos Gratuitas</span>
-          </button>
-          <button class="canvas-plugins-tab-oa" data-plugin="qrcode">
-            <i data-lucide="qr-code" style="width: 14px; height: 14px;"></i>
-            <span>QR Code</span>
-          </button>
-          <button class="canvas-plugins-tab-oa" data-plugin="palettes">
-            <i data-lucide="palette" style="width: 14px; height: 14px;"></i>
-            <span>Paletas</span>
-          </button>
-          <button class="canvas-plugins-tab-oa" data-plugin="quotes">
-            <i data-lucide="quote" style="width: 14px; height: 14px;"></i>
-            <span>Versículos & Frases</span>
-          </button>
-        </div>
-
-        <!-- Área de Conteúdo do Plugin Selecionado -->
-        <div class="canvas-plugins-content-oa" id="canvas-plugins-content"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- --------------------------------------------------
        CANVAS INFINITO (PAN + ZOOM, FUNDO PONTILHADO)
        -------------------------------------------------- -->
   <div class="canvas-view" id="canvas-view">
@@ -741,9 +690,6 @@
           <i data-lucide="image" style="width: 16px; height: 16px;"></i>
         </button>
         <input type="file" id="canvas-image-upload" accept="image/*" style="display: none">
-        <button class="canvas-topbar__btn" id="canvas-plugins-btn" title="Plugins & Recursos: Ícones, Fotos, QR Code, Paletas (Shift+I)">
-          <i data-lucide="blocks" style="width: 16px; height: 16px;"></i>
-        </button>
 
         <span class="canvas-topbar__sep"></span>
 

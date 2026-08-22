@@ -2162,8 +2162,11 @@
       save();
     }
 
-    // Preenche o seletor de famílias uma vez, cada opção já na própria fonte
-    if (selFont) {
+    // Preenche o seletor de famílias
+    function refreshFontSelect() {
+      if (!selFont) return;
+      const currentVal = selFont.value;
+      selFont.innerHTML = '';
       FONTS.forEach(f => {
         const opt = document.createElement('option');
         opt.value = f.css;
@@ -2171,6 +2174,11 @@
         opt.style.fontFamily = f.css;
         selFont.appendChild(opt);
       });
+      if (currentVal) selFont.value = currentVal;
+    }
+
+    if (selFont) {
+      refreshFontSelect();
       selFont.addEventListener('change', (e) => applyTextToolbarAction(c => {
         c.fontFamily = e.target.value;
         c.fontWeight = nearestWeight(fontOf(c), c.fontWeight || TEXT_DEFAULTS.fontWeight);
@@ -3075,6 +3083,7 @@
         if (!raw) {
           undoStack.push(getCanvasSnapshot());
           updateUndoRedoButtons();
+          initCustomFonts();
           return;
         }
         const data = JSON.parse(raw);
@@ -3095,9 +3104,11 @@
         undoStack.push(getCanvasSnapshot());
         updateUndoRedoButtons();
         migrateInlineBackgrounds();
+        initCustomFonts();
       } catch (e) {
         undoStack.push(getCanvasSnapshot());
         updateUndoRedoButtons();
+        initCustomFonts();
       }
     }
 
@@ -7184,6 +7195,19 @@
         const frameW = frame.w || 1080;
         const frameH = frame.h || 1350;
 
+        // Garante que todas as fontes usadas neste frame estejam carregadas e prontas antes de desenhar
+        for (const child of (frame.children || [])) {
+          if (child.type === 'text' && child.fontFamily) {
+            try {
+              const fontObj = fontOf(child);
+              const weight = child.fontWeight || 400;
+              await document.fonts.load(`${weight} 16px ${fontObj.name}`);
+            } catch (e) {
+              console.warn('[export] aviso ao carregar fonte:', child.fontFamily, e);
+            }
+          }
+        }
+
         if (document.fonts && document.fonts.ready) {
           await document.fonts.ready;
         }
@@ -7978,6 +8002,10 @@
       window.renderBatchPhotosGrid = renderPhotosGrid;
       window.exportFrameToBlob = exportFrameToBlob;
       window.renderFrameToCanvas = renderFrameToCanvas;
+      window.selectFrame = selectFrame;
+      window.addTextToSelectedFrame = addTextToSelectedFrame;
+      window.FONTS = FONTS;
+      window.renderAll = renderAll;
     }
 
     // --------------------------------------------------
@@ -7999,7 +8027,7 @@
     const SUGESTOES_ICONES = [
       'mdi:heart', 'mdi:cross', 'ph:hands-praying-fill', 'mdi:book-open-page-variant',
       'solar:star-bold', 'ph:sun-bold', 'ph:moon-stars-fill', 'mdi:leaf',
-      'ph:quotes-fill', 'mdi:arrow-right-thin', 'ph:sparkle-fill', 'mdi:dove',
+      'ph:quotes-fill', 'mdi:arrow-right-thin', 'ph:sparkle-fill', 'fa7-solid:dove',
       'ph:flower-lotus-fill', 'mdi:hand-heart', 'ph:butterfly-fill', 'mdi:candle',
       'ph:cloud-fill', 'mdi:water', 'ph:mountains-fill', 'mdi:infinity'
     ];
@@ -8010,6 +8038,141 @@
       'twemoji:candle', 'noto:open-book', 'fluent-emoji-flat:fire', 'twemoji:sunrise',
       'noto:four-leaf-clover', 'twemoji:glowing-star', 'noto:rose', 'twemoji:rainbow'
     ];
+
+    /* Presets curados de Mesh Gradient */
+    const MESH_PRESETS = [
+      { name: 'Aurora Sunset', colors: ['#FF5E7E', '#FF9966', '#FFD166', '#6B5B95'], seed: 12 },
+      { name: 'Deep Cyberpunk', colors: ['#7928CA', '#FF0080', '#00DFD8', '#111827'], seed: 45 },
+      { name: 'Oceano Místico', colors: ['#007CF0', '#00DFD8', '#7928CA', '#0A192F'], seed: 88 },
+      { name: 'Esmeralda & Ouro', colors: ['#059669', '#10B981', '#F59E0B', '#064E3B'], seed: 33 },
+      { name: 'Lavanda Suave', colors: ['#C4B5FD', '#DDD6FE', '#F3E8FF', '#8B5CF6'], seed: 21 },
+      { name: 'Pêssego & Creme', colors: ['#FCA5A5', '#FDBA74', '#FEF08A', '#FFF7ED'], seed: 67 },
+      { name: 'Dark Slate Neon', colors: ['#1E293B', '#334155', '#38BDF8', '#0F172A'], seed: 99 },
+      { name: 'Devocional Warm', colors: ['#78350F', '#B45309', '#FDE68A', '#451A03'], seed: 14 },
+      { name: 'Alvorada Celestial', colors: ['#38BDF8', '#818CF8', '#C084FC', '#1E1B4B'], seed: 56 },
+      { name: 'Papel Vintage', colors: ['#E7E5E4', '#D6D3D1', '#A8A29E', '#78716C'], seed: 77 }
+    ];
+
+    let MeshGradientModule = null;
+    async function loadMeshGradientLib() {
+      if (MeshGradientModule) return MeshGradientModule;
+      try {
+        const mod = await import('https://esm.sh/@mesh-gradient/core@2.0.2');
+        MeshGradientModule = mod.MeshGradient;
+        return MeshGradientModule;
+      } catch (err) {
+        console.error('[mesh-gradient] Falha ao carregar @mesh-gradient/core:', err);
+        throw err;
+      }
+    }
+
+    async function renderMeshGradientToDataUrl(colors, seed, w = 1080, h = 1350) {
+      const MeshGradClass = await loadMeshGradientLib();
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.style.position = 'fixed';
+      canvas.style.left = '-9999px';
+      canvas.style.top = '-9999px';
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      document.body.appendChild(canvas);
+
+      try {
+        const mg = new MeshGradClass();
+        await mg.init(canvas, {
+          colors: colors,
+          seed: Number(seed) || 42,
+          isStatic: true,
+          webglContextAttributes: { preserveDrawingBuffer: true }
+        });
+
+        if (typeof mg.animateFrame === 'function') {
+          mg.animateFrame();
+        }
+
+        const dataUrl = canvas.toDataURL('image/png');
+        try {
+          if (typeof mg.destroy === 'function') mg.destroy();
+        } catch {}
+
+        return dataUrl;
+      } finally {
+        if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+      }
+    }
+
+    /* Gerenciamento de Fontes Customizadas (Fontsource e Locais) */
+    const CUSTOM_FONTS_STORAGE = 'oa_custom_fonts';
+
+    function saveCustomFontMetadata(fontObj) {
+      try {
+        const raw = localStorage.getItem(CUSTOM_FONTS_STORAGE);
+        const list = raw ? JSON.parse(raw) : [];
+        if (!list.some(f => f.name.toLowerCase() === fontObj.name.toLowerCase())) {
+          list.push({
+            name: fontObj.name,
+            family: fontObj.name,
+            css: fontObj.css,
+            weights: fontObj.weights || [400, 700],
+            category: fontObj.category || 'sans-serif',
+            assetId: fontObj.assetId
+          });
+          localStorage.setItem(CUSTOM_FONTS_STORAGE, JSON.stringify(list));
+        }
+      } catch (e) {
+        console.error('[fonts] erro ao salvar metadata de fonte:', e);
+      }
+    }
+
+    async function initCustomFonts() {
+      try {
+        const raw = localStorage.getItem(CUSTOM_FONTS_STORAGE);
+        if (!raw) return;
+        const customFonts = JSON.parse(raw);
+        if (!Array.isArray(customFonts)) return;
+
+        for (const item of customFonts) {
+          if (!item.assetId || !item.name) continue;
+          let dataUrl = assetCache.get(item.assetId);
+          if (!dataUrl) {
+            dataUrl = await getAsset(item.assetId);
+            if (dataUrl) assetCache.set(item.assetId, dataUrl);
+          }
+          if (dataUrl) {
+            try {
+              const base64 = String(dataUrl).split(',')[1];
+              if (!base64) continue;
+              const binaryStr = atob(base64);
+              const len = binaryStr.length;
+              const bytes = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                bytes[i] = binaryStr.charCodeAt(i);
+              }
+              const fontFace = new FontFace(item.name, bytes.buffer);
+              await fontFace.load();
+              document.fonts.add(fontFace);
+
+              if (!FONTS.some(f => f.name.toLowerCase() === item.name.toLowerCase())) {
+                FONTS.push({
+                  css: item.css || `"${item.name}", sans-serif`,
+                  name: item.name,
+                  weights: item.weights || [400, 700],
+                  category: item.category || 'sans-serif',
+                  custom: true,
+                  assetId: item.assetId
+                });
+              }
+            } catch (err) {
+              console.warn('[fonts] Falha ao re-hidratar fonte:', item.name, err);
+            }
+          }
+        }
+        refreshFontSelect();
+      } catch (e) {
+        console.error('[fonts] erro ao carregar fontes customizadas:', e);
+      }
+    }
 
     function iconPreviewUrl(iconId, color) {
       const [prefix, ...rest] = iconId.split(':');
@@ -8110,11 +8273,14 @@
       const openBtn = document.getElementById('canvas-library-btn');
       const closeBtn = document.getElementById('canvas-library-close');
       const cancelBtn = document.getElementById('canvas-library-cancel');
+      const controlsWrap = document.getElementById('canvas-library-controls');
       const searchInput = document.getElementById('canvas-library-search');
       const colorInput = document.getElementById('canvas-library-color');
       const colorWrap = document.getElementById('canvas-library-color-wrap');
       const grid = document.getElementById('canvas-library-grid');
+      const viewContainer = document.getElementById('canvas-library-view');
       const hint = document.getElementById('canvas-library-hint');
+      const subTitle = document.getElementById('canvas-library-sub');
       const tabs = [...document.querySelectorAll('.canvas-lib-tab-oa')];
 
       if (!modal || !openBtn || !grid) return;
@@ -8122,9 +8288,18 @@
       let tab = 'icons';
       let buscaSeq = 0;
 
+      // Estado do Mesh Gradient
+      let currentMeshColors = [...MESH_PRESETS[0].colors];
+      let currentMeshSeed = MESH_PRESETS[0].seed;
+
+      // Estado do Catálogo de Fontes
+      let fontCatalog = [];
+      let fontCategoryFilter = 'all';
+      let fontCatalogLoading = false;
+
       const corAtual = () => (tab === 'icons' ? (colorInput ? colorInput.value : '#111827') : null);
 
-      function renderResultados(ids) {
+      function renderResultadosIcones(ids) {
         grid.innerHTML = '';
         if (!ids.length) {
           grid.innerHTML = '<div class="canvas-lib-empty-oa">Nada encontrado. Tente em inglês (ex: <strong>heart</strong>, <strong>cross</strong>, <strong>arrow</strong>) ou confira a ortografia.</div>';
@@ -8146,12 +8321,12 @@
         });
       }
 
-      async function buscar(termo) {
+      async function buscarIcones(termo) {
         const seq = ++buscaSeq;
         const q = (termo || '').trim();
 
         if (!q) {
-          renderResultados(tab === 'icons' ? SUGESTOES_ICONES : SUGESTOES_STICKERS);
+          renderResultadosIcones(tab === 'icons' ? SUGESTOES_ICONES : SUGESTOES_STICKERS);
           if (hint) hint.textContent = 'Sugestões — digite pra buscar no acervo inteiro.';
           return;
         }
@@ -8164,7 +8339,7 @@
           if (tab === 'stickers') url += `&prefixes=${STICKER_PREFIXES}`;
           const res = await fetch(url);
           const data = await res.json();
-          if (seq !== buscaSeq) return; // chegou fora de ordem: descarta
+          if (seq !== buscaSeq) return;
           let ids = data.icons || [];
 
           if (!ids.length && queryTerm !== q) {
@@ -8175,7 +8350,7 @@
             if (seq === buscaSeq) ids = data2.icons || [];
           }
 
-          renderResultados(ids);
+          renderResultadosIcones(ids);
           if (hint) {
             if (ids.length) {
               const transNote = queryTerm !== q ? ` (buscado por "${queryTerm}")` : '';
@@ -8201,7 +8376,6 @@
         itemEl.classList.add('is-busy');
         try {
           const { dataUrl, w, h } = await rasterizeIcon(iconId, corAtual());
-          // Ícone entra em ~28% da largura do frame: tamanho de adorno, não de foto
           const alvo = Math.round(frame.w * 0.28);
           const escala = alvo / Math.max(w, h);
           await addImageNode(frame, dataUrl, Math.round(w * escala), Math.round(h * escala));
@@ -8214,38 +8388,535 @@
         }
       }
 
-      tabs.forEach(t => {
-        t.addEventListener('click', () => {
-          tab = t.dataset.tab;
-          tabs.forEach(o => o.classList.toggle('is-active', o === t));
-          // Sticker é colorido por natureza: recolorir descaracteriza
-          if (colorWrap) colorWrap.style.display = tab === 'icons' ? 'block' : 'none';
-          if (searchInput) searchInput.placeholder = tab === 'icons'
-            ? 'Buscar… (ex: heart, cross, arrow)'
-            : 'Buscar sticker… (ex: praying, fire, star)';
-          buscar(searchInput ? searchInput.value : '');
+      // --- ABA GRADIENTES MESH ---
+      async function renderGradientsView() {
+        if (!viewContainer) return;
+        viewContainer.innerHTML = `
+          <div class="canvas-mesh-panel-oa">
+            <div class="canvas-mesh-preview-box-oa">
+              <canvas class="canvas-mesh-canvas-oa" id="canvas-mesh-live-preview" width="360" height="450"></canvas>
+              <div style="font-size: 11.5px; color: #6B7280; text-align: center;">Preview do Gradiente</div>
+            </div>
+
+            <div class="canvas-mesh-controls-oa">
+              <div>
+                <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 6px;">Cores do Mesh (4 Pontos):</label>
+                <div class="canvas-mesh-colors-row-oa">
+                  <input type="color" class="canvas-mesh-color-pick-oa" id="canvas-mesh-c0" value="${currentMeshColors[0]}">
+                  <input type="color" class="canvas-mesh-color-pick-oa" id="canvas-mesh-c1" value="${currentMeshColors[1]}">
+                  <input type="color" class="canvas-mesh-color-pick-oa" id="canvas-mesh-c2" value="${currentMeshColors[2]}">
+                  <input type="color" class="canvas-mesh-color-pick-oa" id="canvas-mesh-c3" value="${currentMeshColors[3]}">
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px;">
+                <button type="button" class="openpanel-btn-secondary" id="canvas-mesh-btn-shuffle" style="flex: 1; padding: 7px;">
+                  🎲 Embaralhar Padrão
+                </button>
+              </div>
+
+              <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
+                <button type="button" class="openpanel-btn-primary" id="canvas-mesh-btn-apply-bg" style="width: 100%; justify-content: center; padding: 8px;">
+                  <span>🖼 Usar como Fundo do Frame</span>
+                </button>
+                <button type="button" class="openpanel-btn-secondary" id="canvas-mesh-btn-insert-elem" style="width: 100%; justify-content: center; padding: 7px;">
+                  ✨ Inserir como Elemento
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 6px; margin-top: 4px;">Presets Recomendados:</label>
+            <div class="canvas-mesh-presets-grid-oa" id="canvas-mesh-presets-container"></div>
+          </div>
+        `;
+
+        // Renderiza lista de presets
+        const presetsContainer = document.getElementById('canvas-mesh-presets-container');
+        if (presetsContainer) {
+          MESH_PRESETS.forEach((preset, idx) => {
+            const card = document.createElement('div');
+            card.className = 'canvas-mesh-preset-card-oa';
+            card.innerHTML = `
+              <div class="canvas-mesh-preset-thumb-oa" style="background: linear-gradient(135deg, ${preset.colors[0]} 0%, ${preset.colors[1]} 35%, ${preset.colors[2]} 70%, ${preset.colors[3]} 100%);"></div>
+              <div class="canvas-mesh-preset-name-oa">${preset.name}</div>
+            `;
+            card.addEventListener('click', () => {
+              currentMeshColors = [...preset.colors];
+              currentMeshSeed = preset.seed;
+              updateMeshInputsAndPreview();
+            });
+            presetsContainer.appendChild(card);
+          });
+        }
+
+        // Conecta inputs de cores
+        [0, 1, 2, 3].forEach(idx => {
+          const inp = document.getElementById(`canvas-mesh-c${idx}`);
+          if (inp) {
+            inp.addEventListener('input', (e) => {
+              currentMeshColors[idx] = e.target.value;
+              updateLiveMeshPreview();
+            });
+          }
         });
+
+        // Botão de Embaralhar
+        const shuffleBtn = document.getElementById('canvas-mesh-btn-shuffle');
+        if (shuffleBtn) {
+          shuffleBtn.addEventListener('click', () => {
+            currentMeshSeed = Math.floor(Math.random() * 1000) + 1;
+            updateLiveMeshPreview();
+          });
+        }
+
+        // Botão Usar como Fundo
+        const applyBgBtn = document.getElementById('canvas-mesh-btn-apply-bg');
+        if (applyBgBtn) {
+          applyBgBtn.addEventListener('click', async () => {
+            const frame = selectedFrame() || frames[0];
+            if (!frame) {
+              alert('Selecione um frame no canvas primeiro.');
+              return;
+            }
+            applyBgBtn.disabled = true;
+            try {
+              const dataUrl = await renderMeshGradientToDataUrl(currentMeshColors, currentMeshSeed, frame.w || 1080, frame.h || 1350);
+              const assetId = 'asset_mesh_bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+              assetCache.set(assetId, dataUrl);
+              await saveAsset(assetId, dataUrl);
+
+              frame.bgAssetId = assetId;
+              frame.bgImage = null;
+              frame.bgRecipe = { type: 'mesh', colors: [...currentMeshColors], seed: currentMeshSeed };
+              if (frame.bgOverlay == null) frame.bgOverlay = 0;
+
+              applyFrameBackground(frame);
+              save();
+              updateTextToolbar();
+              closeLibrary();
+            } catch (err) {
+              console.error('[mesh-gradient] falha ao aplicar fundo:', err);
+              alert('Falha ao renderizar gradiente mesh.');
+            } finally {
+              applyBgBtn.disabled = false;
+            }
+          });
+        }
+
+        // Botão Inserir como Elemento
+        const insertElemBtn = document.getElementById('canvas-mesh-btn-insert-elem');
+        if (insertElemBtn) {
+          insertElemBtn.addEventListener('click', async () => {
+            const frame = selectedFrame() || frames[0];
+            if (!frame) {
+              alert('Selecione um frame no canvas primeiro.');
+              return;
+            }
+            insertElemBtn.disabled = true;
+            try {
+              const targetW = Math.round(frame.w * 0.75);
+              const targetH = Math.round(targetW * 0.75);
+              const dataUrl = await renderMeshGradientToDataUrl(currentMeshColors, currentMeshSeed, targetW, targetH);
+
+              const assetId = 'asset_mesh_node_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+              assetCache.set(assetId, dataUrl);
+              await saveAsset(assetId, dataUrl);
+
+              const x = Math.round((frame.w - targetW) / 2);
+              const y = Math.round((frame.h - targetH) / 2);
+
+              const child = {
+                id: childSeq++,
+                type: 'image',
+                assetId,
+                x, y,
+                w: targetW,
+                h: targetH,
+                origW: targetW,
+                origH: targetH,
+                imgX: 0,
+                imgY: 0,
+                imgW: targetW,
+                imgH: targetH,
+                zoom: 1.0,
+                borderRadius: 16,
+                borderWidth: 0,
+                borderColor: '#000000',
+                opacity: 100,
+                blur: 0,
+                shadow: 0,
+                meshRecipe: { type: 'mesh', colors: [...currentMeshColors], seed: currentMeshSeed }
+              };
+
+              if (!frame.children) frame.children = [];
+              frame.children.push(child);
+              const frameEl = frameElOf(frame);
+              if (frameEl) renderChildNode(child, frame, frameEl);
+              selectTextNode(frame.id, child.id);
+              save();
+              closeLibrary();
+            } catch (err) {
+              console.error('[mesh-gradient] falha ao inserir elemento:', err);
+              alert('Falha ao inserir gradiente como elemento.');
+            } finally {
+              insertElemBtn.disabled = false;
+            }
+          });
+        }
+
+        updateLiveMeshPreview();
+      }
+
+      function updateMeshInputsAndPreview() {
+        [0, 1, 2, 3].forEach(idx => {
+          const inp = document.getElementById(`canvas-mesh-c${idx}`);
+          if (inp) inp.value = currentMeshColors[idx];
+        });
+        updateLiveMeshPreview();
+      }
+
+      let meshLiveInstance = null;
+      async function updateLiveMeshPreview() {
+        const previewCanvas = document.getElementById('canvas-mesh-live-preview');
+        if (!previewCanvas) return;
+        try {
+          if (meshLiveInstance) {
+            try { meshLiveInstance.destroy(); } catch {}
+            meshLiveInstance = null;
+          }
+          const MeshGradClass = await loadMeshGradientLib();
+          meshLiveInstance = new MeshGradClass();
+          await meshLiveInstance.init(previewCanvas, {
+            colors: currentMeshColors,
+            seed: currentMeshSeed,
+            isStatic: true,
+            webglContextAttributes: { preserveDrawingBuffer: true }
+          });
+          if (typeof meshLiveInstance.animateFrame === 'function') meshLiveInstance.animateFrame();
+        } catch (e) {
+          console.warn('[mesh-preview] falha ao atualizar preview:', e);
+        }
+      }
+
+      // --- ABA FONTES & TIPOGRAFIA ---
+      async function loadFontCatalog() {
+        if (fontCatalog.length > 0) return fontCatalog;
+        if (fontCatalogLoading) return [];
+        fontCatalogLoading = true;
+        try {
+          if (hint) hint.textContent = 'Carregando catálogo de fontes do Fontsource…';
+          const res = await fetch('https://api.fontsource.org/v1/fonts');
+          const data = await res.json();
+          fontCatalog = Array.isArray(data) ? data : [];
+          if (hint) hint.textContent = `${fontCatalog.length} famílias disponíveis`;
+          return fontCatalog;
+        } catch (e) {
+          console.error('[fonts] falha ao carregar catálogo Fontsource:', e);
+          if (hint) hint.textContent = 'Não foi possível carregar o catálogo de fontes online.';
+          return [];
+        } finally {
+          fontCatalogLoading = false;
+        }
+      }
+
+      async function renderFontsView() {
+        if (!viewContainer) return;
+        viewContainer.innerHTML = `
+          <!-- Filtro de Categorias -->
+          <div class="canvas-font-chips-oa">
+            <button type="button" class="canvas-font-chip-oa ${fontCategoryFilter === 'all' ? 'is-active' : ''}" data-cat="all">Todas</button>
+            <button type="button" class="canvas-font-chip-oa ${fontCategoryFilter === 'sans-serif' ? 'is-active' : ''}" data-cat="sans-serif">Sans-Serif</button>
+            <button type="button" class="canvas-font-chip-oa ${fontCategoryFilter === 'serif' ? 'is-active' : ''}" data-cat="serif">Serif</button>
+            <button type="button" class="canvas-font-chip-oa ${fontCategoryFilter === 'display' ? 'is-active' : ''}" data-cat="display">Display</button>
+            <button type="button" class="canvas-font-chip-oa ${fontCategoryFilter === 'handwriting' ? 'is-active' : ''}" data-cat="handwriting">Handwriting</button>
+            <button type="button" class="canvas-font-chip-oa ${fontCategoryFilter === 'monospace' ? 'is-active' : ''}" data-cat="monospace">Monospace</button>
+          </div>
+
+          <!-- Dropzone de Arquivo Local -->
+          <div class="canvas-font-dropzone-oa" id="canvas-font-dropzone">
+            <span>📥 Arraste seu arquivo <strong>.ttf</strong>, <strong>.otf</strong> ou <strong>.woff2</strong> aqui ou clique para importar</span>
+            <input type="file" id="canvas-font-file-input" accept=".ttf,.otf,.woff,.woff2" style="display: none;">
+          </div>
+
+          <!-- Lista de Fontes -->
+          <div class="canvas-font-list-oa" id="canvas-font-list"></div>
+        `;
+
+        // Filtro por categoria
+        viewContainer.querySelectorAll('.canvas-font-chip-oa').forEach(chip => {
+          chip.addEventListener('click', () => {
+            fontCategoryFilter = chip.dataset.cat;
+            viewContainer.querySelectorAll('.canvas-font-chip-oa').forEach(c => c.classList.toggle('is-active', c === chip));
+            filterAndRenderFontList();
+          });
+        });
+
+        // Configura Dropzone e Importação de Arquivos Locais
+        const dropzone = document.getElementById('canvas-font-dropzone');
+        const fileInput = document.getElementById('canvas-font-file-input');
+        if (dropzone && fileInput) {
+          dropzone.addEventListener('click', () => fileInput.click());
+          dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('is-dragover');
+          });
+          dropzone.addEventListener('dragleave', () => dropzone.classList.remove('is-dragover'));
+          dropzone.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('is-dragover');
+            const file = e.dataTransfer && e.dataTransfer.files ? e.dataTransfer.files[0] : null;
+            if (file) await importLocalFontFile(file);
+          });
+          fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files ? e.target.files[0] : null;
+            if (file) await importLocalFontFile(file);
+          });
+        }
+
+        if (fontCatalog.length === 0) {
+          await loadFontCatalog();
+        }
+        filterAndRenderFontList();
+      }
+
+      function filterAndRenderFontList() {
+        const listEl = document.getElementById('canvas-font-list');
+        if (!listEl) return;
+        listEl.innerHTML = '';
+
+        const q = (searchInput ? searchInput.value : '').toLowerCase().trim();
+        let results = fontCatalog;
+
+        if (fontCategoryFilter !== 'all') {
+          results = results.filter(f => f.category === fontCategoryFilter);
+        }
+
+        if (q) {
+          results = results.filter(f => f.family.toLowerCase().includes(q) || f.id.toLowerCase().includes(q));
+        }
+
+        // Limita a 50 itens para máxima performance
+        const displayList = results.slice(0, 50);
+
+        if (displayList.length === 0) {
+          listEl.innerHTML = '<div class="canvas-lib-empty-oa">Nenhuma família encontrada com este filtro.</div>';
+          return;
+        }
+
+        displayList.forEach(f => {
+          const isInstalled = FONTS.some(fo => fo.name.toLowerCase() === f.family.toLowerCase());
+          const card = document.createElement('div');
+          card.className = 'canvas-font-card-oa';
+          card.innerHTML = `
+            <div class="canvas-font-info-oa">
+              <div class="canvas-font-header-row-oa">
+                <span class="canvas-font-title-oa">${f.family}</span>
+                <span class="canvas-font-badge-oa">${f.category || 'font'}</span>
+              </div>
+              <div class="canvas-font-preview-text-oa" style="font-family: '${f.family}', sans-serif;">
+                O amor é paciente e bondoso.
+              </div>
+            </div>
+            <button type="button" class="canvas-font-action-btn-oa ${isInstalled ? 'is-installed' : ''}" data-id="${f.id}">
+              ${isInstalled ? '✓ Instalada' : '+ Adicionar'}
+            </button>
+          `;
+
+          const btn = card.querySelector('.canvas-font-action-btn-oa');
+          if (btn && !isInstalled) {
+            btn.addEventListener('click', () => installFontsourceFont(f, btn));
+          }
+
+          listEl.appendChild(card);
+        });
+
+        if (hint) {
+          hint.textContent = `${results.length} fontes encontradas${results.length > 50 ? ' (mostrando 50 primeiras)' : ''}`;
+        }
+      }
+
+      async function installFontsourceFont(fontItem, btnEl) {
+        if (btnEl) {
+          btnEl.disabled = true;
+          btnEl.textContent = 'Baixando…';
+        }
+        try {
+          const fontUrl = `https://cdn.jsdelivr.net/fontsource/fonts/${fontItem.id}@latest/latin-400-normal.woff2`;
+          const res = await fetch(fontUrl);
+          if (!res.ok) throw new Error('Falha ao baixar arquivo .woff2: ' + res.status);
+          const buf = await res.arrayBuffer();
+
+          // Converte arrayBuffer para base64 para armazenar no IndexedDB
+          const bytes = new Uint8Array(buf);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64 = btoa(binary);
+          const dataUrl = `data:font/woff2;base64,${base64}`;
+
+          const assetId = `font_${fontItem.id}_400_${Date.now()}`;
+          assetCache.set(assetId, dataUrl);
+          await saveAsset(assetId, dataUrl);
+
+          // Registra FontFace no navegador
+          const fontFace = new FontFace(fontItem.family, buf);
+          await fontFace.load();
+          document.fonts.add(fontFace);
+
+          // Adiciona ao array FONTS
+          const fallbackCat = fontItem.category === 'serif' ? 'serif' : (fontItem.category === 'monospace' ? 'monospace' : (fontItem.category === 'handwriting' ? 'cursive' : 'sans-serif'));
+          const fontObj = {
+            css: `"${fontItem.family}", ${fallbackCat}`,
+            name: fontItem.family,
+            weights: [400, 700],
+            category: fontItem.category || 'sans-serif',
+            custom: true,
+            assetId
+          };
+
+          if (!FONTS.some(f => f.name.toLowerCase() === fontItem.family.toLowerCase())) {
+            FONTS.push(fontObj);
+          }
+
+          saveCustomFontMetadata(fontObj);
+          refreshFontSelect();
+
+          if (btnEl) {
+            btnEl.className = 'canvas-font-action-btn-oa is-installed';
+            btnEl.textContent = '✓ Instalada';
+          }
+        } catch (err) {
+          console.error('[fonts] falha ao instalar fonte:', fontItem.family, err);
+          alert('Não foi possível instalar a fonte ' + fontItem.family + '. Confira a conexão.');
+          if (btnEl) {
+            btnEl.disabled = false;
+            btnEl.textContent = '+ Adicionar';
+          }
+        }
+      }
+
+      async function importLocalFontFile(file) {
+        if (!file) return;
+        try {
+          if (hint) hint.textContent = `Importando ${file.name}…`;
+          const buf = await file.arrayBuffer();
+          const ext = file.name.split('.').pop().toLowerCase();
+          let mime = 'font/woff2';
+          if (ext === 'ttf') mime = 'font/ttf';
+          else if (ext === 'otf') mime = 'font/otf';
+          else if (ext === 'woff') mime = 'font/woff';
+
+          const bytes = new Uint8Array(buf);
+          let binary = '';
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          const base64 = btoa(binary);
+          const dataUrl = `data:${mime};base64,${base64}`;
+
+          const family = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+          const assetId = `font_local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+          assetCache.set(assetId, dataUrl);
+          await saveAsset(assetId, dataUrl);
+
+          const fontFace = new FontFace(family, buf);
+          await fontFace.load();
+          document.fonts.add(fontFace);
+
+          const fontObj = {
+            css: `"${family}", sans-serif`,
+            name: family,
+            weights: [400, 700],
+            category: 'custom',
+            custom: true,
+            assetId
+          };
+
+          if (!FONTS.some(f => f.name.toLowerCase() === family.toLowerCase())) {
+            FONTS.push(fontObj);
+          }
+
+          saveCustomFontMetadata(fontObj);
+          refreshFontSelect();
+          filterAndRenderFontList();
+          if (hint) hint.textContent = `Fonte "${family}" instalada com sucesso!`;
+        } catch (err) {
+          console.error('[fonts] falha ao importar fonte local:', err);
+          alert('Erro ao carregar arquivo de fonte: ' + err.message);
+        }
+      }
+
+      function switchTab(newTab) {
+        tab = newTab;
+        tabs.forEach(o => o.classList.toggle('is-active', o.dataset.tab === tab));
+
+        if (tab === 'icons' || tab === 'stickers') {
+          if (colorWrap) colorWrap.style.display = tab === 'icons' ? 'block' : 'none';
+          if (searchInput) {
+            searchInput.style.display = 'block';
+            searchInput.placeholder = tab === 'icons'
+              ? 'Buscar… (ex: coração, seta, cruz)'
+              : 'Buscar sticker… (ex: praying, fire, star)';
+          }
+          if (grid) grid.style.display = 'grid';
+          if (viewContainer) viewContainer.style.display = 'none';
+          if (subTitle) subTitle.textContent = '275 mil ícones e stickers — clique para inserir no frame';
+          buscarIcones(searchInput ? searchInput.value : '');
+        } else if (tab === 'gradients') {
+          if (colorWrap) colorWrap.style.display = 'none';
+          if (searchInput) searchInput.style.display = 'none';
+          if (grid) grid.style.display = 'none';
+          if (viewContainer) viewContainer.style.display = 'flex';
+          if (subTitle) subTitle.textContent = 'Gradientes Mesh (@mesh-gradient/core) — Fundo ou Elemento';
+          if (hint) hint.textContent = 'Escolha 4 cores ou selecione um preset para gerar o gradiente WebGL.';
+          renderGradientsView();
+        } else if (tab === 'fonts') {
+          if (colorWrap) colorWrap.style.display = 'none';
+          if (searchInput) {
+            searchInput.style.display = 'block';
+            searchInput.placeholder = 'Buscar família de fontes (ex: Inter, Playfair, Lora, Oswald)…';
+          }
+          if (grid) grid.style.display = 'none';
+          if (viewContainer) viewContainer.style.display = 'flex';
+          if (subTitle) subTitle.textContent = 'Tipografia & Fontes (2.096 famílias via Fontsource + Arquivos Locais)';
+          renderFontsView();
+        }
+      }
+
+      tabs.forEach(t => {
+        t.addEventListener('click', () => switchTab(t.dataset.tab));
       });
 
       let debounce = null;
       if (searchInput) {
         searchInput.addEventListener('input', () => {
           clearTimeout(debounce);
-          debounce = setTimeout(() => buscar(searchInput.value), 260);
+          debounce = setTimeout(() => {
+            if (tab === 'fonts') {
+              filterAndRenderFontList();
+            } else {
+              buscarIcones(searchInput.value);
+            }
+          }, 240);
         });
       }
       if (colorInput) {
         colorInput.addEventListener('input', () => {
           clearTimeout(debounce);
-          debounce = setTimeout(() => buscar(searchInput ? searchInput.value : ''), 200);
+          debounce = setTimeout(() => {
+            if (tab === 'icons') buscarIcones(searchInput ? searchInput.value : '');
+          }, 200);
         });
       }
 
       function openLibrary() {
         document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
         modal.classList.add('open');
-        buscar(searchInput ? searchInput.value : '');
-        if (searchInput) setTimeout(() => searchInput.focus(), 60);
+        switchTab(tab);
+        if (searchInput && tab !== 'gradients') setTimeout(() => searchInput.focus(), 60);
         if (window.lucide) lucide.createIcons();
       }
 
@@ -8263,6 +8934,11 @@
       });
       window.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && modal.classList.contains('open')) closeLibrary();
+        const digitando = /^(INPUT|TEXTAREA)$/.test((e.target.tagName || '')) || e.target.isContentEditable;
+        if (e.shiftKey && !digitando && (e.key === 'I' || e.key === 'i')) {
+          e.preventDefault();
+          modal.classList.contains('open') ? closeLibrary() : openLibrary();
+        }
       });
 
       window.openIconLibrary = openLibrary;
