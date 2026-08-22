@@ -2735,9 +2735,17 @@
             }
 
             if (selectGrad) selectGrad.value = '';
-            if (inputOverlay) inputOverlay.value = selFrame.bgOverlay != null ? selFrame.bgOverlay : (selFrame.bgImage ? 35 : 0);
+            if (inputOverlay) inputOverlay.value = selFrame.bgOverlay != null ? selFrame.bgOverlay : (hasFrameBg(selFrame) ? 35 : 0);
             if (inputBlur) inputBlur.value = selFrame.bgBlur || 0;
-            if (btnDelImg) btnDelImg.style.display = selFrame.bgImage ? 'inline-flex' : 'none';
+            if (btnDelImg) btnDelImg.style.display = hasFrameBg(selFrame) ? 'inline-flex' : 'none';
+
+            const btnBgBind = document.getElementById('canvas-frame-bg-bind');
+            if (btnBgBind) {
+              btnBgBind.classList.toggle('is-active', !!selFrame.bgBind);
+              btnBgBind.title = selFrame.bgBind
+                ? `Variável de Fundo: {{${selFrame.bgBind}}} (Clique para editar ou remover)`
+                : 'Virar variável de Fundo do Batch Create ({})';
+            }
 
             frameToolbar.classList.add('is-visible');
           }
@@ -2872,10 +2880,27 @@
       updateUndoRedoButtons();
     }
 
+    let quotaAvisado = false;
+
     function save(recordHistory = true) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ cam, frames, links }));
-      } catch (e) { /* localStorage cheio ou bloqueado: o canvas segue funcionando */ }
+        quotaAvisado = false;
+      } catch (e) {
+        /* Falhar em silêncio aqui custa o trabalho inteiro do usuário no
+           próximo reload — ele precisa saber na hora. */
+        console.error('[canvas] não foi possível salvar o estado:', e);
+        if (!quotaAvisado) {
+          quotaAvisado = true;
+          const label = document.getElementById('canvas-topbar-label');
+          if (label) {
+            label.textContent = '⚠ Armazenamento cheio — o canvas NÃO está sendo salvo';
+            label.style.color = '#B45309';
+          } else {
+            alert('O armazenamento do navegador encheu: o canvas não está sendo salvo. Exporte o que precisa antes de recarregar a página.');
+          }
+        }
+      }
       if (recordHistory) {
         pushHistory();
       }
@@ -3069,10 +3094,32 @@
         }
         undoStack.push(getCanvasSnapshot());
         updateUndoRedoButtons();
+        migrateInlineBackgrounds();
       } catch (e) {
         undoStack.push(getCanvasSnapshot());
         updateUndoRedoButtons();
       }
+    }
+
+    /* Fundo salvo inline come megabytes da cota do localStorage (um único JPEG
+       de fundo já passa de 1 MB), e a cota é o teto de todo o canvas. Move os
+       legados para o IndexedDB uma vez, deixando só o id no frame. */
+    async function migrateInlineBackgrounds() {
+      const pendentes = frames.filter(f => f.bgImage && String(f.bgImage).startsWith('data:'));
+      if (pendentes.length === 0) return;
+      const porDataUrl = new Map();
+      for (const f of pendentes) {
+        let id = porDataUrl.get(f.bgImage);
+        if (!id) {
+          id = 'asset_bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+          assetCache.set(id, f.bgImage);
+          await saveAsset(id, f.bgImage);
+          porDataUrl.set(f.bgImage, id);
+        }
+        f.bgAssetId = id;
+        f.bgImage = null;
+      }
+      save(false);
     }
 
     // Converte um ponto da tela para o espaço infinito
@@ -4565,10 +4612,12 @@
         const blurPx = frame.bgBlur || 0;
         const bgSrc = frameBgSrc(frame);
 
-        /* Asset ainda não veio do IndexedDB (reload): busca e redesenha o frame. */
+        /* Asset ainda não veio do IndexedDB (reload): pinta a camada que já
+           existe quando chegar — recriar o frame aqui duplicaria o elemento. */
         if (!bgSrc && frame.bgAssetId) {
+          const layerRef = bgLayer;
           getAsset(frame.bgAssetId).then(src => {
-            if (src) renderFrame(frame);
+            if (src) layerRef.style.backgroundImage = `url("${src}")`;
           });
         }
 
@@ -5069,8 +5118,12 @@
         const head = !p ? fmt.name
           : p.total > 1 ? `Post ${p.post} · ${p.page}/${p.total}`
           : `Post ${p.post}`;
-        label.innerHTML = `<b>${head}</b> <span>${fmt.name} · ${frame.w} × ${frame.h}</span>`;
+        const bindTag = frame.bgBind
+          ? ` <span class="canvas-frame__bind-tag" style="background: #7C3AED; color: #FFFFFF; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; vertical-align: middle;">{{${frame.bgBind}}}</span>`
+          : '';
+        label.innerHTML = `<b>${head}</b>${bindTag} <span>${fmt.name} · ${frame.w} × ${frame.h}</span>`;
         el.classList.toggle('is-linked', !!p && p.total > 1);
+        el.classList.toggle('has-bg-bind', !!frame.bgBind);
       });
       updateTopbar();
     }
@@ -6955,6 +7008,14 @@
       function getCanvasBinds() {
         const bindsMap = new Map();
         frames.forEach(f => {
+          if (f.bgBind) {
+            bindsMap.set(f.bgBind, {
+              name: f.bgBind,
+              type: 'image',
+              frameId: f.id,
+              isBackground: true
+            });
+          }
           (f.children || []).forEach(c => {
             if (c.bind) {
               bindsMap.set(c.bind, {
@@ -7049,9 +7110,17 @@
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
 
-        // 1. Fundo do Frame (Cor, Gradiente ou Imagem com Blur & Overlay)
-        if (frame.bgImage) {
-          const bgImg = await loadExportImage(frame.bgImage);
+        // 1. Fundo do Frame (Cor, Gradiente ou Imagem com Blur & Overlay - com suporte a bgBind no batch export)
+        let bgOverride = (frame.bgBind && overrides[frame.bgBind]) ? String(overrides[frame.bgBind]).trim() : null;
+        let bgSrc = null;
+        if (bgOverride && isImageSrcValue(bgOverride)) {
+          bgSrc = bgOverride;
+        } else if (hasFrameBg(frame)) {
+          bgSrc = frame.bgImage || (frame.bgAssetId ? await getAsset(frame.bgAssetId) : null);
+        }
+
+        if (bgSrc) {
+          const bgImg = await loadExportImage(bgSrc);
           if (bgImg) {
             ctx.save();
             const blurPx = frame.bgBlur || 0;
@@ -7060,7 +7129,7 @@
             }
 
             // Cover fit
-            const imgAspect = bgImg.width / bgImg.height;
+            const imgAspect = (bgImg.naturalWidth || bgImg.width) / (bgImg.naturalHeight || bgImg.height);
             const frameAspect = frameW / frameH;
             let drawW, drawH, drawX, drawY;
 
@@ -7086,6 +7155,9 @@
               ctx.fillRect(0, 0, frameW, frameH);
             }
           }
+        } else if (bgOverride && (bgOverride.startsWith('#') || bgOverride.startsWith('rgb'))) {
+          ctx.fillStyle = bgOverride;
+          ctx.fillRect(0, 0, frameW, frameH);
         } else if (frame.bg && frame.bg.includes('gradient')) {
           const hexes = frame.bg.match(/#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}/g);
           const c1 = (hexes && hexes[0]) || '#18181B';
@@ -7399,7 +7471,21 @@
         applyCamera();
       }
 
-      function generateBatchOnCanvas() {
+      /* Todo pixel clonado vira asset no IndexedDB e o frame guarda só o id.
+         Data URL dentro de `frames` é multiplicado por post no localStorage e
+         estoura a cota já no quinto post — em silêncio, porque save() engole o
+         erro. Data URLs iguais compartilham um único asset. */
+      async function assetIdForDataUrl(dataUrl, cache) {
+        if (!isImageSrcValue(dataUrl)) return null;
+        if (cache.has(dataUrl)) return cache.get(dataUrl);
+        const id = 'asset_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+        assetCache.set(id, dataUrl);
+        await saveAsset(id, dataUrl);
+        cache.set(dataUrl, id);
+        return id;
+      }
+
+      async function generateBatchOnCanvas() {
         const records = (batchData.records || []).filter(rec => {
           return Object.keys(rec).some(k => !k.startsWith('__') && rec[k] && String(rec[k]).trim() !== '');
         });
@@ -7415,6 +7501,7 @@
           return;
         }
 
+        const dataUrlAssets = new Map();
         const byId = new Map(frames.map(f => [f.id, f]));
         const chain = (computePosts().find(c => c.includes(anchor.id)) || [anchor.id])
           .map(id => byId.get(id))
@@ -7433,36 +7520,74 @@
 
         const newCreatedFrames = [];
 
-        records.forEach((row, rowIndex) => {
+        for (let rowIndex = 0; rowIndex < records.length; rowIndex++) {
+          const row = records[rowIndex];
           const postNum = rowIndex + 1;
           const postStartX = nextPostX;
           const clonedSlideIds = [];
           let curX = postStartX;
 
-          chain.forEach((srcSlide, slideIdx) => {
+          for (let slideIdx = 0; slideIdx < chain.length; slideIdx++) {
+            const srcSlide = chain[slideIdx];
+            const children = [];
+
+            for (const child of (srcSlide.children || [])) {
+              const ch = { ...JSON.parse(JSON.stringify(child)), id: childSeq++ };
+              if (ch.type === 'text' && ch.bind && row[ch.bind] !== undefined && row[ch.bind] !== '') {
+                ch.text = String(row[ch.bind]);
+                delete ch.html;
+              }
+              if (ch.type === 'image') {
+                ensureImageProps(ch);
+                if (ch.bind && isImageSrcValue(row[ch.bind])) {
+                  const newId = await assetIdForDataUrl(String(row[ch.bind]), dataUrlAssets);
+                  if (newId) { ch.assetId = newId; delete ch.src; }
+                } else if (ch.assetId) {
+                  /* Sem foto na linha: o asset do template já serve, não copia nada. */
+                  delete ch.src;
+                } else if (isImageSrcValue(ch.src)) {
+                  const newId = await assetIdForDataUrl(ch.src, dataUrlAssets);
+                  if (newId) { ch.assetId = newId; delete ch.src; }
+                }
+              }
+              /* Clone é post concreto, não template: sem bind ele não é
+                 recapturado como variável na próxima geração. */
+              delete ch.bind;
+              children.push(ch);
+            }
+
             const clonedFrame = {
               ...JSON.parse(JSON.stringify(srcSlide)),
               id: frameSeq++,
               name: isCarousel ? `Post ${postNum} · Slide ${slideIdx + 1}` : `Post ${postNum}`,
               x: curX,
               y: postStartY,
-              children: (srcSlide.children || []).map(child => {
-                const ch = { ...JSON.parse(JSON.stringify(child)), id: childSeq++ };
-                if (ch.type === 'text' && ch.bind && row[ch.bind] !== undefined && row[ch.bind] !== '') {
-                  ch.text = String(row[ch.bind]);
-                  delete ch.html;
-                }
-                if (ch.type === 'image') {
-                  ensureImageProps(ch);
-                  if (ch.bind && row[ch.bind]) {
-                    ch.src = String(row[ch.bind]);
-                  } else if (ch.assetId && assetCache.has(ch.assetId)) {
-                    ch.src = assetCache.get(ch.assetId);
-                  }
-                }
-                return ch;
-              })
+              children
             };
+
+            if (srcSlide.bgBind && row[srcSlide.bgBind]) {
+              const bgVal = String(row[srcSlide.bgBind]).trim();
+              if (isImageSrcValue(bgVal)) {
+                const bgId = await assetIdForDataUrl(bgVal, dataUrlAssets);
+                if (bgId) {
+                  clonedFrame.bgAssetId = bgId;
+                  clonedFrame.bgImage = null;
+                } else {
+                  clonedFrame.bgImage = bgVal;
+                }
+              } else if (bgVal.startsWith('#') || bgVal.startsWith('rgb') || bgVal.includes('gradient')) {
+                clonedFrame.bg = bgVal;
+                clonedFrame.bgImage = null;
+                clonedFrame.bgAssetId = null;
+              }
+            } else if (clonedFrame.bgImage) {
+              const bgId = await assetIdForDataUrl(clonedFrame.bgImage, dataUrlAssets);
+              if (bgId) {
+                clonedFrame.bgAssetId = bgId;
+                clonedFrame.bgImage = null;
+              }
+            }
+            delete clonedFrame.bgBind;
 
             frames.push(clonedFrame);
             renderFrame(clonedFrame);
@@ -7470,7 +7595,7 @@
             clonedSlideIds.push(clonedFrame.id);
 
             curX += srcSlide.w + FRAME_GAP;
-          });
+          }
 
           if (clonedSlideIds.length > 1) {
             for (let s = 0; s < clonedSlideIds.length - 1; s++) {
@@ -7483,7 +7608,7 @@
           }
 
           nextPostX = curX - FRAME_GAP + POST_GAP;
-        });
+        }
 
         renderLinks();
         updateFrameMeta();
@@ -7499,7 +7624,8 @@
           updateTopbar();
         }
 
-        zoomToFitFrames([...frames]);
+        // Enquadra o que acabou de nascer, não o canvas inteiro
+        zoomToFitFrames(newCreatedFrames.length ? newCreatedFrames : [...frames]);
         save();
         closeBatchModal();
 
@@ -7922,6 +8048,7 @@
         const dir = (selectGradDir && selectGradDir.value) || '180deg';
         frame.bg = buildGradientString(c1, c2, dir);
         frame.bgImage = null;
+        frame.bgAssetId = null;
         applyFrameBackground(frame);
         save();
       }
@@ -7937,6 +8064,7 @@
 
           frame.bg = (inputBgColor && inputBgColor.value) || '#FFFFFF';
           frame.bgImage = null;
+        frame.bgAssetId = null;
           applyFrameBackground(frame);
           save();
         });
@@ -7961,6 +8089,7 @@
           if (!frame) return;
           frame.bg = e.target.value;
           frame.bgImage = null;
+        frame.bgAssetId = null;
           if (selectGrad) selectGrad.value = '';
           applyFrameBackground(frame);
           save();
@@ -8021,10 +8150,15 @@
           const file = e.target.files && e.target.files[0];
           if (!file) return;
           const reader = new FileReader();
-          reader.onload = (ev) => {
+          reader.onload = async (ev) => {
             const frame = selectedFrame();
             if (!frame) return;
-            frame.bgImage = ev.target.result;
+            // Pixel vai pro IndexedDB; o frame guarda só o id (cota do localStorage)
+            const id = 'asset_bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            assetCache.set(id, ev.target.result);
+            await saveAsset(id, ev.target.result);
+            frame.bgImage = null;
+            frame.bgAssetId = id;
             if (frame.bgOverlay == null) frame.bgOverlay = 35;
             applyFrameBackground(frame);
             save();
@@ -8067,6 +8201,7 @@
           const frame = selectedFrame();
           if (!frame) return;
           frame.bgImage = null;
+        frame.bgAssetId = null;
           frame.bgOverlay = 0;
           frame.bgBlur = 0;
           applyFrameBackground(frame);
@@ -8081,6 +8216,7 @@
           if (!frame) return;
           frame.bg = '#FFFFFF';
           frame.bgImage = null;
+        frame.bgAssetId = null;
           frame.bgOverlay = 0;
           frame.bgBlur = 0;
           if (selectGrad) selectGrad.value = '';
@@ -8093,6 +8229,28 @@
           applyFrameBackground(frame);
           save();
           updateTextToolbar();
+        });
+      }
+
+      const btnBgBind = document.getElementById('canvas-frame-bg-bind');
+      if (btnBgBind) {
+        btnBgBind.addEventListener('click', () => {
+          const frame = selectedFrame();
+          if (!frame) return;
+          if (frame.bgBind) {
+            delete frame.bgBind;
+          } else {
+            const suggested = hasFrameBg(frame) ? 'imagem_fundo' : 'fundo';
+            const raw = prompt('Nome da variável de Fundo (vira coluna do CSV/Sheets):', suggested);
+            if (raw === null) return;
+            const name = slugifyBind(raw);
+            if (!BIND_RE.test(name)) return;
+            frame.bgBind = name;
+          }
+          applyFrameBackground(frame);
+          updateFrameMeta();
+          updateTextToolbar();
+          save();
         });
       }
     }
