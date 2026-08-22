@@ -6289,14 +6289,22 @@
     /* --------------------------------------------------
        Batch Create Controller (Motor de Criação em Lote)
        -------------------------------------------------- */
+    /* A tabela do modal é a fonte da verdade: cada record já vem chaveado pelo
+       nome do bind, então não existe mais etapa de "mapear coluna" (e nem o bug
+       de apontar um {{bind}} de imagem para uma coluna de texto). O CSV virou
+       só um atalho de preenchimento. */
     let batchData = {
-      headers: [],
-      rows: [],
-      localImages: new Map(), // filename.toLowerCase() -> dataUrl
-      mappings: {},           // bindName -> csvHeader
+      binds: [],              // snapshot dos binds na última renderização da tabela
+      records: [],            // [{ bindName: valor }] — valor de imagem é data URL
+      csv: null,              // último { headers, rows } importado, para repontar colunas
+      csvPick: {},            // bindName -> header do CSV que alimenta a coluna
       originalTemplateSnapshot: null,
       previewRowIndex: null
     };
+
+    function isImageSrcValue(v) {
+      return typeof v === 'string' && /^(data:image\/|blob:|https?:\/\/)/i.test(v.trim());
+    }
 
     function parseCSV(text) {
       const rows = [];
@@ -6352,19 +6360,91 @@
     }
 
     function parseTSVOrCSV(text) {
-      if (text.includes('\t')) {
-        const lines = text.trim().split(/\r\n|\n/);
-        const rows = lines.map(line => line.split('\t').map(c => c.trim()));
-        if (rows.length === 0) return { headers: [], rows: [] };
-        const headers = rows[0].map((h, i) => h || `coluna_${i + 1}`);
-        const dataRows = rows.slice(1).map(r => {
+      if (!text || typeof text !== 'string') return { headers: [], rows: [], hasRealHeaders: false };
+      const clean = text.trim();
+      if (!clean) return { headers: [], rows: [], hasRealHeaders: false };
+
+      const isTSV = clean.includes('\t');
+      const firstLine = clean.split(/\r\n|\n/)[0] || '';
+      let delimiter = '\t';
+      if (!isTSV) {
+        delimiter = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+      }
+
+      const rows = [];
+      let currentRow = [];
+      let currentCell = '';
+      let insideQuotes = false;
+
+      for (let i = 0; i < clean.length; i++) {
+        const char = clean[i];
+        const nextChar = clean[i + 1];
+
+        if (char === '"') {
+          if (insideQuotes && nextChar === '"') {
+            currentCell += '"';
+            i++;
+          } else {
+            insideQuotes = !insideQuotes;
+          }
+        } else if (char === delimiter && !insideQuotes) {
+          currentRow.push(currentCell.trim());
+          currentCell = '';
+        } else if ((char === '\r' || char === '\n') && !insideQuotes) {
+          if (char === '\r' && nextChar === '\n') i++;
+          currentRow.push(currentCell.trim());
+          if (currentRow.some(c => c.length > 0)) {
+            rows.push(currentRow);
+          }
+          currentRow = [];
+          currentCell = '';
+        } else {
+          currentCell += char;
+        }
+      }
+      if (currentCell.length > 0 || currentRow.length > 0) {
+        currentRow.push(currentCell.trim());
+        if (currentRow.some(c => c.length > 0)) {
+          rows.push(currentRow);
+        }
+      }
+
+      if (rows.length === 0) return { headers: [], rows: [], hasRealHeaders: false };
+
+      const binds = (typeof getCanvasBinds === 'function') ? getCanvasBinds() : [];
+      const firstRow = rows[0];
+      const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const bindsNorm = binds.map(b => norm(b.name));
+
+      const firstRowMatchesBind = firstRow.some(cell => {
+        const c = norm(cell);
+        return c && bindsNorm.some(b => b === c || b.includes(c) || c.includes(b));
+      });
+
+      let headers = [];
+      let dataRows = [];
+
+      if (firstRowMatchesBind && rows.length > 1) {
+        headers = firstRow.map((h, idx) => h || `coluna_${idx + 1}`);
+        dataRows = rows.slice(1).map(r => {
           const obj = {};
-          headers.forEach((h, i) => obj[h] = r[i] !== undefined ? r[i] : '');
+          headers.forEach((h, idx) => {
+            obj[h] = r[idx] !== undefined ? r[idx] : '';
+          });
           return obj;
         });
-        return { headers, rows: dataRows };
+      } else {
+        headers = firstRow.map((_, idx) => `coluna_${idx + 1}`);
+        dataRows = rows.map(r => {
+          const obj = {};
+          headers.forEach((h, idx) => {
+            obj[h] = r[idx] !== undefined ? r[idx] : '';
+          });
+          return obj;
+        });
       }
-      return parseCSV(text);
+
+      return { headers, rows: dataRows, hasRealHeaders: firstRowMatchesBind && rows.length > 1 };
     }
 
     function initBatchCreateController() {
@@ -6372,14 +6452,14 @@
       const openBtn = document.getElementById('canvas-batch-btn');
       const closeBtn = document.getElementById('canvas-batch-close');
       const cancelBtn = document.getElementById('canvas-batch-cancel');
-      const dropzone = document.getElementById('canvas-batch-dropzone');
       const csvInput = document.getElementById('canvas-batch-csv-input');
-      const dropzoneLabel = document.getElementById('canvas-batch-dropzone-label');
-      const mappingsList = document.getElementById('canvas-batch-mappings-list');
-      const imagesDropzone = document.getElementById('canvas-batch-images-dropzone');
       const imagesInput = document.getElementById('canvas-batch-images-input');
-      const imagesLabel = document.getElementById('canvas-batch-images-label');
-      const imagesCount = document.getElementById('canvas-batch-images-count');
+      const importBtn = document.getElementById('canvas-batch-import-btn');
+      const pasteBtn = document.getElementById('canvas-batch-paste-btn');
+      const addRowBtn = document.getElementById('canvas-batch-add-row');
+      const gridWrap = document.getElementById('canvas-batch-gridwrap');
+      const grid = document.getElementById('canvas-batch-grid');
+      const hint = document.getElementById('canvas-batch-hint');
       const startBtn = document.getElementById('canvas-batch-start-btn');
       const startLabel = document.getElementById('canvas-batch-start-label');
 
@@ -6399,95 +6479,390 @@
         if (e.target === modal) closeBatchModal();
       });
 
-      // Dropzone de CSV
-      if (dropzone && csvInput) {
-        dropzone.addEventListener('click', () => csvInput.click());
+      /* ----------------------------------------------------
+         Colar direto do Google Sheets ou Excel no Modal (⌘V)
+         ---------------------------------------------------- */
+      modal.addEventListener('paste', (e) => {
+        if (!modal.classList.contains('open')) return;
+        const text = (e.clipboardData || window.clipboardData)?.getData('text/plain')?.trim();
+        if (text && (text.includes('\t') || (text.includes('\n') && (text.includes(',') || text.includes(';'))))) {
+          e.preventDefault();
+          e.stopPropagation();
+          handleTableText(text, 'Google Sheets / Excel');
+        }
+      });
+
+      // ----------------------------------------------------
+      // TABELA EDITÁVEL (fonte da verdade do lote)
+      // ----------------------------------------------------
+      let pendingImageTarget = null; // { rowIndex, bindName } | { column: bindName }
+
+      function readFileAsDataURL(file) {
+        return new Promise(resolve => {
+          const reader = new FileReader();
+          reader.onload = ev => resolve(ev.target.result);
+          reader.onerror = () => resolve(null);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function blankRecord(binds) {
+        const rec = {};
+        binds.forEach(b => { rec[b.name] = ''; });
+        return rec;
+      }
+
+      /* CSV/TSV: casa header com bind por nome (exato antes de parcial). */
+      function matchHeaderForBind(bindName, headers) {
+        const normBind = bindName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const norm = h => h.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const exact = headers.find(h => norm(h) === normBind);
+        if (exact) return exact;
+        return headers.find(h => norm(h).includes(normBind) || normBind.includes(norm(h))) || '';
+      }
+
+      function handleTableText(text, sourceName = 'Tabela') {
+        if (!text || typeof text !== 'string') return false;
+        const parsed = parseTSVOrCSV(text);
+        if (!parsed.headers.length || !parsed.rows.length) {
+          if (hint) hint.innerHTML = `<span style="color: #EF4444;">Formato de tabela vazio ou não reconhecido.</span>`;
+          return false;
+        }
+
+        const binds = getCanvasBinds();
+        batchData.csv = parsed;
+        batchData.csvPick = {};
+
+        if (parsed.hasRealHeaders) {
+          binds.forEach(b => {
+            batchData.csvPick[b.name] = matchHeaderForBind(b.name, parsed.headers);
+          });
+        } else {
+          // Se não vieram cabeçalhos, mapeia na ordem sequencial das variáveis
+          binds.forEach((b, idx) => {
+            if (idx < parsed.headers.length) {
+              batchData.csvPick[b.name] = parsed.headers[idx];
+            }
+          });
+        }
+
+        batchData.records = parsed.rows.map(() => blankRecord(binds));
+        binds.forEach(b => fillColumnFromCSV(b));
+
+        renderBatchGrid();
+        updateBatchFooter();
+
+        if (hint) {
+          const semColuna = binds.filter(b => !batchData.csvPick[b.name] && b.type !== 'image');
+          hint.innerHTML = `<strong style="color:#059669;">✓ ${parsed.rows.length} ${parsed.rows.length === 1 ? 'post carregado' : 'posts carregados'} (${sourceName})</strong>.` +
+            (semColuna.length
+              ? ` Escolha a coluna no cabeçalho de ${semColuna.map(b => '{{' + b.name + '}}').join(', ')}.`
+              : ` Você pode editar qualquer texto ou foto nas células.`);
+        }
+        return true;
+      }
+
+      if (pasteBtn) {
+        pasteBtn.addEventListener('click', async () => {
+          try {
+            if (navigator.clipboard && navigator.clipboard.readText) {
+              const text = await navigator.clipboard.readText();
+              if (text && (text.includes('\t') || text.includes('\n') || text.includes(','))) {
+                const ok = handleTableText(text, 'Google Sheets / Excel');
+                if (ok) return;
+              }
+            }
+          } catch (err) {}
+          const pasted = prompt('Cole aqui a tabela copiada do Google Sheets ou Excel (⌘V / Ctrl+V):');
+          if (pasted) {
+            handleTableText(pasted, 'Google Sheets');
+          }
+        });
+      }
+
+      if (importBtn && csvInput) {
+        importBtn.addEventListener('click', () => csvInput.click());
         csvInput.addEventListener('change', (e) => {
           const file = e.target.files && e.target.files[0];
           if (file) handleCSVFile(file);
+          csvInput.value = '';
         });
+      }
 
-        dropzone.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          dropzone.classList.add('is-dragover');
+      if (addRowBtn) {
+        addRowBtn.addEventListener('click', () => {
+          batchData.records.push(blankRecord(getCanvasBinds()));
+          renderBatchGrid();
+          updateBatchFooter();
+          if (gridWrap) gridWrap.scrollTop = gridWrap.scrollHeight;
         });
-        dropzone.addEventListener('dragleave', () => dropzone.classList.remove('is-dragover'));
-        dropzone.addEventListener('drop', (e) => {
+      }
+
+      // Soltar um .csv em cima da tabela preenche tudo
+      if (gridWrap) {
+        gridWrap.addEventListener('dragover', (e) => {
+          if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
           e.preventDefault();
-          dropzone.classList.remove('is-dragover');
+          gridWrap.classList.add('is-dragover');
+        });
+        gridWrap.addEventListener('dragleave', () => gridWrap.classList.remove('is-dragover'));
+        gridWrap.addEventListener('drop', (e) => {
           const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-          if (file && (file.name.endsWith('.csv') || file.type.includes('csv') || file.type.includes('text'))) {
+          if (!file) return;
+          gridWrap.classList.remove('is-dragover');
+          if (file.name.toLowerCase().endsWith('.csv') || file.type.includes('csv')) {
+            e.preventDefault();
             handleCSVFile(file);
           }
+        });
+      }
+
+      // Seletor de fotos: serve tanto para uma célula quanto para a coluna toda
+      if (imagesInput) {
+        imagesInput.addEventListener('change', async (e) => {
+          const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/'));
+          imagesInput.value = '';
+          if (!files.length || !pendingImageTarget) return;
+          const target = pendingImageTarget;
+          pendingImageTarget = null;
+
+          if (target.column) {
+            const urls = await Promise.all(files.map(readFileAsDataURL));
+            const binds = getCanvasBinds();
+            urls.forEach((url, i) => {
+              if (!url) return;
+              while (batchData.records.length <= i) batchData.records.push(blankRecord(binds));
+              batchData.records[i][target.column] = url;
+              delete batchData.records[i]['__hint_' + target.column];
+            });
+          } else {
+            const url = await readFileAsDataURL(files[0]);
+            const rec = batchData.records[target.rowIndex];
+            if (url && rec) {
+              rec[target.bindName] = url;
+              delete rec['__hint_' + target.bindName];
+            }
+          }
+          renderBatchGrid();
+          updateBatchFooter();
         });
       }
 
       function handleCSVFile(file) {
         const reader = new FileReader();
         reader.onload = (e) => {
-          const text = e.target.result;
-          const parsed = parseCSV(text);
-          if (!parsed.headers.length || !parsed.rows.length) {
-            if (dropzoneLabel) {
-              dropzoneLabel.innerHTML = `<span style="color: #EF4444;">Arquivo CSV vazio ou sem linhas válidas.</span>`;
-            }
-            return;
-          }
-          batchData.headers = parsed.headers;
-          batchData.rows = parsed.rows;
-          dropzone.classList.add('has-file');
-          if (dropzoneLabel) {
-            dropzoneLabel.innerHTML = `<strong>${file.name}</strong><br><span style="font-size: 11.5px; color: #10B981; font-weight: 400;">✓ ${parsed.rows.length} ${parsed.rows.length === 1 ? 'linha importada' : 'linhas importadas'} (${parsed.headers.length} colunas)</span>`;
-          }
-          updateBatchMappings();
-          updateBatchFooter();
+          handleTableText(e.target.result, file.name);
         };
         reader.readAsText(file, 'UTF-8');
       }
 
-      // Dropzone de Imagens Locais (Zero CORS)
-      if (imagesDropzone && imagesInput) {
-        imagesDropzone.addEventListener('click', () => imagesInput.click());
-        imagesInput.addEventListener('change', (e) => {
-          if (e.target.files) handleImageFiles(Array.from(e.target.files));
-        });
-
-        imagesDropzone.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          imagesDropzone.classList.add('is-dragover');
-        });
-        imagesDropzone.addEventListener('dragleave', () => {
-          imagesDropzone.classList.remove('is-dragover');
-        });
-        imagesDropzone.addEventListener('drop', (e) => {
-          e.preventDefault();
-          imagesDropzone.classList.remove('is-dragover');
-          if (e.dataTransfer && e.dataTransfer.files) {
-            handleImageFiles(Array.from(e.dataTransfer.files));
+      /* Repontar uma coluna reescreve só ela: o que foi digitado nas outras fica. */
+      function fillColumnFromCSV(bind) {
+        if (!batchData.csv) return;
+        const col = batchData.csvPick[bind.name];
+        batchData.csv.rows.forEach((row, i) => {
+          const rec = batchData.records[i];
+          if (!rec) return;
+          const raw = col ? String(row[col] !== undefined ? row[col] : '') : '';
+          if (bind.type === 'image') {
+            /* Nome de arquivo solto no CSV não é imagem: vira dica na célula em
+               vez de virar src quebrado (era isso que sumia com o nó no export). */
+            rec[bind.name] = isImageSrcValue(raw) ? raw : (rec[bind.name] || '');
+            if (raw && !isImageSrcValue(raw)) rec['__hint_' + bind.name] = raw;
+            else delete rec['__hint_' + bind.name];
+          } else {
+            rec[bind.name] = raw;
           }
         });
       }
 
-      function handleImageFiles(files) {
-        const imgFiles = files.filter(f => f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|svg)$/i.test(f.name));
-        if (!imgFiles.length) return;
-        imgFiles.forEach(file => {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const dataUrl = ev.target.result;
-            const key = file.name.toLowerCase().trim();
-            batchData.localImages.set(key, dataUrl);
-            imagesDropzone.classList.add('has-file');
-            if (imagesCount) {
-              imagesCount.style.display = 'inline-block';
-              imagesCount.textContent = `${batchData.localImages.size} fotos`;
-            }
-            if (imagesLabel) {
-              imagesLabel.innerHTML = `<strong>${batchData.localImages.size} ${batchData.localImages.size === 1 ? 'foto indexada' : 'fotos indexadas'}</strong><br><span style="font-size: 11.5px; color: #10B981; font-weight: 400;">✓ Prontas para renderizar sem CORS</span>`;
-            }
-          };
-          reader.readAsDataURL(file);
+      function renderBatchGrid() {
+        if (!grid) return;
+        const binds = getCanvasBinds();
+        batchData.binds = binds;
+        grid.innerHTML = '';
+
+        if (binds.length === 0) {
+          grid.style.gridTemplateColumns = '1fr';
+          const empty = document.createElement('div');
+          empty.className = 'canvas-batch-empty-oa';
+          empty.innerHTML = 'Nenhuma variável {{}} no post. Marque textos ou fotos com o botão <code>{}</code> para criar as colunas.';
+          grid.appendChild(empty);
+          return;
+        }
+
+        // Mantém o que já foi digitado quando os binds do canvas mudam
+        batchData.records = batchData.records.map(rec => {
+          const next = {};
+          binds.forEach(b => {
+            next[b.name] = rec[b.name] !== undefined ? rec[b.name] : '';
+            if (rec['__hint_' + b.name]) next['__hint_' + b.name] = rec['__hint_' + b.name];
+          });
+          return next;
         });
+        if (batchData.records.length === 0) batchData.records.push(blankRecord(binds));
+
+        grid.style.gridTemplateColumns = `36px repeat(${binds.length}, minmax(170px, 1fr)) 34px`;
+
+        // Cabeçalho
+        const idxHead = document.createElement('div');
+        idxHead.className = 'canvas-batch-cell-oa is-head is-idx';
+        idxHead.textContent = '#';
+        grid.appendChild(idxHead);
+
+        binds.forEach(b => {
+          const cell = document.createElement('div');
+          cell.className = 'canvas-batch-cell-oa is-head';
+
+          const top = document.createElement('div');
+          top.className = 'canvas-batch-headtop-oa';
+          const label = document.createElement('span');
+          label.innerHTML = `<span style="color: ${b.type === 'image' ? '#7C3AED' : '#DB2777'};">${b.type === 'image' ? '🖼️' : '✍️'}</span> {{${b.name}}}`;
+          top.appendChild(label);
+          if (b.type === 'image') {
+            const fill = document.createElement('button');
+            fill.type = 'button';
+            fill.className = 'canvas-batch-colfill-oa';
+            fill.title = 'Escolher várias fotos e preencher a coluna na ordem';
+            fill.innerHTML = '<i data-lucide="images" style="width:14px;height:14px;"></i>';
+            fill.addEventListener('click', () => {
+              pendingImageTarget = { column: b.name };
+              imagesInput.click();
+            });
+            top.appendChild(fill);
+          }
+          cell.appendChild(top);
+
+          /* Só aparece depois de um import: é o que substitui o antigo passo de
+             "mapear colunas", agora no lugar onde a coluna já está. */
+          if (batchData.csv) {
+            const sel = document.createElement('select');
+            sel.className = 'canvas-batch-headsel-oa';
+            const none = document.createElement('option');
+            none.value = '';
+            none.textContent = '— sem coluna —';
+            sel.appendChild(none);
+            batchData.csv.headers.forEach(h => {
+              const o = document.createElement('option');
+              o.value = h;
+              o.textContent = h;
+              sel.appendChild(o);
+            });
+            sel.value = batchData.csvPick[b.name] || '';
+            sel.addEventListener('change', () => {
+              batchData.csvPick[b.name] = sel.value;
+              fillColumnFromCSV(b);
+              renderBatchGrid();
+              updateBatchFooter();
+            });
+            cell.appendChild(sel);
+          }
+
+          grid.appendChild(cell);
+        });
+
+        const actHead = document.createElement('div');
+        actHead.className = 'canvas-batch-cell-oa is-head is-act';
+        grid.appendChild(actHead);
+
+        // Linhas
+        batchData.records.forEach((rec, rowIndex) => {
+          const idx = document.createElement('div');
+          idx.className = 'canvas-batch-cell-oa is-idx';
+          idx.textContent = rowIndex + 1;
+          grid.appendChild(idx);
+
+          binds.forEach(b => {
+            const cell = document.createElement('div');
+            cell.className = 'canvas-batch-cell-oa';
+            if (b.type === 'image') {
+              cell.appendChild(buildImageCell(rec, rowIndex, b.name));
+            } else {
+              const ta = document.createElement('textarea');
+              ta.className = 'canvas-batch-input-oa';
+              ta.rows = 1;
+              ta.placeholder = b.name;
+              ta.value = rec[b.name] || '';
+              const autoGrow = () => {
+                ta.style.height = 'auto';
+                ta.style.height = Math.min(ta.scrollHeight, 66) + 'px';
+              };
+              ta.addEventListener('input', () => {
+                rec[b.name] = ta.value;
+                autoGrow();
+              });
+              cell.appendChild(ta);
+              requestAnimationFrame(autoGrow);
+            }
+            grid.appendChild(cell);
+          });
+
+          const act = document.createElement('div');
+          act.className = 'canvas-batch-cell-oa is-act';
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'canvas-batch-rowdel-oa';
+          del.title = 'Remover esta linha';
+          del.innerHTML = '<i data-lucide="x" style="width:13px;height:13px;"></i>';
+          del.addEventListener('click', () => {
+            batchData.records.splice(rowIndex, 1);
+            renderBatchGrid();
+            updateBatchFooter();
+          });
+          act.appendChild(del);
+          grid.appendChild(act);
+        });
+
+        if (window.lucide) lucide.createIcons();
+      }
+
+      function buildImageCell(rec, rowIndex, bindName) {
+        const wrap = document.createElement('div');
+        wrap.className = 'canvas-batch-imgcell-oa';
+        const value = rec[bindName];
+        const pending = rec['__hint_' + bindName];
+
+        if (isImageSrcValue(value)) {
+          const thumb = document.createElement('img');
+          thumb.className = 'canvas-batch-thumb-oa';
+          thumb.src = value;
+          wrap.appendChild(thumb);
+        }
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'canvas-batch-imgbtn-oa' + (isImageSrcValue(value) ? ' has-img' : '');
+        btn.textContent = isImageSrcValue(value)
+          ? 'Trocar foto'
+          : (pending ? `Escolher (${pending})` : '+ Foto');
+        btn.addEventListener('click', () => {
+          pendingImageTarget = { rowIndex, bindName };
+          imagesInput.click();
+        });
+        wrap.appendChild(btn);
+
+        // Soltar a foto direto em cima da célula
+        const accept = (e) => {
+          const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+          return file && file.type.startsWith('image/') ? file : null;
+        };
+        wrap.addEventListener('dragover', (e) => {
+          if (e.dataTransfer && e.dataTransfer.types.includes('Files')) e.preventDefault();
+        });
+        wrap.addEventListener('drop', async (e) => {
+          const file = accept(e);
+          if (!file) return;
+          e.preventDefault();
+          e.stopPropagation();
+          const url = await readFileAsDataURL(file);
+          if (!url) return;
+          rec[bindName] = url;
+          delete rec['__hint_' + bindName];
+          renderBatchGrid();
+          updateBatchFooter();
+        });
+
+        return wrap;
       }
 
       function getCanvasBinds() {
@@ -6507,86 +6882,11 @@
         return Array.from(bindsMap.values());
       }
 
-      function updateBatchMappings() {
-        if (!mappingsList) return;
-        const binds = getCanvasBinds();
-        mappingsList.innerHTML = '';
-
-        if (binds.length === 0) {
-          mappingsList.innerHTML = `
-            <div class="canvas-batch-empty-oa">
-              Nenhuma variável {{}} no post. Marque textos ou fotos com o botão <code>{}</code> para conectar.
-            </div>`;
-          return;
-        }
-
-        const headers = batchData.headers || [];
-
-        if (headers.length === 0) {
-          mappingsList.innerHTML = `
-            <div class="canvas-batch-empty-oa">
-              Suba um arquivo .csv acima para conectar às ${binds.length} ${binds.length === 1 ? 'variável' : 'variáveis'} do post.
-            </div>`;
-          return;
-        }
-
-        binds.forEach(bind => {
-          const row = document.createElement('div');
-          row.className = 'canvas-batch-mapping-row-oa';
-
-          const target = document.createElement('div');
-          target.className = 'canvas-batch-mapping-target-oa';
-          target.innerHTML = `
-            <span style="color: ${bind.type === 'image' ? '#7C3AED' : '#DB2777'};">${bind.type === 'image' ? '🖼️' : '✍️'}</span>
-            <span>{{${bind.name}}}</span>
-          `;
-
-          const select = document.createElement('select');
-          select.className = 'canvas-batch-mapping-select-oa';
-
-          const optNone = document.createElement('option');
-          optNone.value = '';
-          optNone.textContent = '— Selecionar Coluna —';
-          select.appendChild(optNone);
-
-          headers.forEach(h => {
-            const opt = document.createElement('option');
-            opt.value = h;
-            opt.textContent = h;
-            select.appendChild(opt);
-          });
-
-          // Auto-match
-          const normBind = bind.name.toLowerCase().replace(/[^a-z0-9]/g, '');
-          let matchedHeader = '';
-          headers.forEach(h => {
-            const normH = h.toLowerCase().replace(/[^a-z0-9]/g, '');
-            if (normH === normBind || normH.includes(normBind) || normBind.includes(normH)) {
-              matchedHeader = h;
-            }
-          });
-
-          if (matchedHeader) {
-            select.value = matchedHeader;
-            batchData.mappings[bind.name] = matchedHeader;
-          } else if (batchData.mappings[bind.name] && headers.includes(batchData.mappings[bind.name])) {
-            select.value = batchData.mappings[bind.name];
-          }
-
-          select.addEventListener('change', () => {
-            batchData.mappings[bind.name] = select.value;
-          });
-
-          row.appendChild(target);
-          row.appendChild(select);
-          mappingsList.appendChild(row);
-        });
-      }
-
       // ----------------------------------------------------
       // MOTOR DE RENDERIZAÇÃO HIGH-DPI (ATÉ 4K) & EXPORTAÇÃO
       // ----------------------------------------------------
       const exportImageCache = new Map();
+      const exportImageFailures = [];
 
       function loadExportImage(src) {
         if (!src) return Promise.resolve(null);
@@ -6608,31 +6908,17 @@
          arquivo original vive no IndexedDB, igual ao que renderImageNode faz
          para desenhar na tela. */
       async function resolveChildImageSrc(child, overrides) {
-        if (child.bind && overrides[child.bind] !== undefined) {
-          const val = String(overrides[child.bind]).toLowerCase().trim();
-          if (batchData.localImages && batchData.localImages.has(val)) {
-            console.log('[EXPORT-DBG] child', child.id, 'bind', child.bind, '-> localImage');
-            return batchData.localImages.get(val);
-          }
-          if (overrides[child.bind]) {
-            console.log('[EXPORT-DBG] child', child.id, 'bind', child.bind, '-> override value:', String(overrides[child.bind]).slice(0, 80));
-            return overrides[child.bind];
-          }
+        /* Um override só substitui o pixel se for de fato uma imagem. Valor de
+           texto num {{bind}} de imagem não pode virar src: o load falha e o nó
+           some do PNG sem ninguém avisar. Nesse caso cai no asset original. */
+        if (child.bind && isImageSrcValue(overrides[child.bind])) {
+          return String(overrides[child.bind]).trim();
         }
-        if (child.src) {
-          console.log('[EXPORT-DBG] child', child.id, '-> child.src');
-          return child.src;
-        }
+        if (child.src) return child.src;
         if (child.assetId) {
-          if (assetCache.has(child.assetId)) {
-            console.log('[EXPORT-DBG] child', child.id, '-> assetCache', child.assetId);
-            return assetCache.get(child.assetId);
-          }
-          const fromDb = await getAsset(child.assetId);
-          console.log('[EXPORT-DBG] child', child.id, '-> IDB', child.assetId, fromDb ? 'OK len=' + fromDb.length : 'NULL');
-          return fromDb;
+          if (assetCache.has(child.assetId)) return assetCache.get(child.assetId);
+          return await getAsset(child.assetId);
         }
-        console.log('[EXPORT-DBG] child', child.id, '-> NOTHING');
         return null;
       }
 
@@ -6745,12 +7031,16 @@
 
         // 2. Nós filhos
         const children = frame.children || [];
-        console.log('[EXPORT-DBG] frame', frame.id, 'children:', children.map(c => c.type + '#' + c.id).join(', '), '| overrides:', JSON.stringify(overrides).slice(0, 200));
         for (const child of children) {
           if (child.type === 'image') {
             const src = await resolveChildImageSrc(child, overrides);
             const img = await loadExportImage(src);
-            console.log('[EXPORT-DBG] child', child.id, 'img loaded?', !!img);
+            if (!img) {
+              /* Slide em branco sem aviso é pior que slide errado: registra a
+                 falha para o lote poder reclamar no fim. */
+              exportImageFailures.push({ frameId: frame.id, childId: child.id, src: src ? String(src).slice(0, 80) : null });
+              console.warn('[export] imagem não carregou', { frame: frame.id, child: child.id, src: src ? String(src).slice(0, 80) : null });
+            }
             if (img) {
               ctx.save();
               ctx.globalAlpha = (child.opacity != null ? child.opacity : 100) / 100;
@@ -6890,8 +7180,9 @@
           return;
         }
 
-        const totalRows = batchData.rows.length;
+        const totalRows = batchData.records.length;
         if (totalRows === 0) return;
+        exportImageFailures.length = 0;
 
         const scale = Number(scaleSelect ? scaleSelect.value : 2);
         const format = formatSelect ? formatSelect.value : 'png';
@@ -6915,20 +7206,19 @@
         const zip = new JSZip();
 
         for (let i = 0; i < totalRows; i++) {
-          const row = batchData.rows[i];
           const pct = Math.round(((i + 1) / totalRows) * 100);
           const postNum = String(i + 1).padStart(3, '0');
 
           if (progressPct) progressPct.textContent = `${pct}%`;
           if (progressFill) progressFill.style.width = `${pct}%`;
 
-          // Prepara mapeamento para esta linha
+          /* A linha da tabela já é o override: chave = nome do bind. Só as dicas
+             internas (__hint_) ficam de fora. */
+          const record = batchData.records[i] || {};
           const overrides = {};
-          Object.keys(batchData.mappings).forEach(bindName => {
-            const col = batchData.mappings[bindName];
-            if (col && row[col] !== undefined) {
-              overrides[bindName] = row[col];
-            }
+          Object.keys(record).forEach(key => {
+            if (key.startsWith('__hint_')) return;
+            if (record[key] !== '') overrides[key] = record[key];
           });
 
           // Todos os slides da linha recebem o mesmo `overrides`
@@ -6960,16 +7250,21 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(downloadUrl);
 
-        if (progressText) progressText.textContent = `✓ ${totalRows} posts exportados com sucesso!`;
+        const falhas = exportImageFailures.length;
+        if (progressText) {
+          progressText.textContent = falhas
+            ? `✓ ${totalRows} posts exportados — ${falhas} imagem${falhas === 1 ? '' : 'ns'} não carregou (veja o console)`
+            : `✓ ${totalRows} posts exportados com sucesso!`;
+        }
         startBtn.disabled = false;
         setTimeout(() => {
           closeBatchModal();
           if (progressBox) progressBox.style.display = 'none';
-        }, 1200);
+        }, falhas ? 3500 : 1200);
       }
 
       function updateBatchFooter() {
-        const total = batchData.rows.length;
+        const total = batchData.records.length;
         const binds = getCanvasBinds();
         if (total > 0 && binds.length > 0) {
           if (startBtn) {
@@ -6987,7 +7282,7 @@
       function openBatchModal() {
         document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
         modal.classList.add('open');
-        updateBatchMappings();
+        renderBatchGrid();
         updateBatchFooter();
         if (window.lucide) lucide.createIcons();
       }

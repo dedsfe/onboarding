@@ -406,8 +406,8 @@
     <div class="openpanel-modal canvas-batch-modal-oa">
       <div class="openpanel-modal__header">
         <div>
-          <h2 class="openpanel-modal__title">Criar em Lote</h2>
-          <div class="openpanel-modal__sub">Conecte uma planilha para gerar variações do post</div>
+          <h2 class="openpanel-modal__title">Dados do Lote</h2>
+          <div class="openpanel-modal__sub">Uma linha = um post. Digite na mão, cole do Sheets ou importe um .csv</div>
         </div>
         <button class="openpanel-close-btn" id="canvas-batch-close" title="Fechar (Esc)">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -418,42 +418,103 @@
       </div>
 
       <div class="canvas-batch-body-oa">
-        <!-- Dropzone 1: Arquivo CSV -->
-        <div class="canvas-batch-section-oa">
-          <div class="canvas-batch-title-oa">Arquivo de Dados</div>
-          <div class="canvas-batch-dropzone-oa" id="canvas-batch-dropzone">
-            <input type="file" id="canvas-batch-csv-input" accept=".csv,text/csv" style="display: none;">
-            <i data-lucide="file-spreadsheet" style="width: 18px; height: 18px; color: #6B7280; flex-shrink: 0;"></i>
-            <div class="canvas-batch-dropzone-label-oa" id="canvas-batch-dropzone-label">
-              <span>Arraste seu arquivo .csv ou clique aqui</span>
+        <!-- Tabela de Posts: uma linha = um post -->
+        <div class="canvas-batch-section-oa" id="canvas-batch-grid-section">
+          <div class="canvas-batch-grid-head-oa">
+            <div class="canvas-batch-title-oa" style="margin-bottom: 0;">Dados dos Posts</div>
+            <div class="canvas-batch-grid-actions-oa">
+              <button type="button" class="canvas-batch-mini-btn-oa" id="canvas-batch-paste-btn" title="Colar dados copiados do Google Sheets ou Excel (⌘V)">
+                <i data-lucide="clipboard-paste" style="width: 13px; height: 13px;"></i>
+                <span>Colar Tabela</span>
+              </button>
+              <button type="button" class="canvas-batch-mini-btn-oa" id="canvas-batch-import-btn" title="Importar .csv para preencher a tabela">
+                <i data-lucide="file-spreadsheet" style="width: 13px; height: 13px;"></i>
+                <span>Importar .csv</span>
+              </button>
+              <button type="button" class="canvas-batch-mini-btn-oa is-primary" id="canvas-batch-add-row" title="Adicionar mais um post">
+                <i data-lucide="plus" style="width: 13px; height: 13px;"></i>
+                <span>Linha</span>
+              </button>
             </div>
           </div>
-        </div>
-
-        <!-- Mapeamento de Variáveis -->
-        <div class="canvas-batch-section-oa">
-          <div class="canvas-batch-title-oa">Mapear Colunas</div>
-          <div class="canvas-batch-list-oa" id="canvas-batch-mappings-list">
-            <div class="canvas-batch-empty-oa">Suba um CSV para conectar às variáveis do post.</div>
+          <input type="file" id="canvas-batch-csv-input" accept=".csv,text/csv" style="display: none;">
+          <input type="file" id="canvas-batch-images-input" accept="image/*" multiple style="display: none;">
+          <div class="canvas-batch-gridwrap-oa" id="canvas-batch-gridwrap">
+            <div class="canvas-batch-grid-oa" id="canvas-batch-grid"></div>
+          </div>
+          <div class="canvas-batch-hint-oa" id="canvas-batch-hint">
+            Copie do Google Sheets/Excel e aperte <strong>⌘V / Ctrl+V</strong> aqui · ou arraste um arquivo .csv
           </div>
         </div>
 
-        <!-- Dropzone 2: Fotos Locais -->
-        <div class="canvas-batch-section-oa">
-          <div class="canvas-batch-title-oa">Fotos Locais <span class="canvas-batch-opt-oa">(opcional)</span></div>
-          <div class="canvas-batch-dropzone-oa" id="canvas-batch-images-dropzone">
-            <input type="file" id="canvas-batch-images-input" accept="image/*" multiple style="display: none;">
-            <i data-lucide="image" style="width: 18px; height: 18px; color: #6B7280; flex-shrink: 0;"></i>
-            <div class="canvas-batch-dropzone-label-oa" id="canvas-batch-images-label">
-              <span>Arraste as fotos locais ou clique para selecionar</span>
-            </div>
-            <span class="canvas-batch-images-tag-oa" id="canvas-batch-images-count" style="display: none;">0 fotos</span>
-          </div>
-        </div>
+      </div>
 
-        <!-- Opções de Exportação (Canva Style) -->
+      <!-- Rodapé -->
+      <div class="openpanel-modal__footer">
+        <span class="canvas-batch-foot-info-oa" id="canvas-batch-foot-info"></span>
+        <button class="openpanel-btn-secondary" id="canvas-batch-cancel">Fechar</button>
+        <button class="openpanel-btn-primary" id="canvas-batch-goto-photos">
+          <span>Fotos do Lote →</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------------
+       MODAL DE FOTOS DO LOTE
+       -------------------------------------------------- -->
+  <div class="modal-overlay" id="canvas-batch-photos-modal">
+    <div class="openpanel-modal canvas-batch-modal-oa">
+      <div class="openpanel-modal__header">
+        <div>
+          <h2 class="openpanel-modal__title">Fotos do Lote</h2>
+          <div class="openpanel-modal__sub">Uma foto para cada post. Clique, arraste em cima ou preencha a coluna em ordem</div>
+        </div>
+        <button class="openpanel-close-btn" id="canvas-batch-photos-close" title="Fechar (Esc)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="canvas-batch-body-oa">
+        <div class="canvas-batch-photos-wrap-oa" id="canvas-batch-photos-wrap"></div>
+      </div>
+
+      <div class="openpanel-modal__footer">
+        <span class="canvas-batch-foot-info-oa" id="canvas-batch-photos-info"></span>
+        <button class="openpanel-btn-secondary" id="canvas-batch-photos-back">← Dados</button>
+        <button class="openpanel-btn-primary" id="canvas-batch-goto-export">
+          <span>Exportar Lote →</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- --------------------------------------------------
+       MODAL DE EXPORTAÇÃO DO LOTE
+       -------------------------------------------------- -->
+  <div class="modal-overlay" id="canvas-batch-export-modal">
+    <div class="openpanel-modal canvas-batch-export-modal-oa">
+      <div class="openpanel-modal__header">
+        <div>
+          <h2 class="openpanel-modal__title">Exportar Lote</h2>
+          <div class="openpanel-modal__sub">Gera todos os posts da tabela em um .zip</div>
+        </div>
+        <button class="openpanel-close-btn" id="canvas-batch-export-close" title="Fechar (Esc)">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="canvas-batch-body-oa" style="margin-bottom: 0;">
+        <div class="canvas-batch-summary-oa" id="canvas-batch-summary"></div>
+
         <div class="canvas-batch-section-oa">
-          <div class="canvas-batch-title-oa">Qualidade & Formato de Exportação</div>
+          <div class="canvas-batch-title-oa">Qualidade & Formato</div>
           <div class="canvas-export-controls-grid">
             <select class="canvas-batch-mapping-select-oa" id="canvas-batch-scale" style="max-width: 100%;">
               <option value="1">1x · 1080p (Padrão Feed)</option>
@@ -467,7 +528,6 @@
           </div>
         </div>
 
-        <!-- Barra de Progresso Durante Exportação -->
         <div class="canvas-batch-progress-box" id="canvas-batch-progress" style="display: none;">
           <div class="canvas-batch-progress-header">
             <span id="canvas-batch-progress-text">Gerando 1 de 20 posts...</span>
@@ -479,9 +539,8 @@
         </div>
       </div>
 
-      <!-- Rodapé -->
       <div class="openpanel-modal__footer">
-        <button class="openpanel-btn-secondary" id="canvas-batch-cancel">Cancelar</button>
+        <button class="openpanel-btn-secondary" id="canvas-batch-export-back">← Fotos</button>
         <button class="openpanel-btn-primary" id="canvas-batch-start-btn" disabled>
           <span id="canvas-batch-start-label">Gerar Posts</span>
         </button>
@@ -611,9 +670,15 @@
 
         <span class="canvas-topbar__sep"></span>
 
-        <!-- Botão Criar em Lote (Batch Create) -->
-        <button class="canvas-topbar__btn" id="canvas-batch-btn" title="Criar em Lote (Batch Create com CSV)">
-          <i data-lucide="sparkles" style="width: 16px; height: 16px;"></i>
+        <!-- Lote: dados, fotos e exportação em modais separados -->
+        <button class="canvas-topbar__btn" id="canvas-batch-btn" title="Dados do Lote (tabela + .csv)">
+          <i data-lucide="table-2" style="width: 16px; height: 16px;"></i>
+        </button>
+        <button class="canvas-topbar__btn" id="canvas-batch-photos-btn" title="Fotos do Lote">
+          <i data-lucide="images" style="width: 16px; height: 16px;"></i>
+        </button>
+        <button class="canvas-topbar__btn" id="canvas-batch-export-btn" title="Exportar Lote (gerar todos os posts)">
+          <i data-lucide="package" style="width: 16px; height: 16px;"></i>
         </button>
 
         <!-- Botão Exportar Imagem (Canva Style) -->
