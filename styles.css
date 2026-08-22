@@ -3470,100 +3470,186 @@ body {
   margin-top: 12px;
 }
 
-/* --- GRADIENTES MESH --- */
-.canvas-mesh-panel-oa {
+/* --- GRADIENTES & TEXTURAS STUDIO --- */
+.canvas-grad-panel-oa {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  gap: 20px;
+  align-items: stretch;
   flex-wrap: wrap;
 }
 
-.canvas-mesh-preview-box-oa {
+.canvas-grad-preview-col-oa {
   flex: 1;
-  min-width: 220px;
-  background: #F9FAFB;
-  border: 1px solid #E5E7EB;
-  border-radius: 14px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-}
-
-.canvas-mesh-canvas-oa {
-  width: 100%;
-  max-width: 220px;
-  aspect-ratio: 4 / 5;
-  border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  display: block;
-}
-
-.canvas-mesh-controls-oa {
-  flex: 1.3;
   min-width: 240px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
+  background: #F9FAFB;
+  border: 1px solid #E5E7EB;
+  border-radius: 14px;
+  padding: 14px;
 }
 
-.canvas-mesh-colors-row-oa {
+.canvas-grad-canvas-oa {
+  width: 100%;
+  max-width: 260px;
+  aspect-ratio: 4 / 5;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.09);
+  display: block;
+}
+
+.canvas-grad-actions-oa {
+  width: 100%;
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.canvas-grad-controls-col-oa {
+  flex: 1.4;
+  min-width: 270px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.canvas-grad-types-oa {
+  display: flex;
+  gap: 6px;
+  background: #F3F4F6;
+  padding: 3px;
+  border-radius: 9px;
+}
+
+.canvas-grad-type-btn-oa {
+  flex: 1;
+  padding: 6px 8px;
+  border: none;
+  background: transparent;
+  color: #4B5563;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all var(--transition);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.canvas-grad-type-btn-oa:hover {
+  color: #111827;
+}
+
+.canvas-grad-type-btn-oa.is-active {
+  background: #FFFFFF;
+  color: #111827;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.canvas-grad-colors-grid-oa {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
-.canvas-mesh-color-pick-oa {
-  flex: 1;
-  height: 36px;
-  border-radius: 8px;
+.canvas-grad-color-item-oa {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #FFFFFF;
   border: 1px solid #E5E7EB;
+  border-radius: 8px;
+  padding: 4px 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.canvas-grad-color-pick-oa {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
   cursor: pointer;
   padding: 0;
+  background: none;
 }
 
-.canvas-mesh-presets-grid-oa {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-  gap: 8px;
-  margin-top: 4px;
+.canvas-grad-color-pick-oa::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.canvas-grad-color-pick-oa::-webkit-color-swatch {
+  border: none;
+  border-radius: 5px;
 }
 
-.canvas-mesh-preset-card-oa {
-  border: 1px solid #E5E7EB;
-  border-radius: 10px;
-  padding: 6px;
-  background: #FFFFFF;
+.canvas-grad-color-del-oa {
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: #9CA3AF;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+
+.canvas-grad-color-del-oa:hover {
+  background: #FEE2E2;
+  color: #EF4444;
+}
+
+.canvas-grad-add-color-btn-oa {
+  padding: 6px 10px;
+  border: 1px dashed #D1D5DB;
+  background: #F9FAFB;
+  color: #4B5563;
+  font-size: 11.5px;
+  font-weight: 500;
+  border-radius: 8px;
   cursor: pointer;
   transition: all var(--transition);
+}
+
+.canvas-grad-add-color-btn-oa:hover {
+  background: #F3F4F6;
+  border-color: #9CA3AF;
+  color: #111827;
+}
+
+.canvas-grad-slider-group-oa {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
-.canvas-mesh-preset-card-oa:hover {
-  border-color: #8B5CF6;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(139, 92, 246, 0.1);
-}
-
-.canvas-mesh-preset-thumb-oa {
-  width: 100%;
-  height: 48px;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.canvas-mesh-preset-name-oa {
-  font-size: 11px;
+.canvas-grad-slider-header-oa {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
   font-weight: 500;
   color: #374151;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+
+.canvas-grad-slider-val-oa {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #6B7280;
+  font-variant-numeric: tabular-nums;
+}
+
+.canvas-grad-range-input-oa {
+  width: 100%;
+  accent-color: #2563EB;
+  cursor: pointer;
 }
 
 /* --- FONTES & TIPOGRAFIA --- */

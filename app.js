@@ -8726,139 +8726,376 @@
         }
       }
 
-      // --- ABA GRADIENTES MESH ---
+      // --- ABA GRADIENTES STUDIO (INTERATIVO) ---
+      let gradientStudioState = {
+        type: 'mesh', // 'mesh' | 'linear' | 'radial' | 'conic'
+        colors: ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B'],
+        noise: 16,
+        blur: 0,
+        angle: 135,
+        seed: 42
+      };
+
+      const HARMONIC_PALETTES = [
+        ['#2563EB', '#7C3AED', '#DB2777', '#F59E0B'],
+        ['#0F172A', '#1E293B', '#334155', '#475569'],
+        ['#06B6D4', '#3B82F6', '#6366F1', '#A855F7'],
+        ['#F43F5E', '#FB7185', '#FDA4AF', '#FFE4E6'],
+        ['#10B981', '#059669', '#047857', '#065F46'],
+        ['#F59E0B', '#EF4444', '#EC4899', '#8B5CF6'],
+        ['#E2E8F0', '#CBD5E1', '#94A3B8', '#64748B'],
+        ['#18181B', '#27272A', '#3F3F46', '#52525B']
+      ];
+
+      function pseudoRandom(s) {
+        const x = Math.sin(s) * 10000;
+        return x - Math.floor(x);
+      }
+
+      async function renderStudioGradientToCanvas(targetCanvas, state) {
+        if (!targetCanvas) return;
+        const ctx = targetCanvas.getContext('2d');
+        const w = targetCanvas.width;
+        const h = targetCanvas.height;
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.save();
+
+        const colors = state.colors && state.colors.length > 0 ? state.colors : ['#2563EB', '#7C3AED', '#DB2777', '#F59E0B'];
+
+        if (state.type === 'linear') {
+          const rad = ((state.angle || 0) * Math.PI) / 180;
+          const cx = w / 2;
+          const cy = h / 2;
+          const len = Math.sqrt(w * w + h * h) / 2;
+          const x0 = cx - Math.cos(rad) * len;
+          const y0 = cy - Math.sin(rad) * len;
+          const x1 = cx + Math.cos(rad) * len;
+          const y1 = cy + Math.sin(rad) * len;
+
+          const grad = ctx.createLinearGradient(x0, y0, x1, y1);
+          const n = colors.length;
+          colors.forEach((col, i) => {
+            grad.addColorStop(n > 1 ? i / (n - 1) : 0, col);
+          });
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
+        } else if (state.type === 'radial') {
+          const cx = w / 2;
+          const cy = h / 2;
+          const radius = Math.max(w, h) * 0.75;
+          const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+          const n = colors.length;
+          colors.forEach((col, i) => {
+            grad.addColorStop(n > 1 ? i / (n - 1) : 0, col);
+          });
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, w, h);
+        } else if (state.type === 'conic') {
+          const cx = w / 2;
+          const cy = h / 2;
+          const rad = ((state.angle || 0) * Math.PI) / 180;
+          if (typeof ctx.createConicGradient === 'function') {
+            const grad = ctx.createConicGradient(rad, cx, cy);
+            const n = colors.length;
+            colors.forEach((col, i) => {
+              grad.addColorStop(n > 1 ? i / (n - 1) : 0, col);
+            });
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+          } else {
+            ctx.fillStyle = colors[0];
+            ctx.fillRect(0, 0, w, h);
+          }
+        } else {
+          // Mesh Fluido: Multi-ponto orgânico de alta saturação
+          const baseSeed = Number(state.seed) || 42;
+          const defaultPos = [
+            [w * 0.85, h * 0.15],
+            [w * 0.15, h * 0.85],
+            [w * 0.85, h * 0.85],
+            [w * 0.50, h * 0.45],
+            [w * 0.15, h * 0.15],
+            [w * 0.50, h * 0.90]
+          ];
+
+          ctx.fillStyle = colors[0];
+          ctx.fillRect(0, 0, w, h);
+
+          colors.slice(1).forEach((col, i) => {
+            const def = defaultPos[i % defaultPos.length];
+            const rx = (pseudoRandom(baseSeed + i * 17) - 0.5) * (w * 0.35);
+            const ry = (pseudoRandom(baseSeed + i * 29) - 0.5) * (h * 0.35);
+            const px = Math.max(0, Math.min(w, def[0] + rx));
+            const py = Math.max(0, Math.min(h, def[1] + ry));
+            const radius = Math.max(w, h) * (0.85 + pseudoRandom(baseSeed + i * 7) * 0.3);
+
+            const g = ctx.createRadialGradient(px, py, 0, px, py, radius);
+            g.addColorStop(0, col);
+            g.addColorStop(0.65, col + 'AA');
+            g.addColorStop(1, 'transparent');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, w, h);
+          });
+        }
+
+        // 2. Aplica Blur se > 0
+        if (state.blur > 0) {
+          const blurCanvas = document.createElement('canvas');
+          blurCanvas.width = w;
+          blurCanvas.height = h;
+          const bCtx = blurCanvas.getContext('2d');
+          bCtx.filter = `blur(${state.blur}px)`;
+          bCtx.drawImage(targetCanvas, 0, 0, w, h);
+          ctx.clearRect(0, 0, w, h);
+          ctx.drawImage(blurCanvas, 0, 0, w, h);
+        }
+
+        // 3. Aplica Ruído / Noise Grain se > 0
+        if (state.noise > 0) {
+          const noiseAmount = (state.noise / 100) * 0.45;
+          const noiseTile = document.createElement('canvas');
+          const tw = 256;
+          const th = 256;
+          noiseTile.width = tw;
+          noiseTile.height = th;
+          const nCtx = noiseTile.getContext('2d');
+          const imgData = nCtx.createImageData(tw, th);
+          const data = imgData.data;
+          for (let i = 0; i < data.length; i += 4) {
+            const v = (Math.random() * 255) | 0;
+            data[i] = v;
+            data[i + 1] = v;
+            data[i + 2] = v;
+            data[i + 3] = (Math.random() * 255 * noiseAmount) | 0;
+          }
+          nCtx.putImageData(imgData, 0, 0);
+
+          ctx.save();
+          ctx.globalCompositeOperation = 'overlay';
+          const pattern = ctx.createPattern(noiseTile, 'repeat');
+          if (pattern) {
+            ctx.fillStyle = pattern;
+            ctx.fillRect(0, 0, w, h);
+          }
+          ctx.restore();
+        }
+
+        ctx.restore();
+      }
+
+      async function renderStudioGradientToDataUrl(state, w = 1080, h = 1350) {
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = w;
+        offCanvas.height = h;
+        await renderStudioGradientToCanvas(offCanvas, state);
+        return offCanvas.toDataURL('image/png');
+      }
+
       async function renderGradientsView() {
         if (!viewContainer) return;
         viewContainer.innerHTML = `
-          <div class="canvas-mesh-panel-oa">
-            <div class="canvas-mesh-preview-box-oa">
-              <canvas class="canvas-mesh-canvas-oa" id="canvas-mesh-live-preview" width="360" height="450"></canvas>
-              <div style="font-size: 11.5px; color: #6B7280; text-align: center;">Preview do Gradiente</div>
+          <div class="canvas-grad-panel-oa">
+            <!-- Coluna Esquerda: Preview ao Vivo + Ações -->
+            <div class="canvas-grad-preview-col-oa">
+              <canvas class="canvas-grad-canvas-oa" id="canvas-grad-live-preview" width="360" height="450"></canvas>
+              
+              <div class="canvas-grad-actions-oa">
+                <button type="button" class="openpanel-btn-primary" id="canvas-grad-btn-apply-bg" style="width: 100%; justify-content: center; padding: 9px; font-weight: 600;">
+                  🖼 Aplicar como Fundo do Post
+                </button>
+                <button type="button" class="openpanel-btn-secondary" id="canvas-grad-btn-insert-elem" style="width: 100%; justify-content: center; padding: 8px;">
+                  ✨ Inserir como Card / Elemento
+                </button>
+              </div>
             </div>
 
-            <div class="canvas-mesh-controls-oa">
+            <!-- Coluna Direita: Controles Interativos -->
+            <div class="canvas-grad-controls-col-oa">
+              <!-- Seletor de Tipo -->
               <div>
-                <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 6px;">Cores do Mesh (4 Pontos):</label>
-                <div class="canvas-mesh-colors-row-oa">
-                  <input type="color" class="canvas-mesh-color-pick-oa" id="canvas-mesh-c0" value="${currentMeshColors[0]}">
-                  <input type="color" class="canvas-mesh-color-pick-oa" id="canvas-mesh-c1" value="${currentMeshColors[1]}">
-                  <input type="color" class="canvas-mesh-color-pick-oa" id="canvas-mesh-c2" value="${currentMeshColors[2]}">
-                  <input type="color" class="canvas-mesh-color-pick-oa" id="canvas-mesh-c3" value="${currentMeshColors[3]}">
+                <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 6px;">Tipo de Gradiente:</label>
+                <div class="canvas-grad-types-oa">
+                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'mesh' ? 'is-active' : ''}" data-type="mesh">⚯ Mesh Fluido</button>
+                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'linear' ? 'is-active' : ''}" data-type="linear">↗ Linear</button>
+                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'radial' ? 'is-active' : ''}" data-type="radial">⦿ Radial</button>
+                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'conic' ? 'is-active' : ''}" data-type="conic">◷ Cônico</button>
                 </div>
               </div>
 
-              <div style="display: flex; gap: 8px;">
-                <button type="button" class="openpanel-btn-secondary" id="canvas-mesh-btn-shuffle" style="flex: 1; padding: 7px;">
-                  🎲 Embaralhar Padrão
-                </button>
+              <!-- Cores -->
+              <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                  <label style="font-size: 12px; font-weight: 600; color: #374151;">Cores do Gradiente (${gradientStudioState.colors.length}):</label>
+                  <button type="button" class="canvas-font-chip-oa" id="canvas-grad-btn-random-palette" style="padding: 2px 8px; font-size: 11px;">🎲 Sortear Paleta</button>
+                </div>
+                <div class="canvas-grad-colors-grid-oa" id="canvas-grad-colors-container"></div>
               </div>
 
-              <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
-                <button type="button" class="openpanel-btn-primary" id="canvas-mesh-btn-apply-bg" style="width: 100%; justify-content: center; padding: 8px;">
-                  <span>🖼 Usar como Fundo do Frame</span>
-                </button>
-                <button type="button" class="openpanel-btn-secondary" id="canvas-mesh-btn-insert-elem" style="width: 100%; justify-content: center; padding: 7px;">
-                  ✨ Inserir como Elemento
+              <!-- Slider Ruído / Grain -->
+              <div class="canvas-grad-slider-group-oa">
+                <div class="canvas-grad-slider-header-oa">
+                  <span>Textura de Ruído (Grain)</span>
+                  <span class="canvas-grad-slider-val-oa" id="canvas-grad-noise-val">${gradientStudioState.noise}%</span>
+                </div>
+                <input type="range" class="canvas-grad-range-input-oa" id="canvas-grad-noise-input" min="0" max="50" value="${gradientStudioState.noise}">
+              </div>
+
+              <!-- Slider Blur -->
+              <div class="canvas-grad-slider-group-oa">
+                <div class="canvas-grad-slider-header-oa">
+                  <span>Desfoque / Suavização (Blur)</span>
+                  <span class="canvas-grad-slider-val-oa" id="canvas-grad-blur-val">${gradientStudioState.blur}px</span>
+                </div>
+                <input type="range" class="canvas-grad-range-input-oa" id="canvas-grad-blur-input" min="0" max="60" value="${gradientStudioState.blur}">
+              </div>
+
+              <!-- Slider Ângulo (visível se linear/conic) -->
+              <div class="canvas-grad-slider-group-oa" id="canvas-grad-angle-group" style="${gradientStudioState.type === 'linear' || gradientStudioState.type === 'conic' ? 'display: flex;' : 'display: none;'}">
+                <div class="canvas-grad-slider-header-oa">
+                  <span>Ângulo de Direção</span>
+                  <span class="canvas-grad-slider-val-oa" id="canvas-grad-angle-val">${gradientStudioState.angle}°</span>
+                </div>
+                <input type="range" class="canvas-grad-range-input-oa" id="canvas-grad-angle-input" min="0" max="360" value="${gradientStudioState.angle}">
+              </div>
+
+              <!-- Botão Distorção Mesh (visível se mesh) -->
+              <div id="canvas-grad-seed-group" style="${gradientStudioState.type === 'mesh' ? 'display: block;' : 'display: none;'}">
+                <button type="button" class="openpanel-btn-secondary" id="canvas-grad-btn-seed" style="width: 100%; justify-content: center; padding: 7px; font-size: 12px;">
+                  🎲 Nova Variação / Distorção
                 </button>
               </div>
             </div>
           </div>
-
-          <div>
-            <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 6px; margin-top: 4px;">Presets Recomendados:</label>
-            <div class="canvas-mesh-presets-grid-oa" id="canvas-mesh-presets-container"></div>
-          </div>
         `;
 
-        // Renderiza lista de presets
-        const presetsContainer = document.getElementById('canvas-mesh-presets-container');
-        if (presetsContainer) {
-          MESH_PRESETS.forEach((preset, idx) => {
-            const card = document.createElement('div');
-            card.className = 'canvas-mesh-preset-card-oa';
-            card.innerHTML = `
-              <div class="canvas-mesh-preset-thumb-oa" style="background: linear-gradient(135deg, ${preset.colors[0]} 0%, ${preset.colors[1]} 35%, ${preset.colors[2]} 70%, ${preset.colors[3]} 100%);"></div>
-              <div class="canvas-mesh-preset-name-oa">${preset.name}</div>
-            `;
-            card.addEventListener('click', () => {
-              currentMeshColors = [...preset.colors];
-              currentMeshSeed = preset.seed;
-              updateMeshInputsAndPreview();
-            });
-            presetsContainer.appendChild(card);
-          });
-        }
+        // Seletor de Tipo
+        viewContainer.querySelectorAll('.canvas-grad-type-btn-oa').forEach(btn => {
+          btn.addEventListener('click', () => {
+            gradientStudioState.type = btn.dataset.type;
+            viewContainer.querySelectorAll('.canvas-grad-type-btn-oa').forEach(b => b.classList.toggle('is-active', b === btn));
+            
+            const angleGroup = document.getElementById('canvas-grad-angle-group');
+            if (angleGroup) angleGroup.style.display = (gradientStudioState.type === 'linear' || gradientStudioState.type === 'conic') ? 'flex' : 'none';
 
-        // Conecta inputs de cores
-        [0, 1, 2, 3].forEach(idx => {
-          const inp = document.getElementById(`canvas-mesh-c${idx}`);
-          if (inp) {
-            inp.addEventListener('input', (e) => {
-              currentMeshColors[idx] = e.target.value;
-              updateLiveMeshPreview();
-            });
-          }
+            const seedGroup = document.getElementById('canvas-grad-seed-group');
+            if (seedGroup) seedGroup.style.display = (gradientStudioState.type === 'mesh') ? 'block' : 'none';
+
+            updateLiveStudioPreview();
+          });
         });
 
-        // Botão de Embaralhar
-        const shuffleBtn = document.getElementById('canvas-mesh-btn-shuffle');
-        if (shuffleBtn) {
-          shuffleBtn.addEventListener('click', () => {
-            currentMeshSeed = Math.floor(Math.random() * 1000) + 1;
-            updateLiveMeshPreview();
+        // Cores
+        renderStudioColorPickers();
+
+        // Sortear Paleta
+        const randPalBtn = document.getElementById('canvas-grad-btn-random-palette');
+        if (randPalBtn) {
+          randPalBtn.addEventListener('click', () => {
+            const pal = HARMONIC_PALETTES[Math.floor(Math.random() * HARMONIC_PALETTES.length)];
+            gradientStudioState.colors = [...pal];
+            renderStudioColorPickers();
+            updateLiveStudioPreview();
           });
         }
 
-        // Botão Usar como Fundo
-        const applyBgBtn = document.getElementById('canvas-mesh-btn-apply-bg');
+        // Ruído Input
+        const noiseInput = document.getElementById('canvas-grad-noise-input');
+        const noiseVal = document.getElementById('canvas-grad-noise-val');
+        if (noiseInput && noiseVal) {
+          noiseInput.addEventListener('input', (e) => {
+            gradientStudioState.noise = Number(e.target.value);
+            noiseVal.textContent = `${gradientStudioState.noise}%`;
+            updateLiveStudioPreview();
+          });
+        }
+
+        // Blur Input
+        const blurInput = document.getElementById('canvas-grad-blur-input');
+        const blurVal = document.getElementById('canvas-grad-blur-val');
+        if (blurInput && blurVal) {
+          blurInput.addEventListener('input', (e) => {
+            gradientStudioState.blur = Number(e.target.value);
+            blurVal.textContent = `${gradientStudioState.blur}px`;
+            updateLiveStudioPreview();
+          });
+        }
+
+        // Ângulo Input
+        const angleInput = document.getElementById('canvas-grad-angle-input');
+        const angleVal = document.getElementById('canvas-grad-angle-val');
+        if (angleInput && angleVal) {
+          angleInput.addEventListener('input', (e) => {
+            gradientStudioState.angle = Number(e.target.value);
+            angleVal.textContent = `${gradientStudioState.angle}°`;
+            updateLiveStudioPreview();
+          });
+        }
+
+        // Seed Botão
+        const seedBtn = document.getElementById('canvas-grad-btn-seed');
+        if (seedBtn) {
+          seedBtn.addEventListener('click', () => {
+            gradientStudioState.seed = Math.floor(Math.random() * 1000) + 1;
+            updateLiveStudioPreview();
+          });
+        }
+
+        // Botão Aplicar como Fundo
+        const applyBgBtn = document.getElementById('canvas-grad-btn-apply-bg');
         if (applyBgBtn) {
           applyBgBtn.addEventListener('click', async () => {
             const frame = selectedFrame() || frames[0];
             if (!frame) {
-              toast.info('Selecione um frame no canvas primeiro.');
+              toast.info('Selecione um post no canvas primeiro.');
               return;
             }
             applyBgBtn.disabled = true;
+            applyBgBtn.textContent = 'Aplicando…';
             try {
-              const dataUrl = await renderMeshGradientToDataUrl(currentMeshColors, currentMeshSeed, frame.w || 1080, frame.h || 1350);
-              const assetId = 'asset_mesh_bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+              const dataUrl = await renderStudioGradientToDataUrl(gradientStudioState, frame.w || 1080, frame.h || 1350);
+              const assetId = 'asset_grad_bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
               assetCache.set(assetId, dataUrl);
               await saveAsset(assetId, dataUrl);
 
               frame.bgAssetId = assetId;
               frame.bgImage = null;
-              frame.bgRecipe = { type: 'mesh', colors: [...currentMeshColors], seed: currentMeshSeed };
+              frame.bg = null;
+              frame.bgRecipe = { ...gradientStudioState };
               if (frame.bgOverlay == null) frame.bgOverlay = 0;
 
               applyFrameBackground(frame);
               save();
               updateTextToolbar();
               closeLibrary();
+              toast.success('Fundo do post atualizado com sucesso!');
             } catch (err) {
-              console.error('[mesh-gradient] falha ao aplicar fundo:', err);
-              toast.error('Falha ao renderizar gradiente mesh.');
+              console.error('[gradient-studio] falha ao aplicar fundo:', err);
+              toast.error('Falha ao renderizar gradiente.');
             } finally {
               applyBgBtn.disabled = false;
+              applyBgBtn.textContent = '🖼 Aplicar como Fundo do Post';
             }
           });
         }
 
         // Botão Inserir como Elemento
-        const insertElemBtn = document.getElementById('canvas-mesh-btn-insert-elem');
+        const insertElemBtn = document.getElementById('canvas-grad-btn-insert-elem');
         if (insertElemBtn) {
           insertElemBtn.addEventListener('click', async () => {
             const frame = selectedFrame() || frames[0];
             if (!frame) {
-              toast.info('Selecione um frame no canvas primeiro.');
+              toast.info('Selecione um post no canvas primeiro.');
               return;
             }
             insertElemBtn.disabled = true;
+            insertElemBtn.textContent = 'Inserindo…';
             try {
               const targetW = Math.round(frame.w * 0.75);
               const targetH = Math.round(targetW * 0.75);
-              const dataUrl = await renderMeshGradientToDataUrl(currentMeshColors, currentMeshSeed, targetW, targetH);
+              const dataUrl = await renderStudioGradientToDataUrl(gradientStudioState, targetW, targetH);
 
-              const assetId = 'asset_mesh_node_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+              const assetId = 'asset_grad_elem_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
               assetCache.set(assetId, dataUrl);
               await saveAsset(assetId, dataUrl);
 
@@ -8885,7 +9122,7 @@
                 opacity: 100,
                 blur: 0,
                 shadow: 0,
-                meshRecipe: { type: 'mesh', colors: [...currentMeshColors], seed: currentMeshSeed }
+                gradRecipe: { ...gradientStudioState }
               };
 
               if (!frame.children) frame.children = [];
@@ -8895,47 +9132,79 @@
               selectTextNode(frame.id, child.id);
               save();
               closeLibrary();
+              toast.success('Elemento de gradiente inserido no canvas!');
             } catch (err) {
-              console.error('[mesh-gradient] falha ao inserir elemento:', err);
+              console.error('[gradient-studio] falha ao inserir elemento:', err);
               toast.error('Falha ao inserir gradiente como elemento.');
             } finally {
               insertElemBtn.disabled = false;
+              insertElemBtn.textContent = '✨ Inserir como Card / Elemento';
             }
           });
         }
 
-        updateLiveMeshPreview();
+        updateLiveStudioPreview();
       }
 
-      function updateMeshInputsAndPreview() {
-        [0, 1, 2, 3].forEach(idx => {
-          const inp = document.getElementById(`canvas-mesh-c${idx}`);
-          if (inp) inp.value = currentMeshColors[idx];
-        });
-        updateLiveMeshPreview();
-      }
+      function renderStudioColorPickers() {
+        const container = document.getElementById('canvas-grad-colors-container');
+        if (!container) return;
+        container.innerHTML = '';
 
-      let meshLiveInstance = null;
-      async function updateLiveMeshPreview() {
-        const previewCanvas = document.getElementById('canvas-mesh-live-preview');
-        if (!previewCanvas) return;
-        try {
-          if (meshLiveInstance) {
-            try { meshLiveInstance.destroy(); } catch {}
-            meshLiveInstance = null;
+        gradientStudioState.colors.forEach((col, idx) => {
+          const item = document.createElement('div');
+          item.className = 'canvas-grad-color-item-oa';
+          item.innerHTML = `
+            <input type="color" class="canvas-grad-color-pick-oa" value="${col}" data-idx="${idx}">
+            <span style="font-size: 11px; font-weight: 500; color: #4B5563; font-family: monospace;">${col.toUpperCase()}</span>
+            ${gradientStudioState.colors.length > 2 ? `<button type="button" class="canvas-grad-color-del-oa" data-idx="${idx}" title="Remover cor">✕</button>` : ''}
+          `;
+
+          const pick = item.querySelector('.canvas-grad-color-pick-oa');
+          if (pick) {
+            pick.addEventListener('input', (e) => {
+              gradientStudioState.colors[idx] = e.target.value;
+              const label = item.querySelector('span');
+              if (label) label.textContent = e.target.value.toUpperCase();
+              updateLiveStudioPreview();
+            });
           }
-          const MeshGradClass = await loadMeshGradientLib();
-          meshLiveInstance = new MeshGradClass();
-          await meshLiveInstance.init(previewCanvas, {
-            colors: currentMeshColors,
-            seed: currentMeshSeed,
-            isStatic: true,
-            webglContextAttributes: { preserveDrawingBuffer: true }
+
+          const delBtn = item.querySelector('.canvas-grad-color-del-oa');
+          if (delBtn) {
+            delBtn.addEventListener('click', () => {
+              gradientStudioState.colors.splice(idx, 1);
+              renderStudioColorPickers();
+              updateLiveStudioPreview();
+            });
+          }
+
+          container.appendChild(item);
+        });
+
+        if (gradientStudioState.colors.length < 6) {
+          const addBtn = document.createElement('button');
+          addBtn.type = 'button';
+          addBtn.className = 'canvas-grad-add-color-btn-oa';
+          addBtn.textContent = '+ Cor';
+          addBtn.addEventListener('click', () => {
+            const randomColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+            gradientStudioState.colors.push(randomColor);
+            renderStudioColorPickers();
+            updateLiveStudioPreview();
           });
-          if (typeof meshLiveInstance.animateFrame === 'function') meshLiveInstance.animateFrame();
-        } catch (e) {
-          console.warn('[mesh-preview] falha ao atualizar preview:', e);
+          container.appendChild(addBtn);
         }
+      }
+
+      let studioPreviewDebounce = null;
+      function updateLiveStudioPreview() {
+        if (studioPreviewDebounce) clearTimeout(studioPreviewDebounce);
+        studioPreviewDebounce = setTimeout(async () => {
+          const canvas = document.getElementById('canvas-grad-live-preview');
+          if (!canvas) return;
+          await renderStudioGradientToCanvas(canvas, gradientStudioState);
+        }, 16);
       }
 
       // --- ABA FONTES & TIPOGRAFIA ---
