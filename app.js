@@ -7343,36 +7343,20 @@
 
         const isCarousel = chain.length > 1;
 
-        let maxX = -Infinity, maxY = -Infinity, minX = Infinity;
+        let maxX = -Infinity;
         frames.forEach(f => {
           maxX = Math.max(maxX, f.x + f.w);
-          maxY = Math.max(maxY, f.y + f.h);
-          minX = Math.min(minX, f.x);
         });
 
-        const chainHeight = Math.max(...chain.map(f => f.h));
-        const isHorizontalFlow = !isCarousel && records.length <= 6;
-        const maxPerRow = isCarousel ? 1 : 4;
+        const POST_GAP = isCarousel ? 240 : FRAME_GAP;
+        let nextPostX = maxX + POST_GAP;
+        const postStartY = anchor.y;
 
         const newCreatedFrames = [];
 
         records.forEach((row, rowIndex) => {
           const postNum = rowIndex + 1;
-          let postStartX, postStartY;
-
-          if (isCarousel) {
-            postStartX = minX;
-            postStartY = maxY + 240 + rowIndex * (chainHeight + 240);
-          } else if (isHorizontalFlow) {
-            postStartX = maxX + 180 + rowIndex * (anchor.w + FRAME_GAP);
-            postStartY = anchor.y;
-          } else {
-            const col = rowIndex % maxPerRow;
-            const rowNum = Math.floor(rowIndex / maxPerRow);
-            postStartX = minX + col * (anchor.w + FRAME_GAP);
-            postStartY = maxY + 220 + rowNum * (anchor.h + 220);
-          }
-
+          const postStartX = nextPostX;
           const clonedSlideIds = [];
           let curX = postStartX;
 
@@ -7418,6 +7402,8 @@
               });
             }
           }
+
+          nextPostX = curX - FRAME_GAP + POST_GAP;
         });
 
         renderLinks();
