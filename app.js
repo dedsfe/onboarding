@@ -1913,7 +1913,7 @@
     ];
 
     const WEIGHT_NAMES = {
-      300: 'Light', 400: 'Regular', 500: 'Medium',
+      100: 'Thin', 200: 'ExtraLight', 300: 'Light', 400: 'Regular', 500: 'Medium',
       600: 'SemiBold', 700: 'Bold', 800: 'ExtraBold', 900: 'Black',
     };
 
@@ -8465,21 +8465,78 @@
     /* Gerenciamento de Fontes Customizadas (Fontsource e Locais) */
     const CUSTOM_FONTS_STORAGE = 'oa_custom_fonts';
 
+    function parseFontFilename(filename) {
+      const base = filename.replace(/\.[^/.]+$/, '').trim();
+
+      const weightMap = [
+        { pattern: /(?:^|[-_ ])(thin|hairline)(?:[-_ ]|$)/i, weight: 100 },
+        { pattern: /(?:^|[-_ ])(extralight|ultralight)(?:[-_ ]|$)/i, weight: 200 },
+        { pattern: /(?:^|[-_ ])(light)(?:[-_ ]|$)/i, weight: 300 },
+        { pattern: /(?:^|[-_ ])(regular|normal|book)(?:[-_ ]|$)/i, weight: 400 },
+        { pattern: /(?:^|[-_ ])(medium)(?:[-_ ]|$)/i, weight: 500 },
+        { pattern: /(?:^|[-_ ])(semibold|demibold)(?:[-_ ]|$)/i, weight: 600 },
+        { pattern: /(?:^|[-_ ])(extrabold|ultrabold)(?:[-_ ]|$)/i, weight: 800 },
+        { pattern: /(?:^|[-_ ])(black|heavy)(?:[-_ ]|$)/i, weight: 900 },
+        { pattern: /(?:^|[-_ ])(bold)(?:[-_ ]|$)/i, weight: 700 }
+      ];
+
+      let weight = 400;
+      let isItalic = /italic|oblique/i.test(base);
+
+      for (const w of weightMap) {
+        if (w.pattern.test(base)) {
+          weight = w.weight;
+          break;
+        }
+      }
+
+      let cleanFamily = base
+        .replace(/[-_](thin|hairline|extralight|ultralight|light|regular|normal|book|medium|semibold|demibold|extrabold|ultrabold|black|heavy|bold)/gi, '')
+        .replace(/(thin|hairline|extralight|ultralight|light|regular|normal|book|medium|semibold|demibold|extrabold|ultrabold|black|heavy|bold)/gi, '')
+        .replace(/[-_]?(italic|oblique)/gi, '')
+        .replace(/[-_]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      if (!cleanFamily) cleanFamily = base.replace(/[-_]/g, ' ').trim();
+
+      cleanFamily = cleanFamily.split(' ')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+
+      return {
+        family: cleanFamily,
+        weight,
+        style: isItalic ? 'italic' : 'normal'
+      };
+    }
+
     function saveCustomFontMetadata(fontObj) {
       try {
         const raw = localStorage.getItem(CUSTOM_FONTS_STORAGE);
-        const list = raw ? JSON.parse(raw) : [];
-        if (!list.some(f => f.name.toLowerCase() === fontObj.name.toLowerCase())) {
-          list.push({
-            name: fontObj.name,
-            family: fontObj.name,
-            css: fontObj.css,
-            weights: fontObj.weights || [400, 700],
-            category: fontObj.category || 'sans-serif',
-            assetId: fontObj.assetId
-          });
-          localStorage.setItem(CUSTOM_FONTS_STORAGE, JSON.stringify(list));
+        let list = raw ? JSON.parse(raw) : [];
+        const idx = list.findIndex(f => f.name.toLowerCase() === fontObj.name.toLowerCase());
+        const dataToSave = {
+          name: fontObj.name,
+          family: fontObj.name,
+          css: fontObj.css,
+          weights: fontObj.weights || [400],
+          category: fontObj.category || 'sans-serif',
+          assetId: fontObj.assetId,
+          assetMap: fontObj.assetMap || { [fontObj.weights && fontObj.weights[0] ? fontObj.weights[0] : 400]: fontObj.assetId }
+        };
+
+        if (idx >= 0) {
+          list[idx] = {
+            ...list[idx],
+            ...dataToSave,
+            weights: Array.from(new Set([...(list[idx].weights || []), ...(dataToSave.weights || [])])).sort((a, b) => a - b),
+            assetMap: { ...(list[idx].assetMap || {}), ...(dataToSave.assetMap || {}) }
+          };
+        } else {
+          list.push(dataToSave);
         }
+        localStorage.setItem(CUSTOM_FONTS_STORAGE, JSON.stringify(list));
       } catch (e) {
         console.error('[fonts] erro ao salvar metadata de fonte:', e);
       }
@@ -8493,39 +8550,49 @@
         if (!Array.isArray(customFonts)) return;
 
         for (const item of customFonts) {
-          if (!item.assetId || !item.name) continue;
-          let dataUrl = assetCache.get(item.assetId);
-          if (!dataUrl) {
-            dataUrl = await getAsset(item.assetId);
-            if (dataUrl) assetCache.set(item.assetId, dataUrl);
-          }
-          if (dataUrl) {
-            try {
-              const base64 = String(dataUrl).split(',')[1];
-              if (!base64) continue;
-              const binaryStr = atob(base64);
-              const len = binaryStr.length;
-              const bytes = new Uint8Array(len);
-              for (let i = 0; i < len; i++) {
-                bytes[i] = binaryStr.charCodeAt(i);
-              }
-              const fontFace = new FontFace(item.name, bytes.buffer);
-              await fontFace.load();
-              document.fonts.add(fontFace);
+          if (!item.name) continue;
+          const weights = Array.isArray(item.weights) && item.weights.length > 0 ? item.weights : [400];
+          const assetMap = item.assetMap || (item.assetId ? { 400: item.assetId } : {});
 
-              if (!FONTS.some(f => f.name.toLowerCase() === item.name.toLowerCase())) {
-                FONTS.push({
-                  css: item.css || `"${item.name}", sans-serif`,
-                  name: item.name,
-                  weights: item.weights || [400, 700],
-                  category: item.category || 'sans-serif',
-                  custom: true,
-                  assetId: item.assetId
-                });
-              }
-            } catch (err) {
-              console.warn('[fonts] Falha ao re-hidratar fonte:', item.name, err);
+          for (const [wStr, assetId] of Object.entries(assetMap)) {
+            if (!assetId) continue;
+            let dataUrl = assetCache.get(assetId);
+            if (!dataUrl) {
+              dataUrl = await getAsset(assetId);
+              if (dataUrl) assetCache.set(assetId, dataUrl);
             }
+            if (dataUrl) {
+              try {
+                const base64 = String(dataUrl).split(',')[1];
+                if (!base64) continue;
+                const binaryStr = atob(base64);
+                const len = binaryStr.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                  bytes[i] = binaryStr.charCodeAt(i);
+                }
+                const fontFace = new FontFace(item.name, bytes.buffer, {
+                  weight: String(wStr),
+                  style: 'normal'
+                });
+                await fontFace.load();
+                document.fonts.add(fontFace);
+              } catch (err) {
+                console.warn('[fonts] Falha ao re-hidratar peso da fonte:', item.name, wStr, err);
+              }
+            }
+          }
+
+          if (!FONTS.some(f => f.name.toLowerCase() === item.name.toLowerCase())) {
+            FONTS.push({
+              css: item.css || `"${item.name}", sans-serif`,
+              name: item.name,
+              weights: weights.sort((a, b) => a - b),
+              category: item.category || 'sans-serif',
+              custom: true,
+              assetId: item.assetId || (Object.values(assetMap)[0] || null),
+              assetMap
+            });
           }
         }
         refreshFontSelect();
@@ -9481,11 +9548,15 @@
           card.dataset.fontSub = subset;
           card.dataset.fontWeight = weight;
 
+          const weightBadge = f.custom
+            ? `⭐ Minhas Fontes${f.weights && f.weights.length > 1 ? ` · ${f.weights.length} pesos (${f.weights.map(w => WEIGHT_NAMES[w] || w).join(', ')})` : ''}`
+            : (f.category || 'font');
+
           card.innerHTML = `
             <div class="canvas-font-info-oa">
               <div class="canvas-font-header-row-oa">
                 <span class="canvas-font-title-oa">${f.family}</span>
-                <span class="canvas-font-badge-oa">${f.custom ? '⭐ Minhas Fontes' : (f.category || 'font')}</span>
+                <span class="canvas-font-badge-oa">${weightBadge}</span>
               </div>
               <div class="canvas-font-preview-text-oa" style="font-family: '${f.family}', sans-serif;">
                 O amor é paciente e bondoso.
@@ -9590,6 +9661,7 @@
         if (!files || files.length === 0) return;
 
         let totalImported = 0;
+        const importedFamilies = new Set();
         const errors = [];
 
         for (const file of files) {
@@ -9622,8 +9694,8 @@
                 try {
                   const buf = await item.entry.async('arraybuffer');
                   const filename = item.path.split('/').pop();
-                  const family = filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-                  await registerAndSaveCustomFont(family, buf, item.ext);
+                  const fObj = await registerAndSaveCustomFont(filename, buf, item.ext);
+                  if (fObj) importedFamilies.add(fObj.name);
                   totalImported++;
                 } catch (e) {
                   console.warn('[fonts] falha em item do zip:', item.path, e);
@@ -9637,8 +9709,8 @@
             try {
               if (hint) hint.textContent = `Importando ${file.name}…`;
               const buf = await file.arrayBuffer();
-              const family = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-              await registerAndSaveCustomFont(family, buf, ext);
+              const fObj = await registerAndSaveCustomFont(file.name, buf, ext);
+              if (fObj) importedFamilies.add(fObj.name);
               totalImported++;
             } catch (err) {
               console.error('[fonts] falha ao importar fonte:', err);
@@ -9653,8 +9725,9 @@
         filterAndRenderFontList();
 
         if (totalImported > 0) {
-          toast.success(`${totalImported} fonte(s) importada(s) com sucesso!`);
-          if (hint) hint.textContent = `${totalImported} fonte(s) instalada(s) e pronta(s) para uso!`;
+          const famCount = importedFamilies.size;
+          toast.success(`${totalImported} arquivo(s) de fonte importado(s) em ${famCount} família(s)!`);
+          if (hint) hint.textContent = `${famCount} família(s) de fontes pronta(s) para uso!`;
         }
         if (errors.length > 0 && totalImported === 0) {
           toast.error(errors[0]);
@@ -9662,7 +9735,12 @@
         }
       }
 
-      async function registerAndSaveCustomFont(family, buf, ext) {
+      async function registerAndSaveCustomFont(rawFamilyOrFilename, buf, ext) {
+        const parsed = parseFontFilename(rawFamilyOrFilename);
+        const family = parsed.family;
+        const weight = parsed.weight || 400;
+        const style = parsed.style || 'normal';
+
         let mime = 'font/woff2';
         if (ext === 'ttf') mime = 'font/ttf';
         else if (ext === 'otf') mime = 'font/otf';
@@ -9679,32 +9757,44 @@
         const base64 = btoa(binary);
         const dataUrl = `data:${mime};base64,${base64}`;
 
-        const assetId = `font_local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        const assetId = `font_local_${family.toLowerCase().replace(/\s+/g, '_')}_${weight}_${Date.now()}`;
         assetCache.set(assetId, dataUrl);
         await saveAsset(assetId, dataUrl);
 
         try {
-          const fontFace = new FontFace(family, buf);
+          const fontFace = new FontFace(family, buf, {
+            weight: String(weight),
+            style: style
+          });
           await fontFace.load();
           document.fonts.add(fontFace);
         } catch (e) {
-          console.warn('[fonts] document.fonts.add falhou para ' + family, e);
+          console.warn('[fonts] document.fonts.add falhou para ' + family + ' (' + weight + ')', e);
         }
 
-        const fontObj = {
-          css: `"${family}", sans-serif`,
-          name: family,
-          weights: [400, 700],
-          category: 'custom',
-          custom: true,
-          assetId
-        };
-
-        if (!FONTS.some(f => f.name.toLowerCase() === family.toLowerCase())) {
+        let fontObj = FONTS.find(f => f.name.toLowerCase() === family.toLowerCase());
+        if (!fontObj) {
+          fontObj = {
+            css: `"${family}", sans-serif`,
+            name: family,
+            weights: [weight],
+            category: 'custom',
+            custom: true,
+            assetId: assetId,
+            assetMap: { [weight]: assetId }
+          };
           FONTS.push(fontObj);
+        } else {
+          if (!fontObj.weights) fontObj.weights = [];
+          if (!fontObj.weights.includes(weight)) fontObj.weights.push(weight);
+          fontObj.weights.sort((a, b) => a - b);
+          if (!fontObj.assetMap) fontObj.assetMap = {};
+          fontObj.assetMap[weight] = assetId;
+          if (weight === 400 || !fontObj.assetId) fontObj.assetId = assetId;
         }
 
         saveCustomFontMetadata(fontObj);
+        return fontObj;
       }
 
       function switchTab(newTab) {
