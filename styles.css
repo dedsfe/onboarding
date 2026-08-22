@@ -3467,6 +3467,7 @@ body {
   max-height: 56vh;
   overflow-y: auto;
   padding-right: 4px;
+  margin-top: 12px;
 }
 
 /* --- GRADIENTES MESH --- */
@@ -3571,7 +3572,7 @@ body {
   align-items: center;
   gap: 6px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding: 4px 0 6px 0;
   scrollbar-width: none;
 }
 .canvas-font-chips-oa::-webkit-scrollbar { display: none; }

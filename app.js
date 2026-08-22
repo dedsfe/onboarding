@@ -9019,10 +9019,48 @@
         filterAndRenderFontList();
       }
 
+      const loadedPreviewFonts = new Set();
+      let fontPreviewObserver = null;
+
+      function setupFontPreviewObserver(listEl) {
+        if (fontPreviewObserver) fontPreviewObserver.disconnect();
+        fontPreviewObserver = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting) {
+              const card = entry.target;
+              const fontId = card.dataset.fontId;
+              const fontFamily = card.dataset.fontFamily;
+              const fontSub = card.dataset.fontSub || 'latin';
+              const fontWeight = card.dataset.fontWeight || '400';
+              if (fontPreviewObserver) fontPreviewObserver.unobserve(card);
+
+              if (!fontId || loadedPreviewFonts.has(fontId)) return;
+              loadedPreviewFonts.add(fontId);
+
+              const fontUrl = `https://cdn.jsdelivr.net/fontsource/fonts/${fontId}@latest/${fontSub}-${fontWeight}-normal.woff2`;
+              const previewFace = new FontFace(fontFamily, `url(${fontUrl}) format('woff2')`);
+              previewFace.load().then(loaded => {
+                document.fonts.add(loaded);
+                const previewEl = card.querySelector('.canvas-font-preview-text-oa');
+                if (previewEl) previewEl.style.fontFamily = `"${fontFamily}", sans-serif`;
+              }).catch(() => {
+                const fallbackFace = new FontFace(fontFamily, `url(https://cdn.jsdelivr.net/fontsource/fonts/${fontId}@latest/latin-400-normal.woff2) format('woff2')`);
+                fallbackFace.load().then(l => {
+                  document.fonts.add(l);
+                  const previewEl = card.querySelector('.canvas-font-preview-text-oa');
+                  if (previewEl) previewEl.style.fontFamily = `"${fontFamily}", sans-serif`;
+                }).catch(() => {});
+              });
+            }
+          });
+        }, { root: listEl, rootMargin: '150px' });
+      }
+
       function filterAndRenderFontList() {
         const listEl = document.getElementById('canvas-font-list');
         if (!listEl) return;
         listEl.innerHTML = '';
+        setupFontPreviewObserver(listEl);
 
         const q = (searchInput ? searchInput.value : '').toLowerCase().trim();
         let results = fontCatalog;
@@ -9047,6 +9085,13 @@
           const isInstalled = FONTS.some(fo => fo.name.toLowerCase() === f.family.toLowerCase());
           const card = document.createElement('div');
           card.className = 'canvas-font-card-oa';
+          const weight = (f.weights && f.weights.includes(400)) ? '400' : (f.weights ? String(f.weights[0]) : '400');
+          const subset = (f.subsets && f.subsets.includes('latin')) ? 'latin' : (f.defSubset || 'latin');
+          card.dataset.fontId = f.id;
+          card.dataset.fontFamily = f.family;
+          card.dataset.fontSub = subset;
+          card.dataset.fontWeight = weight;
+
           card.innerHTML = `
             <div class="canvas-font-info-oa">
               <div class="canvas-font-header-row-oa">
@@ -9068,6 +9113,7 @@
           }
 
           listEl.appendChild(card);
+          if (fontPreviewObserver) fontPreviewObserver.observe(card);
         });
 
         if (hint) {
