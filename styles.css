@@ -1160,17 +1160,19 @@ body {
 
 .dock {
   pointer-events: auto;
-  background: #18181B;
+  background: rgba(18, 18, 22, 0.78);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
   isolation: isolate;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-pill);
-  padding: 4px;
+  padding: 4px 6px;
   display: flex;
   align-items: center;
   gap: 4px;
-  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.42), 
-              0 2px 6px rgba(0, 0, 0, 0.15), 
-              inset 0 1px 1px 0 rgba(255, 255, 255, 0.16);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.45), 
+              0 2px 8px rgba(0, 0, 0, 0.2), 
+              inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
 .dock-icon-btn {
@@ -1184,25 +1186,27 @@ body {
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: all var(--transition);
+  transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .dock-icon-btn:hover {
   color: #FFFFFF;
-  background: rgba(255, 255, 255, 0.12);
-  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.dock-icon-btn:active {
+  transform: scale(0.94);
 }
 
 .dock-icon-btn.active {
-  color: #000000;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .dock-icon-btn.active:hover {
-  color: #000000;
-  background: #FFFFFF;
-  transform: scale(1.05);
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .dock-divider {
@@ -1365,26 +1369,30 @@ body {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 4px;
-  background: #FFFFFF;
+  padding: 3px 5px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   isolation: isolate;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: var(--radius-pill);
-  box-shadow: 0 12px 28px -10px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 16px 32px -8px rgba(0, 0, 0, 0.18),
+              0 2px 6px rgba(0, 0, 0, 0.06),
+              inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .canvas-hud__btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 50%;
   background: transparent;
   color: var(--ink-secondary);
   cursor: pointer;
-  transition: all var(--transition);
+  transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .canvas-hud__btn:hover {
@@ -1392,21 +1400,31 @@ body {
   color: var(--ink-primary);
 }
 
+.canvas-hud__btn:active {
+  transform: scale(0.92);
+}
+
 .canvas-hud__zoom {
-  min-width: 52px;
-  height: 30px;
+  min-width: 48px;
+  height: 28px;
   border: none;
   background: transparent;
   color: var(--ink-secondary);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
+  transition: all 140ms ease;
 }
 
 .canvas-hud__zoom:hover {
   background: rgba(0, 0, 0, 0.06);
+  color: var(--ink-primary);
+}
+
+.canvas-hud__zoom:active {
+  transform: scale(0.94);
 }
 
 .canvas-hud__sep {
@@ -1439,7 +1457,7 @@ body {
    ------------------------------------------------------------ */
 .canvas-topbar {
   position: fixed;
-  top: 24px;
+  top: 20px;
   left: 0;
   right: 0;
   display: flex;
@@ -1451,89 +1469,137 @@ body {
 .canvas-topbar__group {
   position: relative;
   pointer-events: auto;
-  background: #18181B;
+  background: rgba(18, 18, 22, 0.78);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
   isolation: isolate;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-pill);
-  padding: 4px;
+  padding: 4px 6px;
   display: flex;
   align-items: center;
   gap: 4px;
-  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.42),
-              0 2px 6px rgba(0, 0, 0, 0.15),
-              inset 0 1px 1px 0 rgba(255, 255, 255, 0.16);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.45),
+              0 2px 8px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.canvas-topbar__item-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
 }
 
 .canvas-topbar__btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  gap: 6px;
+  height: 34px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
   color: #9CA3AF;
   background: transparent;
   border: none;
+  font-size: 12.5px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all var(--transition);
+  white-space: nowrap;
+  user-select: none;
+  transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .canvas-topbar__btn:hover:not(:disabled) {
   color: #FFFFFF;
-  background: rgba(255, 255, 255, 0.12);
-  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.canvas-topbar__btn:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .canvas-topbar__btn.active {
-  color: #000000;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
-.canvas-topbar__btn.active:hover {
-  color: #000000;
-  background: #FFFFFF;
-  transform: scale(1.05);
+.canvas-topbar__btn--primary {
+  background: #2563EB;
+  color: #FFFFFF;
+  font-weight: 600;
+  padding: 0 14px;
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
-/* Sem frame selecionado não há o que duplicar ou apagar */
+.canvas-topbar__btn--primary:hover:not(:disabled) {
+  background: #1D4ED8;
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.canvas-topbar__btn--primary:active:not(:disabled) {
+  transform: scale(0.96);
+  background: #1E40AF;
+}
+
+.canvas-topbar__btn-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.canvas-topbar__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #3B82F6;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .canvas-topbar__btn:disabled {
-  opacity: 0.3;
+  opacity: 0.35;
   cursor: default;
+  pointer-events: none;
 }
 
 .canvas-topbar__sep {
   width: 1px;
   height: 16px;
-  background: rgba(255, 255, 255, 0.18);
-  margin-inline: 2px;
+  background: rgba(255, 255, 255, 0.14);
+  margin-inline: 3px;
 }
 
 .canvas-topbar__label {
-  padding: 0 12px 0 6px;
+  padding: 0 8px 0 4px;
   font-size: 12px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.55);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-/* Indicador de salvamento: espelha o save() que o canvas já faz.
-   Texto secundário de propósito — não pode disputar atenção com os botões. */
 .canvas-topbar__save {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding-right: 12px;
-  font-size: 12px;
+  gap: 5px;
+  padding-right: 8px;
+  font-size: 11.5px;
   font-weight: 500;
-  color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.45);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  transition: color var(--transition);
+  transition: color 150ms ease;
 }
 
-/* Antes do primeiro salvamento não há o que dizer */
 .canvas-topbar__save:empty {
   display: none;
 }
@@ -1543,11 +1609,11 @@ body {
 }
 
 .canvas-topbar__save-spin {
-  width: 11px;
-  height: 11px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   border: 1.5px solid rgba(255, 255, 255, 0.2);
-  border-top-color: rgba(255, 255, 255, 0.65);
+  border-top-color: rgba(255, 255, 255, 0.7);
   animation: canvas-save-spin 620ms linear infinite;
 }
 
@@ -1555,53 +1621,96 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* Menu de formatos: cai do botão "+", ancorado à esquerda do pill */
-.canvas-formats {
+/* ------------------------------------------------------------
+   CARDS VERTICAIS SUSPENSOS / POPUP DROPDOWNS (OA Design)
+   ------------------------------------------------------------ */
+.canvas-dropdown-card {
   position: absolute;
-  top: calc(100% + 10px);
+  top: calc(100% + 8px);
   left: 0;
-  display: none;
+  min-width: 240px;
+  display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 6px;
-  min-width: 236px;
-  background: #18181B;
+  background: rgba(18, 18, 22, 0.88);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
   isolation: isolate;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.42),
-              inset 0 1px 1px 0 rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.55),
+              0 4px 12px rgba(0, 0, 0, 0.25),
+              inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  opacity: 0;
+  transform: translateY(-6px) scale(0.96);
+  pointer-events: none;
+  transition: opacity 150ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 100;
 }
 
-.canvas-formats.is-open {
-  display: flex;
+.canvas-dropdown-card.is-open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
 }
 
-.canvas-formats__item {
+.canvas-dropdown-head {
+  padding: 6px 10px 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.38);
+  user-select: none;
+}
+
+.canvas-dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.09);
+  margin: 4px 4px;
+}
+
+.canvas-dropdown-item {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 7px 9px;
+  padding: 7px 10px;
   border: none;
-  border-radius: 10px;
+  border-radius: 9px;
   background: transparent;
-  color: #FFFFFF;
+  color: #F3F4F6;
   font-size: 12.5px;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: background var(--transition);
+  user-select: none;
+  transition: background 120ms ease, transform 100ms ease;
 }
 
-.canvas-formats__item:hover {
-  background: rgba(255, 255, 255, 0.12);
+.canvas-dropdown-item:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: #FFFFFF;
 }
 
-/* Miniatura na proporção real do formato, para bater o olho e reconhecer */
+.canvas-dropdown-item:active {
+  transform: scale(0.98);
+}
+
+.canvas-dropdown-meta {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+/* Miniatura na proporção real do formato no dropdown */
 .canvas-formats__ratio {
   flex: none;
-  width: 20px;
+  width: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1614,13 +1723,6 @@ body {
   aspect-ratio: var(--ratio);
   border: 1.5px solid rgba(255, 255, 255, 0.55);
   border-radius: 3px;
-}
-
-.canvas-formats__dim {
-  margin-left: auto;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
-  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------

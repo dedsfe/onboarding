@@ -1733,6 +1733,10 @@
     const btnImageBind = document.getElementById('canvas-image-bind');
     const topLabel = document.getElementById('canvas-topbar-label');
     const formatsMenu = document.getElementById('canvas-formats');
+    const btnInsertMenu = document.getElementById('canvas-insert-menu-btn');
+    const insertMenu = document.getElementById('canvas-insert-menu');
+    const btnBatchMenu = document.getElementById('canvas-batch-menu-btn');
+    const batchMenu = document.getElementById('canvas-batch-menu');
 
     const DOT_GRID = 20;
     // Faixa em que o espaçamento dos pontos pode viver na tela
@@ -4983,20 +4987,40 @@
           : 'Ligar em carrossel (selecione 2+ frames do mesmo formato)';
       }
 
-      /* Atualiza botão e badge de Batch Create */
-      const btnBatch = document.getElementById('canvas-batch-btn');
+      /* Atualiza badge de variáveis no menu de lote */
       const badgeBinds = document.getElementById('canvas-batch-binds-count');
-      if (btnBatch && badgeBinds) {
+      if (badgeBinds) {
         let totalBinds = 0;
         frames.forEach(f => {
           (f.children || []).forEach(c => {
             if (c.bind) totalBinds++;
           });
         });
-        btnBatch.disabled = frames.length === 0;
-        badgeBinds.style.display = totalBinds > 0 ? 'inline-block' : 'none';
+        badgeBinds.style.display = totalBinds > 0 ? 'inline-flex' : 'none';
         badgeBinds.textContent = totalBinds;
       }
+
+      // Labels do menu de lote
+      const bindsMenuLabel = document.getElementById('canvas-menu-binds-label');
+      if (bindsMenuLabel) {
+        const areHidden = world.classList.contains('hide-bind-tags');
+        bindsMenuLabel.textContent = areHidden ? 'Mostrar Tags {{}}' : 'Ocultar Tags {{}}';
+      }
+      const snapMenuLabel = document.getElementById('canvas-menu-snap-label');
+      if (snapMenuLabel) {
+        snapMenuLabel.textContent = `Snap Magnético: ${snapEnabled ? 'Ligado' : 'Desligado'}`;
+      }
+      const guidesMenuLabel = document.getElementById('canvas-menu-guides-label');
+      if (guidesMenuLabel) {
+        guidesMenuLabel.textContent = `Safe Zones: ${showGuides ? 'Ligado' : 'Desligado'}`;
+      }
+
+      // Habilita/desabilita menus
+      if (btnBatchMenu) btnBatchMenu.disabled = false;
+      if (btnInsertMenu) btnInsertMenu.disabled = false;
+      const exportBtn = document.getElementById('canvas-export-btn');
+      if (exportBtn) exportBtn.disabled = frames.length === 0;
+
       ['canvas-batch-btn', 'canvas-batch-photos-btn', 'canvas-batch-export-btn', 'canvas-library-btn'].forEach(id => {
         const b = document.getElementById(id);
         if (b) b.disabled = frames.length === 0;
@@ -5013,7 +5037,7 @@
       } else {
         const posts = computePosts().length;
         if (!frames.length) topLabel.textContent = 'Nenhum frame';
-        else topLabel.textContent = `${frames.length} ${frames.length === 1 ? 'frame' : 'frames'} · ${posts} ${posts === 1 ? 'post' : 'posts'}`;
+        else topLabel.textContent = `${frames.length} ${frames.length === 1 ? 'post' : 'posts'}`;
       }
     }
 
@@ -6266,34 +6290,119 @@
       applyCamera();
       save();
     });
-    /* Barra do topo: criar, duplicar e apagar frame */
-    function closeFormats() {
-      if (!formatsMenu) return;
-      formatsMenu.classList.remove('is-open');
+    /* Barra do topo: Menus Verticais Suspensos & Ações */
+    function closeAllDropdowns() {
+      if (formatsMenu) formatsMenu.classList.remove('is-open');
+      if (insertMenu) insertMenu.classList.remove('is-open');
+      if (batchMenu) batchMenu.classList.remove('is-open');
       if (btnAddFrame) btnAddFrame.classList.remove('active');
+      if (btnInsertMenu) btnInsertMenu.classList.remove('active');
+      if (btnBatchMenu) btnBatchMenu.classList.remove('active');
     }
 
+    // 1. Menu de Formatos de Frame
     if (btnAddFrame && formatsMenu) {
       btnAddFrame.addEventListener('click', (e) => {
         e.stopPropagation();
-        const open = formatsMenu.classList.toggle('is-open');
-        btnAddFrame.classList.toggle('active', open);
+        const willOpen = !formatsMenu.classList.contains('is-open');
+        closeAllDropdowns();
+        if (willOpen) {
+          formatsMenu.classList.add('is-open');
+          btnAddFrame.classList.add('active');
+        }
       });
 
       formatsMenu.addEventListener('click', (e) => {
-        const item = e.target.closest('.canvas-formats__item');
+        const item = e.target.closest('.canvas-dropdown-item');
         if (!item) return;
         addFrame(item.dataset.format);
-        closeFormats();
-      });
-
-      // Clique em qualquer outro lugar fecha o menu
-      document.addEventListener('mousedown', (e) => {
-        if (!formatsMenu.classList.contains('is-open')) return;
-        if (e.target.closest('.canvas-formats') || e.target.closest('#canvas-add-frame')) return;
-        closeFormats();
+        closeAllDropdowns();
       });
     }
+
+    // 2. Menu de Inserção de Elementos (Texto, Imagem, Mesh, Ícones, Fontes)
+    if (btnInsertMenu && insertMenu) {
+      btnInsertMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willOpen = !insertMenu.classList.contains('is-open');
+        closeAllDropdowns();
+        if (willOpen) {
+          insertMenu.classList.add('is-open');
+          btnInsertMenu.classList.add('active');
+        }
+      });
+
+      insertMenu.addEventListener('click', (e) => {
+        const item = e.target.closest('.canvas-dropdown-item');
+        if (!item) return;
+        const action = item.dataset.action;
+        closeAllDropdowns();
+
+        // Se não houver frame no canvas, cria um primeiro automaticamente
+        if (frames.length === 0) {
+          addFrame('ig-feed');
+        }
+        const targetFrame = frames.find(f => f.id === selectedId) || frames[0];
+        if (targetFrame && selectedId !== targetFrame.id) {
+          selectFrame(targetFrame.id);
+        }
+
+        if (action === 'add-text') {
+          addTextToSelectedFrame();
+        } else if (action === 'add-image') {
+          if (imageUpload) imageUpload.click();
+        } else if (action === 'open-mesh') {
+          if (window.openIconLibrary) window.openIconLibrary('gradients');
+        } else if (action === 'open-icons') {
+          if (window.openIconLibrary) window.openIconLibrary('icons');
+        } else if (action === 'open-fonts') {
+          if (window.openIconLibrary) window.openIconLibrary('fonts');
+        }
+      });
+    }
+
+    // 3. Menu de Automação em Lote (CSV, Fotos, Exportar, Snapping, Guias, Binds)
+    if (btnBatchMenu && batchMenu) {
+      btnBatchMenu.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const willOpen = !batchMenu.classList.contains('is-open');
+        closeAllDropdowns();
+        if (willOpen) {
+          batchMenu.classList.add('is-open');
+          btnBatchMenu.classList.add('active');
+        }
+      });
+
+      batchMenu.addEventListener('click', (e) => {
+        const item = e.target.closest('.canvas-dropdown-item');
+        if (!item) return;
+        const action = item.dataset.action;
+        closeAllDropdowns();
+
+        if (action === 'batch-data') {
+          if (window.openBatchModal) window.openBatchModal();
+        } else if (action === 'batch-photos') {
+          if (window.openBatchPhotosModal) window.openBatchPhotosModal();
+        } else if (action === 'batch-export') {
+          if (window.openBatchExportModal) window.openBatchExportModal();
+        } else if (action === 'toggle-binds') {
+          const btnBinds = document.getElementById('canvas-toggle-binds');
+          if (btnBinds) btnBinds.click();
+        } else if (action === 'toggle-snap') {
+          const btnSnap = document.getElementById('canvas-toggle-snap');
+          if (btnSnap) btnSnap.click();
+        } else if (action === 'toggle-guides') {
+          const btnGuides = document.getElementById('canvas-toggle-guides');
+          if (btnGuides) btnGuides.click();
+        }
+      });
+    }
+
+    // Fecha dropdowns ao clicar fora
+    document.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.canvas-dropdown-card') || e.target.closest('.canvas-topbar__btn')) return;
+      closeAllDropdowns();
+    });
 
     if (btnAddText) btnAddText.addEventListener('click', () => addTextToSelectedFrame());
 
@@ -9100,7 +9209,8 @@
         });
       }
 
-      function openLibrary() {
+      function openLibrary(initialTab) {
+        if (initialTab) tab = initialTab;
         document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
         modal.classList.add('open');
         switchTab(tab);
