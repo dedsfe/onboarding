@@ -8369,14 +8369,34 @@
       'solar:star-bold', 'ph:sun-bold', 'ph:moon-stars-fill', 'mdi:leaf',
       'ph:quotes-fill', 'mdi:arrow-right-thin', 'ph:sparkle-fill', 'fa7-solid:dove',
       'ph:flower-lotus-fill', 'mdi:hand-heart', 'ph:butterfly-fill', 'mdi:candle',
-      'ph:cloud-fill', 'mdi:water', 'ph:mountains-fill', 'mdi:infinity'
+      'ph:cloud-fill', 'mdi:water', 'ph:mountains-fill', 'mdi:infinity',
+      'mdi:church', 'mdi:dove', 'ph:crown-fill', 'mdi:star-four-points',
+      'ph:plant-fill', 'mdi:flame', 'ph:drop-fill', 'mdi:white-balance-sunny',
+      'ph:fish-fill', 'mdi:shield-cross', 'ph:tree-fill', 'mdi:weather-sunny',
+      'ph:sun-horizon-fill', 'mdi:ladybug', 'ph:flower-fill', 'mdi:gift',
+      'ph:heart-fill', 'mdi:star-circle', 'ph:lightning-fill', 'mdi:pine-tree',
+      'ph:moon-fill', 'mdi:cross-bones', 'ph:waves-fill', 'mdi:teddy-bear',
+      'ph:angel-fill', 'mdi:baby-face', 'ph:cloud-sun-fill', 'mdi:weather-night',
+      'ph:chat-circle-text-fill', 'mdi:music-note', 'ph:airplane-fill', 'mdi:earth',
+      'ph:book-open-text-fill', 'mdi:hand-peace', 'ph:star-fill', 'mdi:ring',
+      'ph:compass-fill', 'mdi:key', 'ph:map-pin-fill', 'mdi:bell'
     ];
     const SUGESTOES_STICKERS = [
       'twemoji:folded-hands', 'twemoji:red-heart', 'noto:dove', 'twemoji:latin-cross',
       'noto:sparkles', 'twemoji:sun-with-face', 'noto:crescent-moon', 'twemoji:herb',
       'fluent-emoji-flat:star', 'noto:cherry-blossom', 'twemoji:butterfly', 'noto:rainbow',
       'twemoji:candle', 'noto:open-book', 'fluent-emoji-flat:fire', 'twemoji:sunrise',
-      'noto:four-leaf-clover', 'twemoji:glowing-star', 'noto:rose', 'twemoji:rainbow'
+      'noto:four-leaf-clover', 'twemoji:glowing-star', 'noto:rose', 'twemoji:rainbow',
+      'twemoji:smiling-face-with-halo', 'noto:prayer-beads', 'noto:folded-hands', 'noto:sun',
+      'twemoji:cloud', 'noto:tulip', 'twemoji:seedling', 'noto:sunflower',
+      'fluent-emoji-flat:prayer-beads', 'twemoji:baby-angel', 'noto:heart-with-arrow',
+      'twemoji:sparkling-heart', 'fluent-emoji-flat:dove', 'twemoji:star-struck',
+      'noto:hatching-chick', 'twemoji:hibiscus', 'noto:bouquet', 'twemoji:full-moon-face',
+      'fluent-emoji-flat:sad-but-relieved-face', 'twemoji:christmas-tree', 'noto:cross-mark',
+      'twemoji:hot-face', 'noto:blowfish', 'twemoji:sunrise-over-mountains', 'noto:star-of-david',
+      'twemoji:person-in-lotus-position', 'noto:woman-with-headscarf', 'twemoji:raising-hands', 'noto:baby-angel',
+      'twemoji:sleeping-face', 'noto:santa-claus', 'twemoji:heart-with-ribbon', 'noto:balloon',
+      'twemoji:party-popper', 'noto:compass', 'twemoji:fire', 'noto:spiral-shell', 'twemoji:whale', 'noto:cat-face'
     ];
 
     /* Presets curados de Mesh Gradient */
@@ -8620,7 +8640,6 @@
       const grid = document.getElementById('canvas-library-grid');
       const viewContainer = document.getElementById('canvas-library-view');
       const hint = document.getElementById('canvas-library-hint');
-      const subTitle = document.getElementById('canvas-library-sub');
       const tabs = [...document.querySelectorAll('.canvas-lib-tab-oa')];
 
       if (!modal || !openBtn || !grid) return;
@@ -8637,7 +8656,7 @@
       let fontCategoryFilter = 'all';
       let fontCatalogLoading = false;
 
-      const corAtual = () => (tab === 'icons' ? (colorInput ? colorInput.value : '#111827') : null);
+      const corAtual = () => (tab === 'icons' ? (colorInput ? colorInput.value : '#FFFFFF') : null);
 
       function renderResultadosIcones(ids) {
         grid.innerHTML = '';
@@ -8655,6 +8674,7 @@
           img.src = iconPreviewUrl(id, color);
           img.alt = id;
           img.loading = 'lazy';
+          img.onerror = () => { item.style.display = 'none'; };
           item.appendChild(img);
           item.addEventListener('click', () => inserirIcone(id, item));
           grid.appendChild(item);
@@ -8675,7 +8695,7 @@
         const queryTerm = translateIconQuery(q);
 
         try {
-          let url = `${ICONIFY_API}/search?query=${encodeURIComponent(queryTerm)}&limit=64`;
+          let url = `${ICONIFY_API}/search?query=${encodeURIComponent(queryTerm)}&limit=200`;
           if (tab === 'stickers') url += `&prefixes=${STICKER_PREFIXES}`;
           const res = await fetch(url);
           const data = await res.json();
@@ -8683,7 +8703,7 @@
           let ids = data.icons || [];
 
           if (!ids.length && queryTerm !== q) {
-            let url2 = `${ICONIFY_API}/search?query=${encodeURIComponent(q)}&limit=64`;
+            let url2 = `${ICONIFY_API}/search?query=${encodeURIComponent(q)}&limit=200`;
             if (tab === 'stickers') url2 += `&prefixes=${STICKER_PREFIXES}`;
             const res2 = await fetch(url2);
             const data2 = await res2.json();
@@ -8938,11 +8958,13 @@
               <canvas class="canvas-grad-canvas-oa" id="canvas-grad-live-preview" width="360" height="450"></canvas>
               
               <div class="canvas-grad-actions-oa">
-                <button type="button" class="openpanel-btn-primary" id="canvas-grad-btn-apply-bg" style="width: 100%; justify-content: center; padding: 9px; font-weight: 600;">
-                  🖼 Aplicar como Fundo do Post
+                <button type="button" class="openpanel-btn-primary" id="canvas-grad-btn-apply-bg" style="width: 100%; justify-content: center;">
+                  <i data-lucide="image" style="width: 14px; height: 14px;"></i>
+                  <span>Aplicar como Fundo do Post</span>
                 </button>
-                <button type="button" class="openpanel-btn-secondary" id="canvas-grad-btn-insert-elem" style="width: 100%; justify-content: center; padding: 8px;">
-                  ✨ Inserir como Card / Elemento
+                <button type="button" class="openpanel-btn-secondary" id="canvas-grad-btn-insert-elem" style="width: 100%; justify-content: center;">
+                  <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+                  <span>Inserir como Card / Elemento</span>
                 </button>
               </div>
             </div>
@@ -8951,20 +8973,20 @@
             <div class="canvas-grad-controls-col-oa">
               <!-- Seletor de Tipo -->
               <div>
-                <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 6px;">Tipo de Gradiente:</label>
+                <label class="canvas-grad-section-label-oa">Tipo de Gradiente:</label>
                 <div class="canvas-grad-types-oa">
-                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'mesh' ? 'is-active' : ''}" data-type="mesh">⚯ Mesh Fluido</button>
-                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'linear' ? 'is-active' : ''}" data-type="linear">↗ Linear</button>
-                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'radial' ? 'is-active' : ''}" data-type="radial">⦿ Radial</button>
-                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'conic' ? 'is-active' : ''}" data-type="conic">◷ Cônico</button>
+                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'mesh' ? 'is-active' : ''}" data-type="mesh"><i data-lucide="waves" style="width: 13px; height: 13px;"></i><span>Mesh Fluido</span></button>
+                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'linear' ? 'is-active' : ''}" data-type="linear"><i data-lucide="arrow-up-right" style="width: 13px; height: 13px;"></i><span>Linear</span></button>
+                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'radial' ? 'is-active' : ''}" data-type="radial"><i data-lucide="circle" style="width: 13px; height: 13px;"></i><span>Radial</span></button>
+                  <button type="button" class="canvas-grad-type-btn-oa ${gradientStudioState.type === 'conic' ? 'is-active' : ''}" data-type="conic"><i data-lucide="clock" style="width: 13px; height: 13px;"></i><span>Cônico</span></button>
                 </div>
               </div>
 
               <!-- Cores -->
               <div>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <label style="font-size: 12px; font-weight: 600; color: #374151;">Cores do Gradiente (${gradientStudioState.colors.length}):</label>
-                  <button type="button" class="canvas-font-chip-oa" id="canvas-grad-btn-random-palette" style="padding: 2px 8px; font-size: 11px;">🎲 Sortear Paleta</button>
+                  <label class="canvas-grad-section-label-oa">Cores do Gradiente (${gradientStudioState.colors.length}):</label>
+                  <button type="button" class="canvas-font-chip-oa" id="canvas-grad-btn-random-palette"><i data-lucide="dices" style="width: 12px; height: 12px;"></i> Sortear Paleta</button>
                 </div>
                 <div class="canvas-grad-colors-grid-oa" id="canvas-grad-colors-container"></div>
               </div>
@@ -9007,13 +9029,16 @@
 
               <!-- Botão Distorção Mesh (visível se mesh) -->
               <div id="canvas-grad-seed-group" style="${gradientStudioState.type === 'mesh' ? 'display: block;' : 'display: none;'}">
-                <button type="button" class="openpanel-btn-secondary" id="canvas-grad-btn-seed" style="width: 100%; justify-content: center; padding: 7px; font-size: 12px;">
-                  🎲 Nova Variação / Distorção
+                <button type="button" class="openpanel-btn-secondary" id="canvas-grad-btn-seed" style="width: 100%; justify-content: center;">
+                  <i data-lucide="dices" style="width: 14px; height: 14px;"></i>
+                  <span>Nova Variação / Distorção</span>
                 </button>
               </div>
             </div>
           </div>
         `;
+
+        if (window.lucide) lucide.createIcons();
 
         // Seletor de Tipo
         viewContainer.querySelectorAll('.canvas-grad-type-btn-oa').forEach(btn => {
@@ -9214,7 +9239,7 @@
           item.className = 'canvas-grad-color-item-oa';
           item.innerHTML = `
             <input type="color" class="canvas-grad-color-pick-oa" value="${col}" data-idx="${idx}">
-            <span style="font-size: 11px; font-weight: 500; color: #4B5563; font-family: monospace;">${col.toUpperCase()}</span>
+            <span class="canvas-grad-color-hex-oa">${col.toUpperCase()}</span>
             ${gradientStudioState.colors.length > 2 ? `<button type="button" class="canvas-grad-color-del-oa" data-idx="${idx}" title="Remover cor">✕</button>` : ''}
           `;
 
@@ -9301,13 +9326,16 @@
 
           <!-- Dropzone de Arquivo Local -->
           <div class="canvas-font-dropzone-oa" id="canvas-font-dropzone">
-            <span>📥 Arraste seu arquivo <strong>.ttf</strong>, <strong>.otf</strong> ou <strong>.woff2</strong> aqui ou clique para importar</span>
-            <input type="file" id="canvas-font-file-input" accept=".ttf,.otf,.woff,.woff2" style="display: none;">
+            <i data-lucide="upload" style="width: 14px; height: 14px;"></i>
+            <span>Arraste seu arquivo <strong>.zip</strong>, <strong>.ttf</strong>, <strong>.otf</strong> ou <strong>.woff2</strong> aqui ou clique para importar</span>
+            <input type="file" id="canvas-font-file-input" accept=".zip,.ttf,.otf,.woff,.woff2,application/zip,application/x-zip-compressed" multiple style="display: none;">
           </div>
 
           <!-- Lista de Fontes -->
           <div class="canvas-font-list-oa" id="canvas-font-list"></div>
         `;
+
+        if (window.lucide) lucide.createIcons();
 
         // Filtro por categoria
         viewContainer.querySelectorAll('.canvas-font-chip-oa').forEach(chip => {
@@ -9331,12 +9359,13 @@
           dropzone.addEventListener('drop', async (e) => {
             e.preventDefault();
             dropzone.classList.remove('is-dragover');
-            const file = e.dataTransfer && e.dataTransfer.files ? e.dataTransfer.files[0] : null;
-            if (file) await importLocalFontFile(file);
+            const files = e.dataTransfer && e.dataTransfer.files ? e.dataTransfer.files : null;
+            if (files && files.length > 0) await importLocalFontFile(files);
           });
           fileInput.addEventListener('change', async (e) => {
-            const file = e.target.files ? e.target.files[0] : null;
-            if (file) await importLocalFontFile(file);
+            const files = e.target.files;
+            if (files && files.length > 0) await importLocalFontFile(files);
+            fileInput.value = '';
           });
         }
 
@@ -9509,55 +9538,129 @@
         }
       }
 
-      async function importLocalFontFile(file) {
-        if (!file) return;
-        try {
-          if (hint) hint.textContent = `Importando ${file.name}…`;
-          const buf = await file.arrayBuffer();
+      async function importLocalFontFile(fileOrFileList) {
+        const files = fileOrFileList instanceof FileList || Array.isArray(fileOrFileList) 
+          ? Array.from(fileOrFileList) 
+          : [fileOrFileList];
+
+        if (!files || files.length === 0) return;
+
+        let totalImported = 0;
+        const errors = [];
+
+        for (const file of files) {
+          if (!file) continue;
           const ext = file.name.split('.').pop().toLowerCase();
-          let mime = 'font/woff2';
-          if (ext === 'ttf') mime = 'font/ttf';
-          else if (ext === 'otf') mime = 'font/otf';
-          else if (ext === 'woff') mime = 'font/woff';
 
-          const bytes = new Uint8Array(buf);
-          let binary = '';
-          for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
+          if (ext === 'zip' || file.type.includes('zip')) {
+            try {
+              if (hint) hint.textContent = `Descompactando ${file.name}…`;
+              if (!window.JSZip) {
+                throw new Error('Biblioteca JSZip não encontrada.');
+              }
+              const zip = await JSZip.loadAsync(file);
+              const fontEntries = [];
+
+              zip.forEach((relativePath, zipEntry) => {
+                if (zipEntry.dir) return;
+                if (relativePath.includes('__MACOSX') || relativePath.split('/').pop().startsWith('._')) return;
+                const entryExt = relativePath.split('.').pop().toLowerCase();
+                if (['ttf', 'otf', 'woff', 'woff2'].includes(entryExt)) {
+                  fontEntries.push({ path: relativePath, entry: zipEntry, ext: entryExt });
+                }
+              });
+
+              if (fontEntries.length === 0) {
+                throw new Error(`Nenhum arquivo de fonte (.ttf, .otf, .woff2) encontrado dentro de ${file.name}.`);
+              }
+
+              for (const item of fontEntries) {
+                try {
+                  const buf = await item.entry.async('arraybuffer');
+                  const filename = item.path.split('/').pop();
+                  const family = filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+                  await registerAndSaveCustomFont(family, buf, item.ext);
+                  totalImported++;
+                } catch (e) {
+                  console.warn('[fonts] falha em item do zip:', item.path, e);
+                }
+              }
+            } catch (err) {
+              console.error('[fonts] falha ao extrair zip:', err);
+              errors.push(`${file.name}: ${err.message}`);
+            }
+          } else if (['ttf', 'otf', 'woff', 'woff2'].includes(ext)) {
+            try {
+              if (hint) hint.textContent = `Importando ${file.name}…`;
+              const buf = await file.arrayBuffer();
+              const family = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+              await registerAndSaveCustomFont(family, buf, ext);
+              totalImported++;
+            } catch (err) {
+              console.error('[fonts] falha ao importar fonte:', err);
+              errors.push(`${file.name}: ${err.message}`);
+            }
+          } else {
+            errors.push(`${file.name}: formato não suportado (use .zip, .ttf, .otf, .woff2)`);
           }
-          const base64 = btoa(binary);
-          const dataUrl = `data:${mime};base64,${base64}`;
+        }
 
-          const family = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
-          const assetId = `font_local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-          assetCache.set(assetId, dataUrl);
-          await saveAsset(assetId, dataUrl);
+        refreshFontSelect();
+        filterAndRenderFontList();
 
+        if (totalImported > 0) {
+          toast.success(`${totalImported} fonte(s) importada(s) com sucesso!`);
+          if (hint) hint.textContent = `${totalImported} fonte(s) instalada(s) e pronta(s) para uso!`;
+        }
+        if (errors.length > 0 && totalImported === 0) {
+          toast.error(errors[0]);
+          if (hint) hint.textContent = errors[0];
+        }
+      }
+
+      async function registerAndSaveCustomFont(family, buf, ext) {
+        let mime = 'font/woff2';
+        if (ext === 'ttf') mime = 'font/ttf';
+        else if (ext === 'otf') mime = 'font/otf';
+        else if (ext === 'woff') mime = 'font/woff';
+
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        const len = bytes.byteLength;
+        const chunkSize = 0x8000;
+        for (let i = 0; i < len; i += chunkSize) {
+          const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
+          binary += String.fromCharCode.apply(null, chunk);
+        }
+        const base64 = btoa(binary);
+        const dataUrl = `data:${mime};base64,${base64}`;
+
+        const assetId = `font_local_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        assetCache.set(assetId, dataUrl);
+        await saveAsset(assetId, dataUrl);
+
+        try {
           const fontFace = new FontFace(family, buf);
           await fontFace.load();
           document.fonts.add(fontFace);
-
-          const fontObj = {
-            css: `"${family}", sans-serif`,
-            name: family,
-            weights: [400, 700],
-            category: 'custom',
-            custom: true,
-            assetId
-          };
-
-          if (!FONTS.some(f => f.name.toLowerCase() === family.toLowerCase())) {
-            FONTS.push(fontObj);
-          }
-
-          saveCustomFontMetadata(fontObj);
-          refreshFontSelect();
-          filterAndRenderFontList();
-          if (hint) hint.textContent = `Fonte "${family}" instalada com sucesso!`;
-        } catch (err) {
-          console.error('[fonts] falha ao importar fonte local:', err);
-          toast.error('Erro ao carregar arquivo de fonte: ' + err.message);
+        } catch (e) {
+          console.warn('[fonts] document.fonts.add falhou para ' + family, e);
         }
+
+        const fontObj = {
+          css: `"${family}", sans-serif`,
+          name: family,
+          weights: [400, 700],
+          category: 'custom',
+          custom: true,
+          assetId
+        };
+
+        if (!FONTS.some(f => f.name.toLowerCase() === family.toLowerCase())) {
+          FONTS.push(fontObj);
+        }
+
+        saveCustomFontMetadata(fontObj);
       }
 
       function switchTab(newTab) {
@@ -9574,15 +9677,13 @@
           }
           if (grid) grid.style.display = 'grid';
           if (viewContainer) viewContainer.style.display = 'none';
-          if (subTitle) subTitle.textContent = '275 mil ícones e stickers — clique para inserir no frame';
           buscarIcones(searchInput ? searchInput.value : '');
         } else if (tab === 'gradients') {
           if (colorWrap) colorWrap.style.display = 'none';
           if (searchInput) searchInput.style.display = 'none';
           if (grid) grid.style.display = 'none';
           if (viewContainer) viewContainer.style.display = 'flex';
-          if (subTitle) subTitle.textContent = 'Gradientes Mesh (@mesh-gradient/core) — Fundo ou Elemento';
-          if (hint) hint.textContent = 'Escolha 4 cores ou selecione um preset para gerar o gradiente WebGL.';
+          if (hint) hint.textContent = '';
           renderGradientsView();
         } else if (tab === 'fonts') {
           if (colorWrap) colorWrap.style.display = 'none';
@@ -9592,7 +9693,6 @@
           }
           if (grid) grid.style.display = 'none';
           if (viewContainer) viewContainer.style.display = 'flex';
-          if (subTitle) subTitle.textContent = 'Tipografia & Fontes (2.096 famílias via Fontsource + Arquivos Locais)';
           renderFontsView();
         }
       }
