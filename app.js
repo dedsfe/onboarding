@@ -6787,40 +6787,55 @@
 
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && view.classList.contains('is-open')) {
-        const batchModal = document.getElementById('canvas-batch-modal');
-        if (batchModal && batchModal.classList.contains('is-open')) {
+        // 1. Fecha qualquer modal aberto
+        const openModal = document.querySelector('.modal-overlay.open, #canvas-batch-modal.is-open, #canvas-batch-photos-modal.is-open, #canvas-batch-export-modal.is-open');
+        if (openModal) {
+          openModal.classList.remove('open', 'is-open');
           if (typeof window.closeBatchModal === 'function') window.closeBatchModal();
           return;
         }
 
-        // No modo de recorte, o primeiro Escape encerra o recorte e salva
+        // 2. Fecha dropdowns abertos
+        const openDropdown = document.querySelector('.canvas-dropdown-card.is-open');
+        if (openDropdown) {
+          closeAllDropdowns();
+          return;
+        }
+
+        // 3. No modo de recorte, o primeiro Escape encerra o recorte e salva
         if (croppingImage) {
           exitCropMode();
           return;
         }
-        // Editando um texto: o primeiro Escape só sai da edição, mantendo a seleção
+
+        // 4. Editando um texto: o primeiro Escape só sai da edição, mantendo a seleção
         if (document.activeElement && document.activeElement.classList.contains('canvas-text-node__content')) {
           exitTextEditing(document.activeElement);
           return;
         }
-        // Escape desfaz uma camada por vez antes de fechar o canvas
-        if (selectedTextNode.childId !== null) {
+
+        // 5. Desseleciona nós filhos (texto, imagem, gradiente)
+        if (selectedChildNodes.length > 0 || (selectedTextNode && selectedTextNode.childId !== null)) {
           selectTextNode(null, null);
           return;
         }
-        if (formatsMenu && formatsMenu.classList.contains('is-open')) {
-          closeFormats();
-          return;
-        }
+
+        // 6. Desseleciona conexões de carrossel
         if (selectedLinkId !== null) {
           selectLink(null);
           return;
         }
-        if (selectedId !== null) {
+
+        // 7. Desseleciona frames
+        if (selectedFrameIds.size > 0 || selectedId !== null) {
           selectFrame(null);
           return;
         }
-        toggleCanvas(false);
+
+        // 8. ESC no canvas vazio: apenas tira foco ativo sem sair do app
+        if (document.activeElement && document.activeElement !== document.body) {
+          document.activeElement.blur();
+        }
       }
     });
 
