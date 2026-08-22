@@ -2575,51 +2575,62 @@ body {
 
 /* Botão de Concluir com estilo primário no Crop HUD */
 .canvas-text-toolbar__btn--primary {
-  background: #2563EB !important;
+  background: var(--primary, #305dde) !important;
   color: #FFFFFF !important;
   border-radius: var(--radius-pill) !important;
-  padding: 0 12px !important;
+  padding: 0 14px !important;
   width: auto !important;
-  font-weight: 600 !important;
-  gap: 5px !important;
+  font-weight: 500 !important;
+  gap: 6px !important;
+  box-shadow: 0 2px 8px rgba(48, 93, 222, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
 }
 .canvas-text-toolbar__btn--primary:hover:not(:disabled) {
-  background: #1D4ED8 !important;
+  background: #254ec8 !important;
   color: #FFFFFF !important;
-  transform: scale(1.04) !important;
+  transform: scale(1.02) !important;
 }
 
 /* ------------------------------------------------------------
-   TEXT TOOLBAR (HUD PARA FORMATAÇÃO DE TEXTO)
+   TEXT & ELEMENT DOCK / TOOLBAR (OPEN ANALYTICS DESIGN SYSTEM)
+   - Translucent dark glassmorphism (rgba(18, 18, 22, 0.82) + blur)
+   - Unified 32px control heights & continuous squircle curvature
+   - Segmented controls with subtle translucent active pills
+   - Unified steppers and scrubbable metric fields
    ------------------------------------------------------------ */
 .canvas-text-toolbar {
   position: absolute;
-  top: -60px; /* Acima do frame/text node */
+  top: -60px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 4px;
-  background: #18181B;
+  gap: 6px;
+  background: rgba(18, 18, 22, 0.82);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
   isolation: isolate;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-pill);
-  /* 6px nas laterais: a folga da borda tem que bater com o círculo do botão */
-  padding: 4px 6px;
+  padding: 5px 6px;
   color: #9CA3AF;
-  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.42),
-              0 2px 6px rgba(0, 0, 0, 0.15),
-              inset 0 1px 1px 0 rgba(255, 255, 255, 0.16);
+  box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.5),
+              0 4px 12px rgba(0, 0, 0, 0.22),
+              inset 0 1px 0 rgba(255, 255, 255, 0.18);
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity 160ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              border-radius 180ms cubic-bezier(0.16, 1, 0.3, 1),
+              padding 180ms cubic-bezier(0.16, 1, 0.3, 1);
   z-index: var(--z-canvas-float);
+  user-select: none;
 }
 
-/* Com duas linhas o pill viraria uma cápsula deformada: vira squircle */
+/* Quando expandido com painel avançado, vira squircle contínuo */
 .canvas-text-toolbar:has(.canvas-text-toolbar__row--adv.is-open) {
-  border-radius: 26px;
+  border-radius: 20px;
+  padding: 6px 8px;
 }
 
 .canvas-text-toolbar.is-visible {
@@ -2628,12 +2639,10 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
-/* Linha 1 sempre visível; linha 2 (espaçamento e caixa) só quando pedida */
+/* Linhas principais e sub-linhas estruturadas */
 .canvas-text-toolbar__row {
   display: flex;
   align-items: center;
-  /* Centralizada: as duas linhas têm larguras diferentes e a menor ficaria
-     encostada na esquerda, com um vão morto do outro lado */
   justify-content: center;
   gap: 4px;
   color: #9CA3AF;
@@ -2641,15 +2650,11 @@ body {
 
 .canvas-text-toolbar__row--adv {
   display: none;
-  /* Tudo que saiu da linha 1 cabe aqui: quebra em quantas linhas precisar em
-     vez de esticar a barra pela tela toda */
-  flex-wrap: wrap;
-  max-width: 560px;
-  row-gap: 6px;
-  /* A linha divisória recua das laterais para não bater na borda curva */
-  margin: 2px 8px 0;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 2px;
   padding-top: 6px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
   color: #9CA3AF;
 }
 
@@ -2657,81 +2662,228 @@ body {
   display: flex;
 }
 
-/* Linha que quebra: o traço divisório sobraria pendurado no fim de uma linha,
-   então quem separa os grupos aqui é o próprio vão. */
-.canvas-text-toolbar__row--wrap {
-  column-gap: 12px;
+.canvas-text-toolbar__subrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
 }
 
-.canvas-text-toolbar__row--wrap > .canvas-text-toolbar__sep {
-  display: none;
+/* Segmented Control: container em pílula para grupos (B/I/U, Alinhamento, Case, Camadas) */
+.canvas-text-toolbar__segmented {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-pill);
+  padding: 2px;
+  gap: 2px;
+  height: 32px;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.15);
 }
 
-/* Grupo indivisível: mantém os irmãos juntos quando a linha quebra */
+.canvas-text-toolbar__segmented .canvas-text-toolbar__btn {
+  width: 28px;
+  height: 26px;
+  min-width: 28px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.canvas-text-toolbar__segmented .canvas-text-toolbar__btn:hover:not(:disabled) {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.10);
+  transform: none;
+}
+
+.canvas-text-toolbar__segmented .canvas-text-toolbar__btn.is-active {
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  font-weight: 600;
+}
+
+.canvas-text-toolbar__segmented .canvas-text-toolbar__btn.is-active:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.26);
+  color: #FFFFFF;
+}
+
+/* Grupo flexível genérico */
 .canvas-text-toolbar__group {
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
-.canvas-text-toolbar__field {
+/* Stepper de Tamanho e Zoom unificado em pílula */
+.canvas-text-toolbar__stepper {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-pill);
+  height: 32px;
+  padding: 2px;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.15);
+}
+
+.canvas-text-toolbar__stepper .canvas-text-toolbar__input {
+  background: transparent;
+  border: none;
+  color: #FFFFFF;
+  font-size: 12.5px;
+  font-weight: 500;
+  width: 42px;
+  height: 26px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  padding: 0;
+  box-shadow: none;
+}
+
+.canvas-text-toolbar__stepper .canvas-text-toolbar__btn--step {
+  width: 24px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
   display: flex;
   align-items: center;
-  gap: 6px;
-  /* Simétrico: com folga só de um lado o número encostava no vizinho */
-  padding-inline: 2px;
-  color: #9CA3AF;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 120ms ease;
+  padding: 0;
+}
+
+.canvas-text-toolbar__stepper .canvas-text-toolbar__btn--step:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+  transform: none;
+}
+
+.canvas-text-toolbar__stepper .canvas-text-toolbar__btn--step:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+/* Campos de métricas scrubbables com ícone embutido */
+.canvas-text-toolbar__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: var(--radius-pill);
+  height: 32px;
+  padding: 0 6px 0 8px;
+  color: rgba(255, 255, 255, 0.65);
+  transition: border-color 140ms ease, background-color 140ms ease;
+  cursor: ew-resize;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.15);
+}
+
+.canvas-text-toolbar__field:hover {
+  background-color: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
 }
 
 .canvas-text-toolbar__field > i,
 .canvas-text-toolbar__field > svg {
-  color: #9CA3AF;
-  stroke: #9CA3AF;
+  color: rgba(255, 255, 255, 0.6);
+  stroke: currentColor;
   user-select: none;
-  transition: color var(--transition), stroke var(--transition);
+  flex-shrink: 0;
+  transition: color 140ms ease, stroke 140ms ease;
+  cursor: ew-resize;
 }
 
 .canvas-text-toolbar__field:hover > i,
 .canvas-text-toolbar__field:hover > svg {
   color: #FFFFFF;
-  stroke: #FFFFFF;
 }
 
+.canvas-text-toolbar__field .canvas-text-toolbar__input {
+  background: transparent;
+  border: none;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 500;
+  width: 38px;
+  height: 26px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+  padding: 0;
+  cursor: ew-resize;
+  box-shadow: none;
+}
+
+.canvas-text-toolbar__field--highlight {
+  padding: 0 4px 0 8px;
+  gap: 4px;
+}
+
+.canvas-text-toolbar__field--stepper {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  height: 26px;
+}
+
+/* Selects elegantes com seta customizada */
 .canvas-text-toolbar__select {
-  /* Sem a seta do sistema: o chevron é desenhado aqui para bater com o resto */
   appearance: none;
   -webkit-appearance: none;
-  background-color: rgba(255, 255, 255, 0.08);
-  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23D1D5DB' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-color: rgba(255, 255, 255, 0.06);
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23D1D5DB' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 9px center;
-  background-size: 13px 13px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background-position: right 8px center;
+  background-size: 12px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #FFFFFF;
   border-radius: var(--radius-pill);
   height: 32px;
-  padding: 0 28px 0 12px;
-  font-size: 12.5px;
+  padding: 0 24px 0 10px;
+  font-size: 12px;
+  font-weight: 500;
   font-family: inherit;
-  max-width: 152px;
+  max-width: 135px;
   outline: none;
   cursor: pointer;
-  transition: all var(--transition);
+  transition: all 130ms ease;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.15);
 }
 
 .canvas-text-toolbar__select:hover:not(:disabled) {
-  background-color: rgba(255, 255, 255, 0.14);
-  border-color: rgba(255, 255, 255, 0.22);
+  background-color: rgba(255, 255, 255, 0.10);
+  border-color: rgba(255, 255, 255, 0.18);
 }
 
-/* O menu nativo abre com fundo do sistema: força texto legível nas opções */
+.canvas-text-toolbar__select:focus {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 2px rgba(59, 166, 241, 0.3);
+}
+
 .canvas-text-toolbar__select option {
-  background: #16171C;
-  color: #fff;
+  background: #18181B;
+  color: #FFFFFF;
 }
 
 .canvas-text-toolbar__select--sm {
-  max-width: 108px;
+  max-width: 96px;
+}
+
+.canvas-text-toolbar__select--preset {
+  max-width: 110px;
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
 .canvas-text-toolbar__select:disabled {
@@ -2739,23 +2891,25 @@ body {
   cursor: default;
 }
 
+/* Inputs numéricos */
 .canvas-text-toolbar__input {
-  /* Spinner nativo fora: quem mexe no número são os botões − e + */
   appearance: textfield;
   -webkit-appearance: textfield;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  color: #FFFFFF;
   border-radius: var(--radius-pill);
   height: 32px;
-  padding: 0 10px;
-  font-size: 13px;
+  padding: 0 8px;
+  font-size: 12.5px;
+  font-weight: 500;
   font-family: inherit;
-  width: 66px;
+  width: 54px;
   text-align: center;
   font-variant-numeric: tabular-nums;
   outline: none;
-  transition: all var(--transition);
+  transition: all 130ms ease;
+  box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.15);
 }
 
 .canvas-text-toolbar__input::-webkit-outer-spin-button,
@@ -2765,58 +2919,51 @@ body {
 }
 
 .canvas-text-toolbar__input:hover {
-  background: rgba(255, 255, 255, 0.14);
-}
-
-/* Arrastar de lado muda o valor; clicar entra no modo digitação */
-.canvas-text-toolbar__input,
-.canvas-text-toolbar__field > i,
-.canvas-text-toolbar__field > svg {
-  cursor: ew-resize;
-}
-
-.canvas-text-toolbar__field > i,
-.canvas-text-toolbar__field > svg {
-  user-select: none;
+  background-color: rgba(255, 255, 255, 0.10);
 }
 
 .canvas-text-toolbar__input:focus {
   cursor: text;
   border-color: rgba(255, 255, 255, 0.34);
-  background: rgba(255, 255, 255, 0.16);
+  background-color: rgba(255, 255, 255, 0.14);
 }
 
-/* Mesmo botão da dock: círculo de 36, cinza que acende no hover */
+/* Botões soltos de ícone */
 .canvas-text-toolbar__btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  color: #9CA3AF;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  color: rgba(255, 255, 255, 0.7);
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: all var(--transition);
+  transition: all 130ms cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+  flex-shrink: 0;
 }
 
 .canvas-text-toolbar__btn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.10);
   color: #FFFFFF;
-  transform: scale(1.05);
+  transform: scale(1.04);
 }
 
-/* Ativo é o inverso do dock: pastilha branca, ícone preto */
+.canvas-text-toolbar__btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
 .canvas-text-toolbar__btn.is-active {
-  background: rgba(255, 255, 255, 0.95);
-  color: #000000;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  background: rgba(255, 255, 255, 0.20);
+  color: #FFFFFF;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .canvas-text-toolbar__btn.is-active:hover:not(:disabled) {
-  background: #FFFFFF;
-  color: #000000;
+  background: rgba(255, 255, 255, 0.26);
+  color: #FFFFFF;
 }
 
 .canvas-text-toolbar__btn:disabled {
@@ -2824,36 +2971,44 @@ body {
   cursor: default;
 }
 
-/* B / I / U e Aa / AA / aa: a própria letra é o ícone */
 .canvas-text-toolbar__btn--type {
-  font-size: 14px;
-  line-height: 1;
+  font-size: 13px;
+  font-weight: 500;
   font-family: inherit;
 }
 
-/* − e + do tamanho: o campo fica entre os dois, encostado */
-.canvas-text-toolbar__btn--step {
-  width: 28px;
-  height: 28px;
-  font-size: 16px;
-  line-height: 1;
+.canvas-text-toolbar__btn--pill {
+  width: auto;
+  padding: 0 12px;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
-/* A cor precisa parecer uma amostra, não um controle de formulário */
+.canvas-text-toolbar__btn--danger:hover {
+  background: rgba(239, 68, 68, 0.2) !important;
+  color: #FCA5A5 !important;
+}
+
+/* Amostra de cor (Color Swatch) */
 .canvas-text-toolbar__color {
-  display: flex;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4), inset 0 0 0 1px rgba(0, 0, 0, 0.2);
   cursor: pointer;
-  transition: transform var(--transition);
+  transition: transform 140ms ease, border-color 140ms ease;
+  flex-shrink: 0;
 }
 
 .canvas-text-toolbar__color:hover {
-  transform: scale(1.06);
+  transform: scale(1.08);
+  border-color: #FFFFFF;
 }
 
 .canvas-text-toolbar__color input[type="color"] {
@@ -2866,42 +3021,35 @@ body {
   cursor: pointer;
 }
 
-/* Apagar é a única ação destrutiva da barra: vermelho só no hover */
-.canvas-text-toolbar__btn--danger:hover {
-  background: rgba(239, 68, 68, 0.22);
-  color: #FCA5A5;
+.canvas-text-toolbar__color--bg {
+  width: 22px;
+  height: 22px;
+  border-width: 1.5px;
 }
 
-/* O separador só separa se o vão ao redor dele for maior que o vão de dentro
-   do grupo: 4px entre irmãos, 9px em volta do traço. */
+/* Separadores discretos */
 .canvas-text-toolbar__sep {
   width: 1px;
-  height: 20px;
-  background: rgba(255, 255, 255, 0.18);
-  margin-inline: 5px;
-  flex: none;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.12);
+  margin-inline: 3px;
+  flex-shrink: 0;
 }
 
-.canvas-text-toolbar__select--preset {
-  max-width: 116px;
-  font-weight: 500;
-  color: #F3F4F6;
-  background-color: rgba(255, 255, 255, 0.12);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
+/* Botão pequeno (ex: limpar fundo ×) */
 .canvas-text-toolbar__btn--sm {
-  width: 20px;
-  height: 20px;
-  font-size: 14px;
-  color: #9CA3AF;
+  width: 18px;
+  height: 18px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
   padding: 0;
   margin-left: 2px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
 }
+
 .canvas-text-toolbar__btn--sm:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  color: #FFFFFF;
 }
 
 /* Suporte de exibição a fundo de marca-texto com padding e quebra elegante */
@@ -2936,6 +3084,35 @@ body {
   gap: 14px;
   margin-bottom: 12px;
   padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.canvas-batch-body-oa::-webkit-scrollbar {
+  width: 8px;
+}
+
+.canvas-batch-body-oa::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 99px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.canvas-batch-body-oa::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+  background-clip: padding-box;
+}
+
+.canvas-batch-body-oa::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* No modo overlay (macOS), a barra não ocupa layout — garante folga do conteúdo */
+@supports not (overflow: overlay) {
+  .canvas-library-modal-oa .canvas-batch-body-oa {
+    padding-right: 10px;
+  }
 }
 
 .canvas-batch-section-oa {
@@ -3325,20 +3502,18 @@ body {
   line-height: 1.4;
 }
 
+.canvas-batch-hint-oa:empty {
+  display: none;
+}
+
 /* ------------------------------------------------------------
    BIBLIOTECA DE ÍCONES E STICKERS
    ------------------------------------------------------------ */
-.canvas-library-modal-oa {
-  max-width: 720px;
-  height: auto;
-  max-height: 88vh;
-}
-
 .canvas-lib-controls-oa {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .canvas-lib-tabs-oa {
@@ -3413,24 +3588,23 @@ body {
 
 .canvas-lib-grid-oa {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(62px, 1fr));
-  gap: 6px;
-  max-height: 52vh;
-  overflow-y: auto;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 5px;
+  align-content: start;
   padding: 2px;
 }
 
 .canvas-lib-item-oa {
   aspect-ratio: 1 / 1;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: 9px;
   background: #F9FAFB;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all var(--transition);
-  padding: 10px;
+  padding: 7px;
 }
 
 .canvas-lib-item-oa:hover {
@@ -3459,19 +3633,20 @@ body {
   color: #9CA3AF;
 }
 
+/* Tamanho único fixo do modal de Biblioteca (todas as tabs) */
 .canvas-library-modal-oa {
-  max-width: 680px;
+  max-width: 860px;
   width: 92%;
+  height: 640px;
+  max-height: 88vh;
 }
 
 .canvas-lib-view-container-oa {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  max-height: 56vh;
-  overflow-y: auto;
   padding-right: 4px;
-  margin-top: 12px;
+  margin-top: 0;
 }
 
 /* --- GRADIENTES & TEXTURAS STUDIO --- */
@@ -3517,7 +3692,25 @@ body {
   min-width: 270px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
+}
+
+/* Studio compacto: cabe sem scroll dentro do modal de 640px */
+#canvas-library-modal .canvas-grad-panel-oa {
+  align-content: flex-start;
+}
+
+#canvas-library-modal .canvas-grad-preview-col-oa {
+  padding: 12px;
+  gap: 10px;
+}
+
+#canvas-library-modal .canvas-grad-canvas-oa {
+  max-width: 210px;
+}
+
+#canvas-library-modal .canvas-grad-slider-group-oa {
+  gap: 3px;
 }
 
 .canvas-grad-types-oa {
@@ -3661,11 +3854,9 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  overflow-x: auto;
+  flex-wrap: wrap;
   padding: 4px 0 6px 0;
-  scrollbar-width: none;
 }
-.canvas-font-chips-oa::-webkit-scrollbar { display: none; }
 
 .canvas-font-chip-oa {
   padding: 4px 10px;
@@ -3808,14 +3999,14 @@ body {
    Escopado por ID para não afetar os demais modais
    ------------------------------------------------------------ */
 #canvas-library-modal .openpanel-modal {
-  background: rgba(22, 22, 26, 0.86);
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  background: rgba(18, 18, 22, 0.78);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 20px;
-  box-shadow: 0 24px 54px -10px rgba(0, 0, 0, 0.55),
-              0 4px 14px rgba(0, 0, 0, 0.25),
-              inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.45),
+              0 2px 8px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.18);
   color: #F3F4F6;
 }
 
@@ -3828,8 +4019,16 @@ body {
 }
 
 #canvas-library-modal .openpanel-close-btn {
+  width: 30px;
+  height: 30px;
   background: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#canvas-library-modal .openpanel-close-btn:active {
+  transform: scale(0.96);
 }
 
 #canvas-library-modal .openpanel-close-btn:hover {
@@ -3861,6 +4060,8 @@ body {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.12);
   color: #FFFFFF;
+  border-radius: var(--radius-pill);
+  padding: 7px 16px;
 }
 
 #canvas-library-modal .canvas-lib-search-oa::placeholder {
@@ -3875,6 +4076,9 @@ body {
 
 #canvas-library-modal .canvas-lib-color-oa {
   border-color: rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-pill);
+  width: 34px;
+  height: 34px;
 }
 
 /* Grid de ícones/stickers */
@@ -4038,6 +4242,140 @@ body {
 
 #canvas-library-modal .openpanel-btn-secondary:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+/* ------------------------------------------------------------
+   UNIFICAÇÃO COM O TOP DOCK (tokens: pill, 34px, azul #2563EB)
+   ------------------------------------------------------------ */
+
+/* CTA primário: azul do dock com glow (antes era #111827, invisível no vidro escuro) */
+#canvas-library-modal .openpanel-btn-primary {
+  background: #2563EB;
+  color: #FFFFFF;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+#canvas-library-modal .openpanel-btn-primary:hover:not(:disabled) {
+  background: #1D4ED8;
+  transform: none;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+#canvas-library-modal .openpanel-btn-primary:active:not(:disabled) {
+  transform: scale(0.96);
+  background: #1E40AF;
+}
+
+/* Secundários viram pill estilo dock */
+#canvas-library-modal .openpanel-btn-secondary {
+  height: 34px;
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+#canvas-library-modal .openpanel-btn-secondary:active {
+  transform: scale(0.96);
+}
+
+/* Labels de seção do Gradient Studio (antes inline #374151, ilegível no escuro) */
+#canvas-library-modal .canvas-grad-section-label-oa {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  display: block;
+  margin-bottom: 6px;
+}
+
+/* Chips (categorias de fontes, sortear paleta): mesmos tokens das tabs do dock */
+#canvas-library-modal .canvas-font-chip-oa {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-pill);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#canvas-library-modal .canvas-font-chip-oa:active {
+  transform: scale(0.96);
+}
+
+#canvas-library-modal .canvas-font-chip-oa.is-active {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Tabs e segmented controls: pill 34px como o dock */
+#canvas-library-modal .canvas-lib-tabs-oa,
+#canvas-library-modal .canvas-grad-types-oa {
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+/* Gradiente: 4 tipos lado a lado sem estourar largura */
+#canvas-library-modal .canvas-grad-types-oa .canvas-grad-type-btn-oa {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 8px;
+}
+
+#canvas-library-modal .canvas-grad-type-btn-oa span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+#canvas-library-modal .canvas-lib-tab-oa,
+#canvas-library-modal .canvas-grad-type-btn-oa {
+  height: 28px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+#canvas-library-modal .canvas-lib-tab-oa.is-active,
+#canvas-library-modal .canvas-grad-type-btn-oa.is-active {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+#canvas-library-modal .canvas-lib-tab-oa:active,
+#canvas-library-modal .canvas-grad-type-btn-oa:active {
+  transform: scale(0.96);
+}
+
+/* Ícones lucide dentro de chips/tabs herdam cor e não encolhem */
+#canvas-library-modal .canvas-font-chip-oa svg,
+#canvas-library-modal .canvas-lib-tab-oa svg,
+#canvas-library-modal .canvas-grad-type-btn-oa svg {
+  flex-shrink: 0;
+}
+
+/* Hex da cor no Gradient Studio (antes inline #4B5563) */
+#canvas-library-modal .canvas-grad-color-hex-oa {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ------------------------------------------------------------
@@ -4353,4 +4691,113 @@ body {
   .canvas-topbar__save-spin {
     animation-duration: 2s;
   }
+}
+
+/* ------------------------------------------------------------
+   MENU DE CONTEXTO (BOTÃO DIREITO / RIGHT-CLICK) - OA DESIGN
+   ------------------------------------------------------------ */
+.canvas-context-menu-oa {
+  position: fixed;
+  z-index: 100000;
+  min-width: 230px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: rgba(20, 20, 24, 0.94);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  isolation: isolate;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.65),
+              0 6px 16px rgba(0, 0, 0, 0.35),
+              inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  opacity: 0;
+  transform: scale(0.96);
+  pointer-events: none;
+  transition: opacity 120ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 120ms cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+.canvas-context-menu-oa.is-open {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.canvas-context-menu-oa .canvas-context-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6.5px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #F3F4F6;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 100ms ease, color 100ms ease;
+  position: relative;
+}
+
+.canvas-context-menu-oa .canvas-context-item:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: #FFFFFF;
+}
+
+.canvas-context-menu-oa .canvas-context-item:active {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.canvas-context-menu-oa .canvas-context-item--danger:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: #F87171;
+}
+
+.canvas-context-menu-oa .canvas-context-item i,
+.canvas-context-menu-oa .canvas-context-item svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.canvas-context-menu-oa .canvas-context-item:hover i,
+.canvas-context-menu-oa .canvas-context-item:hover svg {
+  color: #FFFFFF;
+}
+
+.canvas-context-menu-oa .canvas-context-item--danger:hover i,
+.canvas-context-menu-oa .canvas-context-item--danger:hover svg {
+  color: #F87171;
+}
+
+.canvas-context-menu-oa .canvas-context-meta {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.38);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  padding-left: 12px;
+}
+
+.canvas-context-menu-oa .canvas-context-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 3px 2px;
+}
+
+.canvas-context-menu-oa .canvas-context-section-label {
+  padding: 5px 10px 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.35);
 }

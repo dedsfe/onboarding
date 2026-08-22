@@ -3268,6 +3268,54 @@
       save();
     }
 
+    function alignSelectedNodes(alignment) {
+      if (selectedChildNodes.length === 0) return;
+      selectedChildNodes.forEach(sel => {
+        const frame = frames.find(f => f.id === sel.frameId);
+        if (!frame) return;
+        const child = (frame.children || []).find(c => c.id === sel.childId);
+        if (!child) return;
+        const el = world.querySelector(`[data-id="${child.id}"]`);
+        
+        const w = child.w || (el ? el.offsetWidth : 100);
+        const h = child.h || (el ? el.offsetHeight : 100);
+
+        if (alignment === 'center-h') {
+          child.x = Math.round((frame.w - w) / 2);
+        } else if (alignment === 'center-v') {
+          child.y = Math.round((frame.h - h) / 2);
+        } else if (alignment === 'center-both') {
+          child.x = Math.round((frame.w - w) / 2);
+          child.y = Math.round((frame.h - h) / 2);
+        } else if (alignment === 'left') {
+          child.x = 40;
+        } else if (alignment === 'right') {
+          child.x = frame.w - w - 40;
+        } else if (alignment === 'top') {
+          child.y = 40;
+        } else if (alignment === 'bottom') {
+          child.y = frame.h - h - 40;
+        }
+
+        if (el) {
+          el.style.left = `${child.x}px`;
+          el.style.top = `${child.y}px`;
+        }
+      });
+      updateTextToolbar();
+      save();
+      const labels = {
+        'center-h': 'Centralizado horizontalmente!',
+        'center-v': 'Centralizado verticalmente!',
+        'center-both': 'Centralizado no post!',
+        'left': 'Alinhado à esquerda!',
+        'right': 'Alinhado à direita!',
+        'top': 'Alinhado ao topo!',
+        'bottom': 'Alinhado à base!'
+      };
+      if (labels[alignment]) toast.success(labels[alignment]);
+    }
+
     function load() {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
@@ -6275,6 +6323,233 @@
       }
     });
 
+    /* --------------------------------------------------
+       Menu de Contexto Flutuante (Botão Direito / Right-Click) - OA Design
+       -------------------------------------------------- */
+    const contextMenuEl = document.getElementById('canvas-context-menu');
+
+    function hideContextMenu() {
+      if (!contextMenuEl) return;
+      contextMenuEl.classList.remove('is-open');
+      contextMenuEl.style.display = 'none';
+      contextMenuEl.innerHTML = '';
+    }
+
+    function showContextMenu(e, targetType, targetData) {
+      if (!contextMenuEl) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      let itemsHtml = '';
+
+      if (targetType === 'child') {
+        const isMulti = selectedChildNodes.length > 1;
+        const label = isMulti ? `${selectedChildNodes.length} elementos` : 'Elemento';
+
+        itemsHtml = `
+          <div class="canvas-context-section-label">Alinhar no Post</div>
+          <button type="button" class="canvas-context-item" data-action="align-center-h">
+            <i data-lucide="align-center-horizontal"></i>
+            <span>Centralizar Horizontal</span>
+            <span class="canvas-context-meta">⌥H</span>
+          </button>
+          <button type="button" class="canvas-context-item" data-action="align-center-v">
+            <i data-lucide="align-center-vertical"></i>
+            <span>Centralizar Vertical</span>
+            <span class="canvas-context-meta">⌥V</span>
+          </button>
+          <button type="button" class="canvas-context-item" data-action="align-center-both">
+            <i data-lucide="crosshair"></i>
+            <span>Centro do Post</span>
+            <span class="canvas-context-meta">⌥C</span>
+          </button>
+
+          <div class="canvas-context-divider"></div>
+          <div class="canvas-context-section-label">Camadas</div>
+          <button type="button" class="canvas-context-item" data-action="bring-front">
+            <i data-lucide="chevrons-up"></i>
+            <span>Trazer para o Topo</span>
+            <span class="canvas-context-meta">⌥⌘]</span>
+          </button>
+          <button type="button" class="canvas-context-item" data-action="bring-forward">
+            <i data-lucide="chevron-up"></i>
+            <span>Avançar uma Camada</span>
+            <span class="canvas-context-meta">⌘]</span>
+          </button>
+          <button type="button" class="canvas-context-item" data-action="send-backward">
+            <i data-lucide="chevron-down"></i>
+            <span>Recuar uma Camada</span>
+            <span class="canvas-context-meta">⌘[</span>
+          </button>
+          <button type="button" class="canvas-context-item" data-action="send-back">
+            <i data-lucide="chevrons-down"></i>
+            <span>Enviar para o Fundo</span>
+            <span class="canvas-context-meta">⌥⌘[</span>
+          </button>
+
+          <div class="canvas-context-divider"></div>
+          <div class="canvas-context-section-label">Ações</div>
+          <button type="button" class="canvas-context-item" data-action="duplicate-node">
+            <i data-lucide="copy"></i>
+            <span>Duplicar ${label}</span>
+            <span class="canvas-context-meta">⌘D</span>
+          </button>
+          <button type="button" class="canvas-context-item canvas-context-item--danger" data-action="delete-node">
+            <i data-lucide="trash-2"></i>
+            <span>Excluir ${label}</span>
+            <span class="canvas-context-meta">⌫</span>
+          </button>
+        `;
+      } else if (targetType === 'frame') {
+        const frame = targetData;
+        const frameTitle = frame ? (frame.name || `Post ${frame.id}`) : 'Post';
+
+        itemsHtml = `
+          <div class="canvas-context-section-label">${frameTitle}</div>
+          <button type="button" class="canvas-context-item" data-action="duplicate-frame">
+            <i data-lucide="copy"></i>
+            <span>Duplicar Post</span>
+            <span class="canvas-context-meta">⌘D</span>
+          </button>
+          <button type="button" class="canvas-context-item" data-action="add-text-frame">
+            <i data-lucide="type"></i>
+            <span>Adicionar Texto</span>
+          </button>
+          <button type="button" class="canvas-context-item" data-action="export-frame">
+            <i data-lucide="download"></i>
+            <span>Exportar este Post</span>
+          </button>
+
+          <div class="canvas-context-divider"></div>
+          <button type="button" class="canvas-context-item canvas-context-item--danger" data-action="delete-frame">
+            <i data-lucide="trash-2"></i>
+            <span>Excluir Post</span>
+          </button>
+        `;
+      } else {
+        itemsHtml = `
+          <div class="canvas-context-section-label">Canvas</div>
+          <button type="button" class="canvas-context-item" data-action="add-new-frame">
+            <i data-lucide="plus-square"></i>
+            <span>Novo Post</span>
+          </button>
+          <button type="button" class="canvas-context-item" data-action="open-library">
+            <i data-lucide="sparkles"></i>
+            <span>Biblioteca & Recursos</span>
+          </button>
+          <button type="button" class="canvas-context-item" data-action="reset-zoom">
+            <i data-lucide="maximize-2"></i>
+            <span>Ajustar Zoom (100%)</span>
+          </button>
+        `;
+      }
+
+      contextMenuEl.innerHTML = itemsHtml;
+      if (window.lucide) lucide.createIcons({ root: contextMenuEl });
+
+      // Action Dispatcher
+      contextMenuEl.querySelectorAll('.canvas-context-item').forEach(btn => {
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          const action = btn.dataset.action;
+          hideContextMenu();
+
+          if (action === 'align-center-h') alignSelectedNodes('center-h');
+          else if (action === 'align-center-v') alignSelectedNodes('center-v');
+          else if (action === 'align-center-both') alignSelectedNodes('center-both');
+          else if (action === 'bring-front') bringChildToFront();
+          else if (action === 'bring-forward') bringChildForward();
+          else if (action === 'send-backward') sendChildBackward();
+          else if (action === 'send-back') sendChildToBack();
+          else if (action === 'duplicate-node') duplicateTextNode();
+          else if (action === 'delete-node') deleteTextNode();
+          else if (action === 'duplicate-frame') {
+            if (targetData && targetData.id) duplicateFrame(targetData.id);
+            else if (selectedId) duplicateFrame(selectedId);
+          } else if (action === 'add-text-frame') {
+            const f = targetData || selectedFrame();
+            if (f) addTextNode(f, Math.round(f.w * 0.1), Math.round(f.h * 0.4));
+          } else if (action === 'export-frame') {
+            const exportBtn = document.getElementById('canvas-export-btn');
+            if (exportBtn) exportBtn.click();
+          } else if (action === 'delete-frame') {
+            if (targetData && targetData.id) deleteFrame(targetData.id);
+            else if (selectedId) deleteFrame(selectedId);
+          } else if (action === 'add-new-frame') {
+            addFrame();
+          } else if (action === 'open-library') {
+            const libBtn = document.getElementById('canvas-insert-menu-btn');
+            if (libBtn) libBtn.click();
+          } else if (action === 'reset-zoom') {
+            cam.scale = 1;
+            applyCamera();
+          }
+        });
+      });
+
+      // Posicionamento inteligente (evita sair da tela)
+      contextMenuEl.style.display = 'flex';
+      const menuW = 230;
+      const menuH = contextMenuEl.offsetHeight || 280;
+      let posX = e.clientX;
+      let posY = e.clientY;
+
+      if (posX + menuW > window.innerWidth - 12) {
+        posX = window.innerWidth - menuW - 12;
+      }
+      if (posY + menuH > window.innerHeight - 12) {
+        posY = window.innerHeight - menuH - 12;
+      }
+
+      contextMenuEl.style.left = `${Math.max(12, posX)}px`;
+      contextMenuEl.style.top = `${Math.max(12, posY)}px`;
+
+      requestAnimationFrame(() => {
+        contextMenuEl.classList.add('is-open');
+      });
+    }
+
+    view.addEventListener('contextmenu', (e) => {
+      if (!view.classList.contains('is-open')) return;
+      if (e.target.closest('.canvas-topbar') || e.target.closest('.canvas-hud') || e.target.closest('.dock-wrapper') || e.target.closest('.modal-overlay')) return;
+
+      const childEl = e.target.closest('.canvas-text-node, .canvas-image-node');
+      if (childEl) {
+        const frameEl = childEl.closest('.canvas-frame');
+        const frameId = frameEl ? Number(frameEl.dataset.id) : null;
+        const childId = Number(childEl.dataset.id);
+        if (frameId && childId) {
+          if (!selectedChildNodes.some(n => n.childId === childId)) {
+            selectTextNode(frameId, childId);
+          }
+          showContextMenu(e, 'child', { frameId, childId });
+          return;
+        }
+      }
+
+      const frameEl = e.target.closest('.canvas-frame');
+      if (frameEl) {
+        const frameId = Number(frameEl.dataset.id);
+        const frame = frames.find(f => f.id === frameId);
+        if (frame) {
+          selectFrame(frame.id);
+          showContextMenu(e, 'frame', frame);
+          return;
+        }
+      }
+
+      showContextMenu(e, 'canvas', null);
+    });
+
+    document.addEventListener('click', (e) => {
+      if (contextMenuEl && !contextMenuEl.contains(e.target)) {
+        hideContextMenu();
+      }
+    });
+
+    window.addEventListener('wheel', () => hideContextMenu(), { passive: true });
+    window.addEventListener('resize', () => hideContextMenu());
+
     /* Controles */
     const btnUndo = document.getElementById('canvas-undo');
     const btnRedo = document.getElementById('canvas-redo');
@@ -6572,6 +6847,23 @@
 
     document.addEventListener('keydown', (e) => {
       if (!view.classList.contains('is-open')) return;
+
+      if (contextMenuEl && contextMenuEl.classList.contains('is-open')) {
+        if (e.key === 'Escape') {
+          hideContextMenu();
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+      }
+
+      /* Atalhos de Alinhamento: ⌥H (Centro H), ⌥V (Centro V), ⌥C (Centro Total) */
+      if (e.altKey && !e.metaKey && !e.ctrlKey && selectedChildNodes.length > 0) {
+        const k = e.key.toLowerCase();
+        if (k === 'h' || e.code === 'KeyH') { e.preventDefault(); e.stopPropagation(); alignSelectedNodes('center-h'); return; }
+        if (k === 'v' || e.code === 'KeyV') { e.preventDefault(); e.stopPropagation(); alignSelectedNodes('center-v'); return; }
+        if (k === 'c' || e.code === 'KeyC') { e.preventDefault(); e.stopPropagation(); alignSelectedNodes('center-both'); return; }
+      }
 
       /* ⌘Z / Ctrl+Z (Undo) e ⌘Shift+Z / Ctrl+Shift+Z / ⌘Y / Ctrl+Y (Redo) */
       if (e.metaKey || e.ctrlKey) {

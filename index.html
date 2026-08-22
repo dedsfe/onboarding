@@ -866,14 +866,14 @@
     <div class="canvas-text-toolbar" id="canvas-frame-toolbar">
       <div class="canvas-text-toolbar__row">
         <!-- Modo do Fundo: Sólido vs Gradiente -->
-        <span class="canvas-text-toolbar__group" title="Modo de Preenchimento">
+        <div class="canvas-text-toolbar__segmented" title="Modo de Preenchimento">
           <button class="canvas-text-toolbar__btn is-active" id="canvas-frame-mode-solid" title="Cor sólida">
             <i data-lucide="circle" style="width: 14px; height: 14px;"></i>
           </button>
           <button class="canvas-text-toolbar__btn" id="canvas-frame-mode-gradient" title="Gradiente de cores">
             <i data-lucide="blend" style="width: 14px; height: 14px;"></i>
           </button>
-        </span>
+        </div>
 
         <span class="canvas-text-toolbar__sep"></span>
 
@@ -892,7 +892,7 @@
           <label class="canvas-text-toolbar__color" title="Cor 2 do Gradiente">
             <input type="color" id="canvas-frame-grad-c2" value="#09090b">
           </label>
-          <select class="canvas-text-toolbar__select" id="canvas-frame-grad-dir" title="Direção do Gradiente" style="min-width: 75px;">
+          <select class="canvas-text-toolbar__select" id="canvas-frame-grad-dir" title="Direção do Gradiente" style="min-width: 80px;">
             <option value="180deg">↓ Vertical</option>
             <option value="135deg">↘ Diagonal</option>
             <option value="90deg">→ Horizontal</option>
@@ -904,7 +904,7 @@
         <span class="canvas-text-toolbar__sep"></span>
 
         <!-- Presets Rápidos de Gradiente -->
-        <select class="canvas-text-toolbar__select" id="canvas-frame-gradient-select" title="Presets de Gradientes" style="min-width: 105px;">
+        <select class="canvas-text-toolbar__select" id="canvas-frame-gradient-select" title="Presets de Gradientes" style="min-width: 110px;">
           <option value="">Presets...</option>
           <option value="#18181B|#09090B|180deg">Obsidian Dark</option>
           <option value="#1C1917|#44403C|135deg">Warm Amber</option>
@@ -942,28 +942,28 @@
       </div>
 
       <!-- Segunda linha expansível: Overlay e Blur -->
-      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv canvas-text-toolbar__row--wrap" id="canvas-frame-advanced">
-        <span class="canvas-text-toolbar__group">
-          <span class="canvas-text-toolbar__field" title="Escurecimento / Overlay (%) [Para destacar textos]">
+      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv" id="canvas-frame-advanced">
+        <div class="canvas-text-toolbar__subrow">
+          <div class="canvas-text-toolbar__field" title="Escurecimento / Overlay (%) [Para destacar textos]">
             <i data-lucide="sun-medium" style="width: 14px; height: 14px;"></i>
             <input type="number" class="canvas-text-toolbar__input" id="canvas-frame-overlay" value="0" min="0" max="100" step="5">
-          </span>
+          </div>
 
-          <span class="canvas-text-toolbar__field" title="Desfoque / Blur de fundo (px)">
+          <div class="canvas-text-toolbar__field" title="Desfoque / Blur de fundo (px)">
             <i data-lucide="aperture" style="width: 14px; height: 14px;"></i>
             <input type="number" class="canvas-text-toolbar__input" id="canvas-frame-blur" value="0" min="0" max="50" step="1">
-          </span>
-        </span>
+          </div>
 
-        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--danger" id="canvas-frame-del-img" title="Remover imagem de fundo" style="display: none;">
-          <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
-          <span style="font-size: 11.5px; margin-left: 4px;">Remover Foto</span>
-        </button>
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--danger canvas-text-toolbar__btn--pill" id="canvas-frame-del-img" title="Remover imagem de fundo" style="display: none;">
+            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+            <span>Remover Foto</span>
+          </button>
+        </div>
       </div>
     </div>
 
     <div class="canvas-text-toolbar" id="canvas-image-toolbar">
-      <!-- Mesma divisão da barra de texto: o que se usa sempre fica à mostra -->
+      <!-- Linha 1: o que se usa sempre -->
       <div class="canvas-text-toolbar__row">
         <button class="canvas-text-toolbar__btn" id="canvas-image-crop" title="Recortar / Zoom da imagem (Duplo clique ou Enter)">
           <i data-lucide="crop" style="width: 15px; height: 15px;"></i>
@@ -971,19 +971,16 @@
 
         <span class="canvas-text-toolbar__sep"></span>
 
-        <!-- Arredondamento e opacidade são da mesma família (o pixel em si):
-             andam colados, sem traço no meio -->
-        <span class="canvas-text-toolbar__group">
-          <span class="canvas-text-toolbar__field" title="Arredondamento das bordas (px) [Arraste para ajustar]">
-            <i data-lucide="square" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-image-radius" value="0" min="0" step="1">
-          </span>
+        <!-- Arredondamento e opacidade em campos de métricas -->
+        <div class="canvas-text-toolbar__field" title="Arredondamento das bordas (px) [Arraste para ajustar]">
+          <i data-lucide="square" style="width: 14px; height: 14px;"></i>
+          <input type="number" class="canvas-text-toolbar__input" id="canvas-image-radius" value="0" min="0" step="1">
+        </div>
 
-          <span class="canvas-text-toolbar__field" title="Opacidade (%) [Arraste para ajustar]">
-            <i data-lucide="droplet" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-image-opacity" value="100" min="0" max="100" step="5">
-          </span>
-        </span>
+        <div class="canvas-text-toolbar__field" title="Opacidade (%) [Arraste para ajustar]">
+          <i data-lucide="droplet" style="width: 14px; height: 14px;"></i>
+          <input type="number" class="canvas-text-toolbar__input" id="canvas-image-opacity" value="100" min="0" max="100" step="5">
+        </div>
 
         <span class="canvas-text-toolbar__sep"></span>
 
@@ -1005,58 +1002,59 @@
         </button>
       </div>
 
-      <!-- Segunda linha: acabamento, que se mexe uma vez e esquece. Mesma receita
-           do painel do texto: quebra em linhas e o vão de 12px é quem separa -->
-      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv canvas-text-toolbar__row--wrap" id="canvas-image-advanced">
-        <!-- Ordem das Camadas / z-index -->
-        <span class="canvas-text-toolbar__group" title="Ordem das Camadas (z-index)">
-          <button class="canvas-text-toolbar__btn" id="canvas-image-send-back" title="Mandar para trás de tudo (⌘[)"><i data-lucide="arrow-down-to-line" style="width: 15px; height: 15px;"></i></button>
-          <button class="canvas-text-toolbar__btn" id="canvas-image-backward" title="Recuar uma camada ([)"><i data-lucide="arrow-down" style="width: 15px; height: 15px;"></i></button>
-          <button class="canvas-text-toolbar__btn" id="canvas-image-forward" title="Avançar uma camada (])"><i data-lucide="arrow-up" style="width: 15px; height: 15px;"></i></button>
-          <button class="canvas-text-toolbar__btn" id="canvas-image-bring-front" title="Trazer para frente de tudo (⌘])"><i data-lucide="arrow-up-to-line" style="width: 15px; height: 15px;"></i></button>
-        </span>
+      <!-- Segunda linha avançada: Acabamento, borda, blur, sombra e camadas -->
+      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv" id="canvas-image-advanced">
+        <div class="canvas-text-toolbar__subrow">
+          <!-- Ordem das Camadas -->
+          <div class="canvas-text-toolbar__segmented" title="Ordem das Camadas (z-index)">
+            <button class="canvas-text-toolbar__btn" id="canvas-image-send-back" title="Mandar para trás de tudo (⌘[)"><i data-lucide="arrow-down-to-line" style="width: 14px; height: 14px;"></i></button>
+            <button class="canvas-text-toolbar__btn" id="canvas-image-backward" title="Recuar uma camada ([)"><i data-lucide="arrow-down" style="width: 14px; height: 14px;"></i></button>
+            <button class="canvas-text-toolbar__btn" id="canvas-image-forward" title="Avançar uma camada (])"><i data-lucide="arrow-up" style="width: 14px; height: 14px;"></i></button>
+            <button class="canvas-text-toolbar__btn" id="canvas-image-bring-front" title="Trazer para frente de tudo (⌘])"><i data-lucide="arrow-up-to-line" style="width: 14px; height: 14px;"></i></button>
+          </div>
 
-        <!-- Borda: espessura e cor são um par, nunca quebram no meio -->
-        <span class="canvas-text-toolbar__group">
-          <span class="canvas-text-toolbar__field" title="Espessura da borda (px) [Arraste para ajustar]">
+          <span class="canvas-text-toolbar__sep"></span>
+
+          <!-- Borda: espessura e cor -->
+          <div class="canvas-text-toolbar__field" title="Espessura da borda (px) [Arraste para ajustar]">
             <i data-lucide="maximize" style="width: 14px; height: 14px;"></i>
             <input type="number" class="canvas-text-toolbar__input" id="canvas-image-border-width" value="0" min="0" step="1">
-          </span>
+          </div>
           <label class="canvas-text-toolbar__color" title="Cor da borda">
             <input type="color" id="canvas-image-border-color" value="#000000">
           </label>
-        </span>
 
-        <!-- Desfoque e sombra: os dois acabamentos de profundidade -->
-        <span class="canvas-text-toolbar__group">
-          <span class="canvas-text-toolbar__field" title="Desfoque / Blur (px) [Arraste para ajustar]">
+          <span class="canvas-text-toolbar__sep"></span>
+
+          <!-- Desfoque e Sombra -->
+          <div class="canvas-text-toolbar__field" title="Desfoque / Blur (px) [Arraste para ajustar]">
             <i data-lucide="aperture" style="width: 14px; height: 14px;"></i>
             <input type="number" class="canvas-text-toolbar__input" id="canvas-image-blur" value="0" min="0" step="1">
-          </span>
+          </div>
 
-          <span class="canvas-text-toolbar__field" title="Sombra externa (px) [Arraste para ajustar]">
+          <div class="canvas-text-toolbar__field" title="Sombra externa (px) [Arraste para ajustar]">
             <i data-lucide="layers" style="width: 14px; height: 14px;"></i>
             <input type="number" class="canvas-text-toolbar__input" id="canvas-image-shadow" value="0" min="0" step="1">
-          </span>
-        </span>
+          </div>
+        </div>
       </div>
     </div>
 
     <!-- HUD de Recorte e Zoom da Imagem (Figma/Canva style) -->
     <div class="canvas-text-toolbar" id="canvas-crop-toolbar">
       <div class="canvas-text-toolbar__row">
-        <span class="canvas-text-toolbar__group">
-          <button class="canvas-text-toolbar__btn" id="canvas-crop-zoom-out" title="Diminuir zoom">
+        <div class="canvas-text-toolbar__stepper">
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-crop-zoom-out" title="Diminuir zoom">
             <i data-lucide="minus" style="width: 14px; height: 14px;"></i>
           </button>
-          <span class="canvas-text-toolbar__field" title="Zoom da imagem (%) [Arraste ou use o scroll para ajustar]">
+          <div class="canvas-text-toolbar__field canvas-text-toolbar__field--stepper" title="Zoom da imagem (%) [Arraste ou use o scroll para ajustar]">
             <i data-lucide="zoom-in" style="width: 14px; height: 14px;"></i>
             <input type="number" class="canvas-text-toolbar__input" id="canvas-crop-zoom-val" value="100" min="100" max="500" step="5">
-          </span>
-          <button class="canvas-text-toolbar__btn" id="canvas-crop-zoom-in" title="Aumentar zoom">
+          </div>
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-crop-zoom-in" title="Aumentar zoom">
             <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
           </button>
-        </span>
+        </div>
 
         <span class="canvas-text-toolbar__sep"></span>
 
@@ -1066,7 +1064,7 @@
 
         <span class="canvas-text-toolbar__sep"></span>
 
-        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--primary" id="canvas-crop-done" title="Concluir recorte (Enter / Esc)">
+        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--primary canvas-text-toolbar__btn--pill" id="canvas-crop-done" title="Concluir recorte (Enter / Esc)">
           <i data-lucide="check" style="width: 14px; height: 14px;"></i>
           <span>Pronto</span>
         </button>
@@ -1074,7 +1072,7 @@
     </div>
 
     <div class="canvas-text-toolbar" id="canvas-text-toolbar">
-      <!-- Linha 1: só o que se mexe o tempo todo — fonte, tamanho e cor -->
+      <!-- Linha 1: Essenciais de texto — Fonte, peso, tamanho stepper, cor, mais opções, bind e ações -->
       <div class="canvas-text-toolbar__row">
         <!-- Famílias e pesos são preenchidos pelo JS a partir de FONTS -->
         <select class="canvas-text-toolbar__select" id="canvas-text-font" title="Fonte"></select>
@@ -1082,19 +1080,25 @@
 
         <span class="canvas-text-toolbar__sep"></span>
 
-        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-text-size-down" title="Diminuir">−</button>
-        <input type="number" class="canvas-text-toolbar__input" id="canvas-text-size" value="48" min="1" max="400" title="Tamanho da fonte [Arraste para ajustar]">
-        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-text-size-up" title="Aumentar">+</button>
+        <!-- Stepper Unificado de Tamanho da Fonte -->
+        <div class="canvas-text-toolbar__stepper">
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-text-size-down" title="Diminuir">−</button>
+          <input type="number" class="canvas-text-toolbar__input" id="canvas-text-size" value="48" min="1" max="400" title="Tamanho da fonte [Arraste para ajustar]">
+          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-text-size-up" title="Aumentar">+</button>
+        </div>
 
         <span class="canvas-text-toolbar__sep"></span>
 
+        <!-- Amostra de Cor do Texto -->
         <label class="canvas-text-toolbar__color" title="Cor do texto">
           <input type="color" id="canvas-text-color" value="#000000">
         </label>
 
         <span class="canvas-text-toolbar__sep"></span>
 
-        <button class="canvas-text-toolbar__btn" id="canvas-text-more" title="Mais opções (Estilo, Negrito, Alinhamento, Espaçamento…)"><i data-lucide="sliders-horizontal" style="width: 15px; height: 15px;"></i></button>
+        <button class="canvas-text-toolbar__btn" id="canvas-text-more" title="Mais opções (Estilo, Negrito, Alinhamento, Espaçamento, Camadas…)">
+          <i data-lucide="sliders-horizontal" style="width: 15px; height: 15px;"></i>
+        </button>
 
         <span class="canvas-text-toolbar__sep"></span>
 
@@ -1106,92 +1110,92 @@
         <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--danger" id="canvas-text-del" title="Apagar texto (Delete)"><i data-lucide="trash-2" style="width: 15px; height: 15px;"></i></button>
       </div>
 
-      <!-- Segunda linha: o que se mexe com menos frequência fica escondido até pedir -->
-      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv canvas-text-toolbar__row--wrap" id="canvas-text-advanced">
-        <!-- Preset / Estilos rápidos -->
-        <select class="canvas-text-toolbar__select canvas-text-toolbar__select--preset" id="canvas-text-preset" title="Estilo rápido de texto">
-          <option value="">Estilo...</option>
-          <option value="heading">👑 Título</option>
-          <option value="subheading">📝 Subtítulo</option>
-          <option value="body">📖 Corpo</option>
-          <option value="quote">✨ Citação</option>
-          <option value="badge">🏷️ Destaque</option>
-        </select>
+      <!-- Segunda seção: Painel Avançado estruturado em 2 sub-linhas perfeitas -->
+      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv" id="canvas-text-advanced">
+        <!-- Sub-row 1: Tipografia, Formatação & Alinhamento -->
+        <div class="canvas-text-toolbar__subrow">
+          <!-- Preset / Estilos rápidos -->
+          <select class="canvas-text-toolbar__select canvas-text-toolbar__select--preset" id="canvas-text-preset" title="Estilo rápido de texto">
+            <option value="">Estilo...</option>
+            <option value="heading">👑 Título</option>
+            <option value="subheading">📝 Subtítulo</option>
+            <option value="body">📖 Corpo</option>
+            <option value="quote">✨ Citação</option>
+            <option value="badge">🏷️ Destaque</option>
+          </select>
 
-        <span class="canvas-text-toolbar__sep"></span>
+          <span class="canvas-text-toolbar__sep"></span>
 
-        <!-- Cada grupo é um bloco: a quebra de linha cai entre grupos, nunca no
-             meio de um trio de botões ou de um par de campos -->
-        <span class="canvas-text-toolbar__group">
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-bold" title="Negrito (⌘B)" style="font-weight: 800;">B</button>
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-italic" title="Itálico (⌘I)" style="font-style: italic; font-family: Georgia, serif;">I</button>
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-underline" title="Sublinhado (⌘U)" style="text-decoration: underline;">U</button>
-        </span>
+          <!-- B / I / U Segmented Control -->
+          <div class="canvas-text-toolbar__segmented" title="Estilos de texto">
+            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-bold" title="Negrito (⌘B)" style="font-weight: 700;">B</button>
+            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-italic" title="Itálico (⌘I)" style="font-style: italic; font-family: Georgia, serif;">I</button>
+            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-underline" title="Sublinhado (⌘U)" style="text-decoration: underline;">U</button>
+          </div>
 
-        <span class="canvas-text-toolbar__sep"></span>
+          <span class="canvas-text-toolbar__sep"></span>
 
-        <span class="canvas-text-toolbar__group">
-          <button class="canvas-text-toolbar__btn" id="canvas-text-align-left" title="Alinhar à esquerda"><i data-lucide="align-left" style="width: 15px; height: 15px;"></i></button>
-          <button class="canvas-text-toolbar__btn" id="canvas-text-align-center" title="Centralizar"><i data-lucide="align-center" style="width: 15px; height: 15px;"></i></button>
-          <button class="canvas-text-toolbar__btn" id="canvas-text-align-right" title="Alinhar à direita"><i data-lucide="align-right" style="width: 15px; height: 15px;"></i></button>
-        </span>
+          <!-- Alinhamento Segmented Control -->
+          <div class="canvas-text-toolbar__segmented" title="Alinhamento">
+            <button class="canvas-text-toolbar__btn" id="canvas-text-align-left" title="Alinhar à esquerda"><i data-lucide="align-left" style="width: 14px; height: 14px;"></i></button>
+            <button class="canvas-text-toolbar__btn" id="canvas-text-align-center" title="Centralizar"><i data-lucide="align-center" style="width: 14px; height: 14px;"></i></button>
+            <button class="canvas-text-toolbar__btn" id="canvas-text-align-right" title="Alinhar à direita"><i data-lucide="align-right" style="width: 14px; height: 14px;"></i></button>
+          </div>
 
-        <span class="canvas-text-toolbar__sep"></span>
+          <span class="canvas-text-toolbar__sep"></span>
 
-        <span class="canvas-text-toolbar__group">
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-none" title="Como digitado">Aa</button>
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-upper" title="MAIÚSCULAS">AA</button>
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-lower" title="minúsculas">aa</button>
-        </span>
+          <!-- Caixa / Transformação Segmented Control -->
+          <div class="canvas-text-toolbar__segmented" title="Capitalização">
+            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-none" title="Como digitado">Aa</button>
+            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-upper" title="MAIÚSCULAS">AA</button>
+            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-lower" title="minúsculas">aa</button>
+          </div>
+        </div>
 
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <span class="canvas-text-toolbar__group">
-          <span class="canvas-text-toolbar__field" title="Altura da linha (Line-height) [Arraste para ajustar]">
+        <!-- Sub-row 2: Métricas, Realce/Sombra & Ordem das Camadas -->
+        <div class="canvas-text-toolbar__subrow">
+          <!-- Métricas: Line-Height, Letter-Spacing e Opacidade -->
+          <div class="canvas-text-toolbar__field" title="Altura da linha (Line-height) [Arraste para ajustar]">
             <i data-lucide="align-vertical-justify-center" style="width: 14px; height: 14px;"></i>
             <input type="number" class="canvas-text-toolbar__input" id="canvas-text-lh" value="1.15" step="0.05" min="0.5" max="4">
-          </span>
+          </div>
 
-          <span class="canvas-text-toolbar__field" title="Espaço entre letras (Letter-spacing) [Arraste para ajustar]">
+          <div class="canvas-text-toolbar__field" title="Espaço entre letras (Letter-spacing) [Arraste para ajustar]">
             <i data-lucide="move-horizontal" style="width: 14px; height: 14px;"></i>
             <input type="number" class="canvas-text-toolbar__input" id="canvas-text-ls" value="-0.02" step="0.01" min="-0.2" max="1">
-          </span>
-        </span>
+          </div>
 
-        <span class="canvas-text-toolbar__sep"></span>
+          <div class="canvas-text-toolbar__field" title="Opacidade do texto (%) [Arraste para ajustar]">
+            <i data-lucide="droplet" style="width: 14px; height: 14px;"></i>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-text-opacity" value="100" step="5" min="0" max="100">
+          </div>
 
-        <span class="canvas-text-toolbar__field" title="Opacidade do texto (%) [Arraste para ajustar]">
-          <i data-lucide="droplet" style="width: 14px; height: 14px;"></i>
-          <input type="number" class="canvas-text-toolbar__input" id="canvas-text-opacity" value="100" step="5" min="0" max="100">
-        </span>
+          <span class="canvas-text-toolbar__sep"></span>
 
-        <span class="canvas-text-toolbar__sep"></span>
+          <!-- Fundo / Marca-texto -->
+          <div class="canvas-text-toolbar__field canvas-text-toolbar__field--highlight" title="Cor de fundo / marca-texto">
+            <i data-lucide="highlighter" style="width: 14px; height: 14px;"></i>
+            <label class="canvas-text-toolbar__color canvas-text-toolbar__color--bg" title="Cor do fundo">
+              <input type="color" id="canvas-text-bg" value="#000000">
+            </label>
+            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--sm" id="canvas-text-bg-clear" title="Remover fundo">×</button>
+          </div>
 
-        <!-- Fundo / Marca-texto -->
-        <span class="canvas-text-toolbar__field" title="Cor de fundo / marca-texto">
-          <i data-lucide="highlighter" style="width: 14px; height: 14px;"></i>
-          <label class="canvas-text-toolbar__color canvas-text-toolbar__color--bg" title="Cor do fundo">
-            <input type="color" id="canvas-text-bg" value="#000000">
-          </label>
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--sm" id="canvas-text-bg-clear" title="Remover fundo">×</button>
-        </span>
+          <!-- Sombra de contraste -->
+          <button class="canvas-text-toolbar__btn" id="canvas-text-shadow" title="Sombra de legibilidade">
+            <i data-lucide="sun" style="width: 14px; height: 14px;"></i>
+          </button>
 
-        <span class="canvas-text-toolbar__sep"></span>
+          <span class="canvas-text-toolbar__sep"></span>
 
-        <!-- Sombra de contraste -->
-        <button class="canvas-text-toolbar__btn" id="canvas-text-shadow" title="Sombra de legibilidade">
-          <i data-lucide="sun" style="width: 14px; height: 14px;"></i>
-        </button>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <!-- Ordem das Camadas / z-index -->
-        <span class="canvas-text-toolbar__group" title="Ordem das Camadas (z-index)">
-          <button class="canvas-text-toolbar__btn" id="canvas-text-send-back" title="Mandar para trás de tudo (⌘[)"><i data-lucide="arrow-down-to-line" style="width: 15px; height: 15px;"></i></button>
-          <button class="canvas-text-toolbar__btn" id="canvas-text-backward" title="Recuar uma camada ([)"><i data-lucide="arrow-down" style="width: 15px; height: 15px;"></i></button>
-          <button class="canvas-text-toolbar__btn" id="canvas-text-forward" title="Avançar uma camada (])"><i data-lucide="arrow-up" style="width: 15px; height: 15px;"></i></button>
-          <button class="canvas-text-toolbar__btn" id="canvas-text-bring-front" title="Trazer para frente de tudo (⌘])"><i data-lucide="arrow-up-to-line" style="width: 15px; height: 15px;"></i></button>
-        </span>
+          <!-- Ordem das Camadas / z-index Segmented Control -->
+          <div class="canvas-text-toolbar__segmented" title="Ordem das Camadas (z-index)">
+            <button class="canvas-text-toolbar__btn" id="canvas-text-send-back" title="Mandar para trás de tudo (⌘[)"><i data-lucide="arrow-down-to-line" style="width: 14px; height: 14px;"></i></button>
+            <button class="canvas-text-toolbar__btn" id="canvas-text-backward" title="Recuar uma camada ([)"><i data-lucide="arrow-down" style="width: 14px; height: 14px;"></i></button>
+            <button class="canvas-text-toolbar__btn" id="canvas-text-forward" title="Avançar uma camada (])"><i data-lucide="arrow-up" style="width: 14px; height: 14px;"></i></button>
+            <button class="canvas-text-toolbar__btn" id="canvas-text-bring-front" title="Trazer para frente de tudo (⌘])"><i data-lucide="arrow-up-to-line" style="width: 14px; height: 14px;"></i></button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1219,6 +1223,11 @@
        PILHA DE TOASTS (avisos curtos, canto inferior direito)
        -------------------------------------------------- -->
   <div class="oa-toast-stack" id="oa-toast-stack" role="status" aria-live="polite"></div>
+
+  <!-- --------------------------------------------------
+       MENU DE CONTEXTO FLUTUANTE (BOTÃO DIREITO NO CANVAS)
+       -------------------------------------------------- -->
+  <div id="canvas-context-menu" class="canvas-context-menu-oa" style="display: none;"></div>
 
   <script src="app.js"></script>
 </body>
