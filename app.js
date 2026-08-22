@@ -4800,7 +4800,7 @@
         badgeBinds.style.display = totalBinds > 0 ? 'inline-block' : 'none';
         badgeBinds.textContent = totalBinds;
       }
-      ['canvas-batch-btn', 'canvas-batch-photos-btn', 'canvas-batch-export-btn'].forEach(id => {
+      ['canvas-batch-btn', 'canvas-batch-photos-btn', 'canvas-batch-export-btn', 'canvas-library-btn'].forEach(id => {
         const b = document.getElementById(id);
         if (b) b.disabled = frames.length === 0;
       });
@@ -7925,6 +7925,215 @@
     // --------------------------------------------------
     // MODAL DE EXPORTAÇÃO INDIVIDUAL / CARROSSEL (CANVA STYLE)
     // --------------------------------------------------
+    /* --------------------------------------------------
+       BIBLIOTECA DE ÍCONES E STICKERS (API DO ICONIFY)
+
+       O SVG é baixado como TEXTO e reembalado num data URI nosso antes de
+       virar <img>. Carregar direto da URL do Iconify contaminaria o canvas e
+       o toDataURL/toBlob do export quebraria. Depois rasterizamos pra PNG:
+       assim o mesmo pixel vale pra tela e pra exportação, e o ícone entra
+       pelo caminho de imagem que os dois renderizadores já sabem desenhar.
+       -------------------------------------------------- */
+    const ICONIFY_API = 'https://api.iconify.design';
+    const STICKER_PREFIXES = 'twemoji,noto,fluent-emoji-flat,openmoji';
+    const RASTER_SIZE = 512;
+
+    const SUGESTOES_ICONES = [
+      'mdi:heart', 'mdi:cross', 'ph:hands-praying-fill', 'mdi:book-open-page-variant',
+      'solar:star-bold', 'ph:sun-bold', 'ph:moon-stars-fill', 'mdi:leaf',
+      'ph:quotes-fill', 'mdi:arrow-right-thin', 'ph:sparkle-fill', 'mdi:dove',
+      'ph:flower-lotus-fill', 'mdi:hand-heart', 'ph:butterfly-fill', 'mdi:candle',
+      'ph:cloud-fill', 'mdi:water', 'ph:mountains-fill', 'mdi:infinity'
+    ];
+    const SUGESTOES_STICKERS = [
+      'twemoji:folded-hands', 'twemoji:red-heart', 'noto:dove', 'twemoji:latin-cross',
+      'noto:sparkles', 'twemoji:sun-with-face', 'noto:crescent-moon', 'twemoji:herb',
+      'fluent-emoji-flat:star', 'noto:cherry-blossom', 'twemoji:butterfly', 'noto:rainbow',
+      'twemoji:candle', 'noto:open-book', 'fluent-emoji-flat:fire', 'twemoji:sunrise',
+      'noto:four-leaf-clover', 'twemoji:glowing-star', 'noto:rose', 'twemoji:rainbow'
+    ];
+
+    function iconPreviewUrl(iconId, color) {
+      const [prefix, ...rest] = iconId.split(':');
+      const base = `${ICONIFY_API}/${prefix}/${rest.join(':')}.svg?height=64`;
+      return color ? `${base}&color=${encodeURIComponent(color)}` : base;
+    }
+
+    /* SVG remoto -> data URI local -> PNG. Devolve dataUrl + dimensões reais. */
+    async function rasterizeIcon(iconId, color) {
+      const [prefix, ...rest] = iconId.split(':');
+      let url = `${ICONIFY_API}/${prefix}/${rest.join(':')}.svg?height=${RASTER_SIZE}`;
+      if (color) url += `&color=${encodeURIComponent(color)}`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Iconify respondeu ' + res.status);
+      const svgText = await res.text();
+      if (!svgText.trim().startsWith('<svg')) throw new Error('Ícone não encontrado');
+
+      const dataUri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = () => reject(new Error('SVG inválido'));
+        i.src = dataUri;
+      });
+
+      const w = img.naturalWidth || RASTER_SIZE;
+      const h = img.naturalHeight || RASTER_SIZE;
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, w, h);
+      return { dataUrl: c.toDataURL('image/png'), w, h };
+    }
+
+    function initIconLibraryController() {
+      const modal = document.getElementById('canvas-library-modal');
+      const openBtn = document.getElementById('canvas-library-btn');
+      const closeBtn = document.getElementById('canvas-library-close');
+      const cancelBtn = document.getElementById('canvas-library-cancel');
+      const searchInput = document.getElementById('canvas-library-search');
+      const colorInput = document.getElementById('canvas-library-color');
+      const colorWrap = document.getElementById('canvas-library-color-wrap');
+      const grid = document.getElementById('canvas-library-grid');
+      const hint = document.getElementById('canvas-library-hint');
+      const tabs = [...document.querySelectorAll('.canvas-lib-tab-oa')];
+
+      if (!modal || !openBtn || !grid) return;
+
+      let tab = 'icons';
+      let buscaSeq = 0;
+
+      const corAtual = () => (tab === 'icons' ? (colorInput ? colorInput.value : '#111827') : null);
+
+      function renderResultados(ids) {
+        grid.innerHTML = '';
+        if (!ids.length) {
+          grid.innerHTML = '<div class="canvas-lib-empty-oa">Nada encontrado. Tente em inglês — o acervo é indexado em inglês (ex: <strong>heart</strong>, <strong>cross</strong>, <strong>arrow</strong>).</div>';
+          return;
+        }
+        const color = corAtual();
+        ids.forEach(id => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'canvas-lib-item-oa';
+          item.title = id;
+          const img = document.createElement('img');
+          img.src = iconPreviewUrl(id, color);
+          img.alt = id;
+          img.loading = 'lazy';
+          item.appendChild(img);
+          item.addEventListener('click', () => inserirIcone(id, item));
+          grid.appendChild(item);
+        });
+      }
+
+      async function buscar(termo) {
+        const seq = ++buscaSeq;
+        const q = (termo || '').trim();
+
+        if (!q) {
+          renderResultados(tab === 'icons' ? SUGESTOES_ICONES : SUGESTOES_STICKERS);
+          if (hint) hint.textContent = 'Sugestões — digite pra buscar no acervo inteiro.';
+          return;
+        }
+
+        if (hint) hint.textContent = 'Buscando…';
+        try {
+          let url = `${ICONIFY_API}/search?query=${encodeURIComponent(q)}&limit=64`;
+          if (tab === 'stickers') url += `&prefixes=${STICKER_PREFIXES}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (seq !== buscaSeq) return; // chegou fora de ordem: descarta
+          const ids = data.icons || [];
+          renderResultados(ids);
+          if (hint) hint.textContent = ids.length ? `${ids.length} resultado${ids.length === 1 ? '' : 's'}` : '';
+        } catch (e) {
+          if (seq !== buscaSeq) return;
+          console.error('[biblioteca] busca falhou', e);
+          grid.innerHTML = '<div class="canvas-lib-empty-oa">Não consegui falar com o Iconify. Confira a conexão e tente de novo.</div>';
+          if (hint) hint.textContent = '';
+        }
+      }
+
+      async function inserirIcone(iconId, itemEl) {
+        const frame = selectedFrame() || frames[0];
+        if (!frame) {
+          alert('Selecione um frame antes de inserir.');
+          return;
+        }
+        itemEl.classList.add('is-busy');
+        try {
+          const { dataUrl, w, h } = await rasterizeIcon(iconId, corAtual());
+          // Ícone entra em ~28% da largura do frame: tamanho de adorno, não de foto
+          const alvo = Math.round(frame.w * 0.28);
+          const escala = alvo / Math.max(w, h);
+          await addImageNode(frame, dataUrl, Math.round(w * escala), Math.round(h * escala));
+          closeLibrary();
+        } catch (e) {
+          console.error('[biblioteca] falha ao inserir', iconId, e);
+          if (hint) hint.innerHTML = `<span style="color:#EF4444;">Não deu pra inserir "${iconId}". Tente outro.</span>`;
+        } finally {
+          itemEl.classList.remove('is-busy');
+        }
+      }
+
+      tabs.forEach(t => {
+        t.addEventListener('click', () => {
+          tab = t.dataset.tab;
+          tabs.forEach(o => o.classList.toggle('is-active', o === t));
+          // Sticker é colorido por natureza: recolorir descaracteriza
+          if (colorWrap) colorWrap.style.display = tab === 'icons' ? 'block' : 'none';
+          if (searchInput) searchInput.placeholder = tab === 'icons'
+            ? 'Buscar… (ex: heart, cross, arrow)'
+            : 'Buscar sticker… (ex: praying, fire, star)';
+          buscar(searchInput ? searchInput.value : '');
+        });
+      });
+
+      let debounce = null;
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          clearTimeout(debounce);
+          debounce = setTimeout(() => buscar(searchInput.value), 260);
+        });
+      }
+      if (colorInput) {
+        colorInput.addEventListener('input', () => {
+          clearTimeout(debounce);
+          debounce = setTimeout(() => buscar(searchInput ? searchInput.value : ''), 200);
+        });
+      }
+
+      function openLibrary() {
+        document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+        modal.classList.add('open');
+        buscar(searchInput ? searchInput.value : '');
+        if (searchInput) setTimeout(() => searchInput.focus(), 60);
+        if (window.lucide) lucide.createIcons();
+      }
+
+      function closeLibrary() {
+        modal.classList.remove('open');
+      }
+
+      openBtn.addEventListener('click', () => {
+        modal.classList.contains('open') ? closeLibrary() : openLibrary();
+      });
+      if (closeBtn) closeBtn.addEventListener('click', closeLibrary);
+      if (cancelBtn) cancelBtn.addEventListener('click', closeLibrary);
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeLibrary();
+      });
+      window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modal.classList.contains('open')) closeLibrary();
+      });
+
+      window.openIconLibrary = openLibrary;
+    }
+
     function initCanvaExportController() {
       const exportBtn = document.getElementById('canvas-export-btn');
       const modal = document.getElementById('canvas-export-modal');
@@ -8284,6 +8493,458 @@
       }
     }
 
+    // --------------------------------------------------
+    // CENTRAL DE PLUGINS & RECURSOS (FIGMA STYLE)
+    // --------------------------------------------------
+    function initPluginsController() {
+      const modal = document.getElementById('canvas-plugins-modal');
+      const openBtn = document.getElementById('canvas-plugins-btn');
+      const closeBtn = document.getElementById('canvas-plugins-close');
+      const tabs = document.querySelectorAll('.canvas-plugins-tab-oa');
+      const content = document.getElementById('canvas-plugins-content');
+
+      if (!modal) return;
+
+      function openPluginsModal(initialPlugin = 'icons') {
+        modal.classList.add('open');
+        selectTab(initialPlugin);
+      }
+
+      function closePluginsModal() {
+        modal.classList.remove('open');
+      }
+
+      if (openBtn) openBtn.addEventListener('click', () => openPluginsModal());
+      if (closeBtn) closeBtn.addEventListener('click', closePluginsModal);
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closePluginsModal();
+      });
+
+      // Atalho Shift + I para abrir os plugins (estilo Figma)
+      window.addEventListener('keydown', (e) => {
+        if (e.shiftKey && (e.key === 'I' || e.key === 'i')) {
+          const isTyping = document.activeElement && 
+            (document.activeElement.isContentEditable || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+          if (!isTyping) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (modal.classList.contains('open')) closePluginsModal();
+            else openPluginsModal();
+          }
+        }
+      });
+
+      function selectTab(pluginId) {
+        tabs.forEach(t => t.classList.toggle('active', t.dataset.plugin === pluginId));
+        renderPluginView(pluginId);
+      }
+
+      tabs.forEach(t => {
+        t.addEventListener('click', () => selectTab(t.dataset.plugin));
+      });
+
+      function renderPluginView(pluginId) {
+        if (!content) return;
+        content.innerHTML = '';
+
+        if (pluginId === 'icons') renderIconsPlugin(content);
+        else if (pluginId === 'photos') renderPhotosPlugin(content);
+        else if (pluginId === 'qrcode') renderQrCodePlugin(content);
+        else if (pluginId === 'palettes') renderPalettesPlugin(content);
+        else if (pluginId === 'quotes') renderQuotesPlugin(content);
+
+        if (window.lucide) lucide.createIcons();
+      }
+
+      // API do Canvas para os Plugins
+      const api = {
+        getSelectedFrame() {
+          return selectedFrame() || frames[0] || null;
+        },
+        async addImage(dataUrlOrSvg, options = {}) {
+          const frame = this.getSelectedFrame();
+          if (!frame) {
+            alert('Crie ou selecione um post no Canvas primeiro.');
+            return;
+          }
+          const w = options.w || 120;
+          const h = options.h || 120;
+          const x = options.x !== undefined ? options.x : Math.round((frame.w - w) / 2);
+          const y = options.y !== undefined ? options.y : Math.round((frame.h - h) / 2);
+          await addImageNode(frame, dataUrlOrSvg, w, h, x, y);
+          closePluginsModal();
+        },
+        addText(text, options = {}) {
+          const frame = this.getSelectedFrame();
+          if (!frame) {
+            alert('Crie ou selecione um post no Canvas primeiro.');
+            return;
+          }
+          const w = options.w || Math.min(600, Math.round(frame.w * 0.75));
+          const x = options.x !== undefined ? options.x : Math.round((frame.w - w) / 2);
+          const y = options.y !== undefined ? options.y : Math.round((frame.h - 100) / 2);
+          const child = {
+            id: childSeq++,
+            type: 'text',
+            x, y, w,
+            text,
+            size: options.size || 28,
+            weight: options.weight || 600,
+            font: options.font || 'Inter',
+            color: options.color || '#111827',
+            align: options.align || 'center',
+            lineHeight: 1.35,
+            letterSpacing: 0,
+            opacity: 100
+          };
+          if (!frame.children) frame.children = [];
+          frame.children.push(child);
+          const frameEl = frameElOf(frame);
+          if (frameEl) renderChildNode(child, frame, frameEl);
+          selectTextNode(frame.id, child.id);
+          save();
+          closePluginsModal();
+        },
+        async setFrameBackground(imgUrlOrColor) {
+          const frame = this.getSelectedFrame();
+          if (!frame) {
+            alert('Selecione um post no Canvas primeiro.');
+            return;
+          }
+          if (isImageSrcValue(imgUrlOrColor)) {
+            const id = 'asset_bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            assetCache.set(id, imgUrlOrColor);
+            await saveAsset(id, imgUrlOrColor);
+            frame.bgImage = null;
+            frame.bgAssetId = id;
+            if (frame.bgOverlay == null) frame.bgOverlay = 35;
+          } else {
+            frame.bg = imgUrlOrColor;
+            frame.bgImage = null;
+            frame.bgAssetId = null;
+          }
+          applyFrameBackground(frame);
+          save();
+          closePluginsModal();
+        }
+      };
+
+      // ------------------------------------------------
+      // PLUGIN 1: ÍCONES VETORIAIS (LUCIDE)
+      // ------------------------------------------------
+      const ICON_LIST = [
+        'heart', 'church', 'book-open', 'sun', 'moon', 'sparkles', 'cross', 'shield',
+        'flame', 'star', 'message-circle', 'bell', 'calendar', 'map-pin', 'instagram',
+        'facebook', 'youtube', 'twitter', 'send', 'share-2', 'bookmark', 'bookmark-check',
+        'arrow-right', 'arrow-left', 'arrow-up-right', 'check', 'check-circle', 'info',
+        'alert-circle', 'help-circle', 'user', 'users', 'eye', 'lock', 'play', 'music',
+        'headphones', 'quote', 'crown', 'compass', 'anchor', 'camera', 'gift', 'award',
+        'smile', 'thumbs-up', 'coffee', 'cloud', 'zap', 'feather', 'edit-3'
+      ];
+
+      let iconColor = '#8B5CF6';
+      let iconSize = 64;
+
+      function renderIconsPlugin(container) {
+        const toolbar = document.createElement('div');
+        toolbar.className = 'canvas-plugins-toolbar-oa';
+
+        const searchWrap = document.createElement('div');
+        searchWrap.className = 'canvas-plugins-search-wrap';
+        searchWrap.innerHTML = `
+          <i data-lucide="search" style="width: 14px; height: 14px;"></i>
+          <input type="text" class="canvas-plugins-search-input" id="plugin-icon-search" placeholder="Buscar ícone (ex: heart, church, sun, star, book)...">
+        `;
+        toolbar.appendChild(searchWrap);
+
+        const colorWrap = document.createElement('div');
+        colorWrap.style.display = 'flex';
+        colorWrap.style.alignItems = 'center';
+        colorWrap.style.gap = '6px';
+        colorWrap.innerHTML = `
+          <span style="font-size: 11.5px; font-weight: 500; color: #4B5563;">Cor:</span>
+          <input type="color" id="plugin-icon-color" value="${iconColor}" style="width: 28px; height: 28px; border-radius: 6px; border: 1px solid #E5E7EB; cursor: pointer;">
+        `;
+        toolbar.appendChild(colorWrap);
+
+        const sizeWrap = document.createElement('div');
+        sizeWrap.style.display = 'flex';
+        sizeWrap.style.alignItems = 'center';
+        sizeWrap.style.gap = '6px';
+        sizeWrap.innerHTML = `
+          <span style="font-size: 11.5px; font-weight: 500; color: #4B5563;">Tam:</span>
+          <select id="plugin-icon-size" class="canvas-batch-mapping-select-oa" style="padding: 4px 8px; font-size: 11.5px; width: 75px;">
+            <option value="32">32px</option>
+            <option value="48">48px</option>
+            <option value="64" selected>64px</option>
+            <option value="96">96px</option>
+            <option value="128">128px</option>
+          </select>
+        `;
+        toolbar.appendChild(sizeWrap);
+        container.appendChild(toolbar);
+
+        const grid = document.createElement('div');
+        grid.className = 'canvas-plugins-icons-grid';
+        container.appendChild(grid);
+
+        function drawIcons(filter = '') {
+          grid.innerHTML = '';
+          const q = filter.toLowerCase().trim();
+          const filtered = ICON_LIST.filter(name => !q || name.toLowerCase().includes(q));
+
+          if (filtered.length === 0) {
+            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #9CA3AF; padding: 20px; font-size: 13px;">Nenhum ícone encontrado.</div>';
+            return;
+          }
+
+          filtered.forEach(name => {
+            const item = document.createElement('div');
+            item.className = 'canvas-plugins-icon-item';
+            item.title = `Inserir ${name}`;
+            item.innerHTML = `
+              <i data-lucide="${name}" style="width: 24px; height: 24px; color: ${iconColor};"></i>
+              <span>${name}</span>
+            `;
+
+            item.addEventListener('click', async () => {
+              const svgEl = item.querySelector('svg');
+              if (!svgEl) return;
+              const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svgEl.innerHTML}</svg>`;
+              const dataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgString);
+              await api.addImage(dataUrl, { w: iconSize, h: iconSize });
+            });
+
+            grid.appendChild(item);
+          });
+          if (window.lucide) lucide.createIcons();
+        }
+
+        drawIcons();
+
+        const searchInput = toolbar.querySelector('#plugin-icon-search');
+        searchInput.addEventListener('input', (e) => drawIcons(e.target.value));
+
+        const colorInput = toolbar.querySelector('#plugin-icon-color');
+        colorInput.addEventListener('input', (e) => {
+          iconColor = e.target.value;
+          drawIcons(searchInput.value);
+        });
+
+        const sizeSelect = toolbar.querySelector('#plugin-icon-size');
+        sizeSelect.addEventListener('change', (e) => {
+          iconSize = Number(e.target.value);
+        });
+      }
+
+      // ------------------------------------------------
+      // PLUGIN 2: BANCO DE FOTOS GRATUITAS (UNSPLASH)
+      // ------------------------------------------------
+      const PHOTO_PRESETS = [
+        { title: 'Paz & Céu', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1080&q=80' },
+        { title: 'Bíblia & Luz', url: 'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?auto=format&fit=crop&w=1080&q=80' },
+        { title: 'Montanhas & Fé', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1080&q=80' },
+        { title: 'Pôr do Sol Dourado', url: 'https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?auto=format&fit=crop&w=1080&q=80' },
+        { title: 'Café & Manhã', url: 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?auto=format&fit=crop&w=1080&q=80' },
+        { title: 'Floresta & Calmaria', url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1080&q=80' },
+        { title: 'Céu Estrelado', url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1080&q=80' },
+        { title: 'Textura Minimalista', url: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=1080&q=80' },
+        { title: 'Vela & Oração', url: 'https://images.unsplash.com/photo-1543258103-a62bd9669e7b?auto=format&fit=crop&w=1080&q=80' }
+      ];
+
+      function renderPhotosPlugin(container) {
+        const toolbar = document.createElement('div');
+        toolbar.className = 'canvas-plugins-toolbar-oa';
+        toolbar.innerHTML = `
+          <div style="font-size: 12px; color: #6B7280;">Fotos em alta resolução gratuitas para seus posts.</div>
+        `;
+        container.appendChild(toolbar);
+
+        const grid = document.createElement('div');
+        grid.className = 'canvas-plugins-photos-grid';
+
+        PHOTO_PRESETS.forEach(photo => {
+          const card = document.createElement('div');
+          card.className = 'canvas-plugins-photo-card';
+          card.innerHTML = `
+            <img src="${photo.url}" alt="${photo.title}" loading="lazy">
+            <div class="canvas-plugins-photo-overlay">
+              <button type="button" class="canvas-plugins-photo-btn" data-action="insert">
+                <i data-lucide="plus" style="width: 12px; height: 12px;"></i>
+                <span>Inserir no Post</span>
+              </button>
+              <button type="button" class="canvas-plugins-photo-btn" data-action="bg" style="background: #8B5CF6; color: #FFF;">
+                <i data-lucide="image" style="width: 12px; height: 12px;"></i>
+                <span>Usar de Fundo</span>
+              </button>
+            </div>
+          `;
+
+          card.querySelector('[data-action="insert"]').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await api.addImage(photo.url, { w: 600, h: 450 });
+          });
+
+          card.querySelector('[data-action="bg"]').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await api.setFrameBackground(photo.url);
+          });
+
+          grid.appendChild(card);
+        });
+
+        container.appendChild(grid);
+      }
+
+      // ------------------------------------------------
+      // PLUGIN 3: GERADOR DE QR CODE
+      // ------------------------------------------------
+      function renderQrCodePlugin(container) {
+        const wrap = document.createElement('div');
+        wrap.className = 'canvas-plugins-qrcode-wrap';
+
+        const previewBox = document.createElement('div');
+        previewBox.className = 'canvas-plugins-qrcode-preview';
+        const canvas = document.createElement('canvas');
+        canvas.width = 160;
+        canvas.height = 160;
+        canvas.style.borderRadius = '8px';
+        previewBox.appendChild(canvas);
+
+        const form = document.createElement('div');
+        form.className = 'canvas-plugins-qrcode-form';
+        form.innerHTML = `
+          <div>
+            <label style="font-size: 12px; font-weight: 500; color: #374151; display: block; margin-bottom: 4px;">Link ou Texto:</label>
+            <input type="text" id="plugin-qr-text" class="canvas-plugins-search-input" value="https://oracaodiaria.space" placeholder="https://..." style="padding-left: 12px;">
+          </div>
+          <div style="display: flex; gap: 12px;">
+            <div style="flex: 1;">
+              <label style="font-size: 11.5px; font-weight: 500; color: #4B5563; display: block; margin-bottom: 4px;">Cor do QR:</label>
+              <input type="color" id="plugin-qr-color" value="#000000" style="width: 100%; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; cursor: pointer;">
+            </div>
+            <div style="flex: 1;">
+              <label style="font-size: 11.5px; font-weight: 500; color: #4B5563; display: block; margin-bottom: 4px;">Fundo:</label>
+              <input type="color" id="plugin-qr-bg" value="#ffffff" style="width: 100%; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; cursor: pointer;">
+            </div>
+          </div>
+          <button type="button" class="openpanel-btn-primary" id="plugin-qr-insert-btn" style="margin-top: 6px;">
+            <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+            <span>Adicionar QR Code ao Post</span>
+          </button>
+        `;
+
+        wrap.appendChild(previewBox);
+        wrap.appendChild(form);
+        container.appendChild(wrap);
+
+        function drawQr() {
+          const text = form.querySelector('#plugin-qr-text').value.trim() || 'https://oracaodiaria.space';
+          const fg = form.querySelector('#plugin-qr-color').value;
+          const bg = form.querySelector('#plugin-qr-bg').value;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}&color=${fg.replace('#', '')}&bgcolor=${bg.replace('#', '')}`;
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          };
+          img.src = qrUrl;
+        }
+
+        form.querySelector('#plugin-qr-text').addEventListener('input', drawQr);
+        form.querySelector('#plugin-qr-color').addEventListener('input', drawQr);
+        form.querySelector('#plugin-qr-bg').addEventListener('input', drawQr);
+
+        form.querySelector('#plugin-qr-insert-btn').addEventListener('click', async () => {
+          const text = form.querySelector('#plugin-qr-text').value.trim() || 'https://oracaodiaria.space';
+          const fg = form.querySelector('#plugin-qr-color').value;
+          const bg = form.querySelector('#plugin-qr-bg').value;
+          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(text)}&color=${fg.replace('#', '')}&bgcolor=${bg.replace('#', '')}`;
+          await api.addImage(qrUrl, { w: 180, h: 180 });
+        });
+
+        drawQr();
+      }
+
+      // ------------------------------------------------
+      // PLUGIN 4: PALETAS DE CORES HARMÔNICAS
+      // ------------------------------------------------
+      const PALETTES = [
+        { name: 'Oração & Céu', colors: ['#0F172A', '#1E293B', '#8B5CF6', '#F8FAFC'] },
+        { name: 'Natureza & Paz', colors: ['#064E3B', '#047857', '#F59E0B', '#F0FDF4'] },
+        { name: 'Pôr do Sol Esperança', colors: ['#4C0519', '#9F1239', '#F43F5E', '#FFF1F2'] },
+        { name: 'Minimalista Neutro', colors: ['#18181B', '#27272A', '#71717A', '#FAFAFA'] },
+        { name: 'Dourado Sagrado', colors: ['#1C1917', '#78350F', '#D97706', '#FEF3C7'] },
+        { name: 'Pastel Devocional', colors: ['#312E81', '#4F46E5', '#A5B4FC', '#EEF2FF'] }
+      ];
+
+      function renderPalettesPlugin(container) {
+        const grid = document.createElement('div');
+        grid.className = 'canvas-plugins-palettes-grid';
+
+        PALETTES.forEach(pal => {
+          const card = document.createElement('div');
+          card.className = 'canvas-plugins-palette-card';
+          card.innerHTML = `
+            <div class="canvas-plugins-palette-title">
+              <span>${pal.name}</span>
+              <span style="font-size: 11px; font-weight: 500; color: #8B5CF6;">Aplicar Fundo →</span>
+            </div>
+            <div class="canvas-plugins-swatches">
+              ${pal.colors.map(c => `<div class="canvas-plugins-swatch" style="background: ${c};" title="${c}"></div>`).join('')}
+            </div>
+          `;
+
+          card.addEventListener('click', async () => {
+            await api.setFrameBackground(pal.colors[0]);
+          });
+
+          grid.appendChild(card);
+        });
+
+        container.appendChild(grid);
+      }
+
+      // ------------------------------------------------
+      // PLUGIN 5: VERSÍCULOS & FRASES RÁPIDAS
+      // ------------------------------------------------
+      const QUOTES = [
+        { text: 'O Senhor é o meu pastor; de nada terei falta.', ref: 'Salmos 23:1' },
+        { text: 'Tudo posso naquele que me fortalece.', ref: 'Filipenses 4:13' },
+        { text: 'Porque sou eu que conheço os planos que tenho para vocês, diz o Senhor.', ref: 'Jeremias 29:11' },
+        { text: 'Aquele que habita no abrigo do Altíssimo e descansa à sombra do Todo-Poderoso.', ref: 'Salmos 91:1' },
+        { text: 'Mas os que esperam no Senhor renovam as suas forças.', ref: 'Isaías 40:31' },
+        { text: 'Confie no Senhor de todo o seu coração e não se apoie em seu próprio entendimento.', ref: 'Provérbios 3:5' }
+      ];
+
+      function renderQuotesPlugin(container) {
+        const list = document.createElement('div');
+        list.className = 'canvas-plugins-quotes-list';
+
+        QUOTES.forEach(q => {
+          const item = document.createElement('div');
+          item.className = 'canvas-plugins-quote-item';
+          item.innerHTML = `
+            <div class="canvas-plugins-quote-text">"${q.text}"</div>
+            <div class="canvas-plugins-quote-ref">${q.ref} · <span style="font-weight: 400; color: #6B7280;">Clique para inserir</span></div>
+          `;
+
+          item.addEventListener('click', () => {
+            api.addText(`"${q.text}"\n— ${q.ref}`, { size: 30, weight: 600 });
+          });
+
+          list.appendChild(item);
+        });
+
+        container.appendChild(list);
+      }
+    }
+
+    initPluginsController();
     initFrameToolbarController();
     initBatchCreateController();
     initCanvaExportController();
