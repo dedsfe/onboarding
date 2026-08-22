@@ -2865,7 +2865,7 @@
       // Calcula caixa delimitadora de todos os nós selecionados na tela
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
       selectedChildNodes.forEach(sel => {
-        const el = world.querySelector(`[data-id="${sel.childId}"]`);
+        const el = nodeElement(sel.childId);
         if (el) {
           const r = el.getBoundingClientRect();
           minX = Math.min(minX, r.left);
@@ -3599,7 +3599,7 @@
         if (!frame) return;
         const child = (frame.children || []).find(c => c.id === sel.childId);
         if (!child) return;
-        const elA = world.querySelector(`[data-id="${child.id}"]`);
+        const elA = nodeElement(child.id);
         const Ah = elA ? elA.offsetHeight : (child.h || 40);
         const Aw = child.w;
         const Ax = frame.x + child.x;
@@ -3781,7 +3781,7 @@
         const c = (f.children || []).find(ch => ch.id === n.childId);
         if (!c) return;
         origins.set(`${n.frameId}_${n.childId}`, { x: c.x, y: c.y });
-        const cEl = world.querySelector(`[data-id="${c.id}"]`);
+        const cEl = nodeElement(c.id);
         if (cEl) cEl.classList.add('is-dragging');
       });
 
@@ -3839,7 +3839,7 @@
 
           c.x = Math.round(orig.x + dx);
           c.y = Math.round(orig.y + dy);
-          const cEl = world.querySelector(`[data-id="${c.id}"]`);
+          const cEl = nodeElement(c.id);
           if (cEl) {
             cEl.style.left = `${c.x}px`;
             cEl.style.top = `${c.y}px`;
@@ -3850,7 +3850,7 @@
 
       const onUp = () => {
         nodesToMove.forEach(n => {
-          const cEl = world.querySelector(`[data-id="${n.childId}"]`);
+          const cEl = nodeElement(n.childId);
           if (cEl) cEl.classList.remove('is-dragging');
         });
         if (snapGuideV) snapGuideV.classList.remove('is-active');
@@ -6688,7 +6688,7 @@
             if (!child) return;
             child.x += dx;
             child.y += dy;
-            const cEl = world.querySelector(`[data-id="${child.id}"]`);
+            const cEl = nodeElement(child.id);
             if (cEl) {
               cEl.style.left = `${child.x}px`;
               cEl.style.top = `${child.y}px`;
