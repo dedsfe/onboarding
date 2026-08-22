@@ -4691,6 +4691,10 @@
         badgeBinds.style.display = totalBinds > 0 ? 'inline-block' : 'none';
         badgeBinds.textContent = totalBinds;
       }
+      ['canvas-batch-btn', 'canvas-batch-photos-btn', 'canvas-batch-export-btn'].forEach(id => {
+        const b = document.getElementById(id);
+        if (b) b.disabled = frames.length === 0;
+      });
 
       if (!topLabel) return;
 
@@ -6359,7 +6363,10 @@
       return { headers, rows: dataRows };
     }
 
-    function parseTSVOrCSV(text) {
+    /* `assumeHeader`: true força a primeira linha como cabeçalho (arquivo .csv
+       sempre tem uma), 'auto' deduz pelos binds (colagem do Sheets pode vir só
+       com as células de dados selecionadas). */
+    function parseTSVOrCSV(text, assumeHeader = 'auto') {
       if (!text || typeof text !== 'string') return { headers: [], rows: [], hasRealHeaders: false };
       const clean = text.trim();
       if (!clean) return { headers: [], rows: [], hasRealHeaders: false };
@@ -6416,10 +6423,10 @@
       const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       const bindsNorm = binds.map(b => norm(b.name));
 
-      const firstRowMatchesBind = firstRow.some(cell => {
+      const firstRowMatchesBind = assumeHeader === true || (assumeHeader !== false && firstRow.some(cell => {
         const c = norm(cell);
         return c && bindsNorm.some(b => b === c || b.includes(c) || c.includes(b));
-      });
+      }));
 
       let headers = [];
       let dataRows = [];
@@ -6460,8 +6467,26 @@
       const gridWrap = document.getElementById('canvas-batch-gridwrap');
       const grid = document.getElementById('canvas-batch-grid');
       const hint = document.getElementById('canvas-batch-hint');
+      const footInfo = document.getElementById('canvas-batch-foot-info');
       const startBtn = document.getElementById('canvas-batch-start-btn');
       const startLabel = document.getElementById('canvas-batch-start-label');
+
+      // Modal 2: fotos do lote
+      const photosModal = document.getElementById('canvas-batch-photos-modal');
+      const photosBtn = document.getElementById('canvas-batch-photos-btn');
+      const photosWrap = document.getElementById('canvas-batch-photos-wrap');
+      const photosInfo = document.getElementById('canvas-batch-photos-info');
+      const photosCloseBtn = document.getElementById('canvas-batch-photos-close');
+      const photosBackBtn = document.getElementById('canvas-batch-photos-back');
+      const gotoPhotosBtn = document.getElementById('canvas-batch-goto-photos');
+
+      // Modal 3: exportação do lote
+      const exportModal = document.getElementById('canvas-batch-export-modal');
+      const exportOpenBtn = document.getElementById('canvas-batch-export-btn');
+      const exportCloseBtn = document.getElementById('canvas-batch-export-close');
+      const exportBackBtn = document.getElementById('canvas-batch-export-back');
+      const gotoExportBtn = document.getElementById('canvas-batch-goto-export');
+      const summaryBox = document.getElementById('canvas-batch-summary');
 
       if (!modal || !openBtn) return;
 
@@ -6521,9 +6546,9 @@
         return headers.find(h => norm(h).includes(normBind) || normBind.includes(norm(h))) || '';
       }
 
-      function handleTableText(text, sourceName = 'Tabela') {
+      function handleTableText(text, sourceName = 'Tabela', assumeHeader = 'auto') {
         if (!text || typeof text !== 'string') return false;
-        const parsed = parseTSVOrCSV(text);
+        const parsed = parseTSVOrCSV(text, assumeHeader);
         if (!parsed.headers.length || !parsed.rows.length) {
           if (hint) hint.innerHTML = `<span style="color: #EF4444;">Formato de tabela vazio ou não reconhecido.</span>`;
           return false;
@@ -6644,6 +6669,7 @@
             }
           }
           renderBatchGrid();
+          if (photosModal && photosModal.classList.contains('open')) renderPhotosGrid();
           updateBatchFooter();
         });
       }
@@ -6651,7 +6677,8 @@
       function handleCSVFile(file) {
         const reader = new FileReader();
         reader.onload = (e) => {
-          handleTableText(e.target.result, file.name);
+          // Arquivo .csv sempre tem linha de cabeçalho — não é hora de adivinhar.
+          handleTableText(e.target.result, file.name, true);
         };
         reader.readAsText(file, 'UTF-8');
       }
@@ -7258,26 +7285,394 @@
         }
         startBtn.disabled = false;
         setTimeout(() => {
-          closeBatchModal();
+          closeBatchExportModal();
           if (progressBox) progressBox.style.display = 'none';
         }, falhas ? 3500 : 1200);
+      }
+
+      /* ----------------------------------------------------
+         GERAÇÃO DO LOTE DIRETO NO INFINITE CANVAS
+         Multiplica os frames na tela, injeta os dados e ajusta o zoom
+         ---------------------------------------------------- */
+      function zoomToFitFrames(targetFrames) {
+        if (!targetFrames || targetFrames.length === 0) return;
+        const padX = 100;
+        const padTop = 130;
+        const padBottom = 160;
+        const availW = innerWidth - padX * 2;
+        const availH = innerHeight - padTop - padBottom;
+
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        targetFrames.forEach(f => {
+          minX = Math.min(minX, f.x);
+          minY = Math.min(minY, f.y);
+          maxX = Math.max(maxX, f.x + f.w);
+          maxY = Math.max(maxY, f.y + f.h);
+        });
+
+        const totalW = maxX - minX;
+        const totalH = maxY - minY;
+
+        const scale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Math.min(availW / totalW, availH / totalH)));
+        cam.scale = scale;
+        cam.x = padX + (availW - totalW * scale) / 2 - minX * scale;
+        cam.y = padTop + (availH - totalH * scale) / 2 - minY * scale;
+        applyCamera();
+      }
+
+      function generateBatchOnCanvas() {
+        const records = (batchData.records || []).filter(rec => {
+          return Object.keys(rec).some(k => !k.startsWith('__') && rec[k] && String(rec[k]).trim() !== '');
+        });
+
+        if (records.length === 0) {
+          alert('Preencha ou cole pelo menos uma linha de dados na tabela.');
+          return;
+        }
+
+        const anchor = selectedFrame() || frames[0];
+        if (!anchor) {
+          alert('Nenhum template encontrado no Canvas. Crie pelo menos um post antes de gerar.');
+          return;
+        }
+
+        const byId = new Map(frames.map(f => [f.id, f]));
+        const chain = (computePosts().find(c => c.includes(anchor.id)) || [anchor.id])
+          .map(id => byId.get(id))
+          .filter(Boolean);
+
+        const isCarousel = chain.length > 1;
+
+        let maxX = -Infinity, maxY = -Infinity, minX = Infinity;
+        frames.forEach(f => {
+          maxX = Math.max(maxX, f.x + f.w);
+          maxY = Math.max(maxY, f.y + f.h);
+          minX = Math.min(minX, f.x);
+        });
+
+        const chainHeight = Math.max(...chain.map(f => f.h));
+        const isHorizontalFlow = !isCarousel && records.length <= 6;
+        const maxPerRow = isCarousel ? 1 : 4;
+
+        const newCreatedFrames = [];
+
+        records.forEach((row, rowIndex) => {
+          const postNum = rowIndex + 1;
+          let postStartX, postStartY;
+
+          if (isCarousel) {
+            postStartX = minX;
+            postStartY = maxY + 240 + rowIndex * (chainHeight + 240);
+          } else if (isHorizontalFlow) {
+            postStartX = maxX + 180 + rowIndex * (anchor.w + FRAME_GAP);
+            postStartY = anchor.y;
+          } else {
+            const col = rowIndex % maxPerRow;
+            const rowNum = Math.floor(rowIndex / maxPerRow);
+            postStartX = minX + col * (anchor.w + FRAME_GAP);
+            postStartY = maxY + 220 + rowNum * (anchor.h + 220);
+          }
+
+          const clonedSlideIds = [];
+          let curX = postStartX;
+
+          chain.forEach((srcSlide, slideIdx) => {
+            const clonedFrame = {
+              ...JSON.parse(JSON.stringify(srcSlide)),
+              id: frameSeq++,
+              name: isCarousel ? `Post ${postNum} · Slide ${slideIdx + 1}` : `Post ${postNum}`,
+              x: curX,
+              y: postStartY,
+              children: (srcSlide.children || []).map(child => {
+                const ch = { ...JSON.parse(JSON.stringify(child)), id: childSeq++ };
+                if (ch.type === 'text' && ch.bind && row[ch.bind] !== undefined && row[ch.bind] !== '') {
+                  ch.text = String(row[ch.bind]);
+                  delete ch.html;
+                }
+                if (ch.type === 'image') {
+                  ensureImageProps(ch);
+                  if (ch.bind && row[ch.bind]) {
+                    ch.src = String(row[ch.bind]);
+                  } else if (ch.assetId && assetCache.has(ch.assetId)) {
+                    ch.src = assetCache.get(ch.assetId);
+                  }
+                }
+                return ch;
+              })
+            };
+
+            frames.push(clonedFrame);
+            renderFrame(clonedFrame);
+            newCreatedFrames.push(clonedFrame);
+            clonedSlideIds.push(clonedFrame.id);
+
+            curX += srcSlide.w + FRAME_GAP;
+          });
+
+          if (clonedSlideIds.length > 1) {
+            for (let s = 0; s < clonedSlideIds.length - 1; s++) {
+              links.push({
+                id: linkSeq++,
+                from: clonedSlideIds[s],
+                to: clonedSlideIds[s + 1]
+              });
+            }
+          }
+        });
+
+        renderLinks();
+        updateFrameMeta();
+        wakeRopes();
+
+        if (newCreatedFrames.length > 0) {
+          selectedFrameIds = new Set([newCreatedFrames[0].id]);
+          selectedId = newCreatedFrames[0].id;
+          world.querySelectorAll('.canvas-frame').forEach((el) => {
+            const fId = Number(el.dataset.id);
+            el.classList.toggle('is-selected', selectedFrameIds.has(fId));
+          });
+          updateTopbar();
+        }
+
+        zoomToFitFrames([...frames]);
+        save();
+        closeBatchModal();
+
+        const topbarLabel = document.getElementById('canvas-topbar-label');
+        if (topbarLabel) {
+          topbarLabel.textContent = `✓ ${records.length} ${records.length === 1 ? 'post gerado' : 'posts gerados'} no Canvas!`;
+          setTimeout(() => { updateTopbar(); }, 3500);
+        }
+      }
+
+      const btnGenCanvas = document.getElementById('canvas-batch-generate-canvas-btn');
+      const labelGenCanvas = document.getElementById('canvas-batch-generate-canvas-label');
+      if (btnGenCanvas) {
+        btnGenCanvas.addEventListener('click', generateBatchOnCanvas);
       }
 
       function updateBatchFooter() {
         const total = batchData.records.length;
         const binds = getCanvasBinds();
-        if (total > 0 && binds.length > 0) {
-          if (startBtn) {
-            startBtn.disabled = false;
-            if (startLabel) startLabel.textContent = `Gerar ${total} ${total === 1 ? 'Post' : 'Posts'}`;
-          }
-        } else {
-          if (startBtn) {
-            startBtn.disabled = true;
-            if (startLabel) startLabel.textContent = 'Gerar Posts';
+        const ok = total > 0 && binds.length > 0;
+        if (startBtn) {
+          startBtn.disabled = !ok;
+          if (startLabel) startLabel.textContent = ok ? `Baixar .ZIP (${total})` : 'Baixar .ZIP';
+        }
+        if (btnGenCanvas) {
+          btnGenCanvas.disabled = !ok;
+          if (labelGenCanvas) {
+            labelGenCanvas.textContent = ok
+              ? `Criar ${total} ${total === 1 ? 'Post' : 'Posts'} no Canvas`
+              : 'Gerar Posts no Canvas';
           }
         }
+        if (footInfo) {
+          footInfo.textContent = total > 0
+            ? `${total} ${total === 1 ? 'post' : 'posts'} na tabela`
+            : '';
+        }
       }
+
+      // ----------------------------------------------------
+      // MODAL 2: FOTOS DO LOTE
+      // ----------------------------------------------------
+      function renderPhotosGrid() {
+        if (!photosWrap) return;
+        const imageBinds = getCanvasBinds().filter(b => b.type === 'image');
+        photosWrap.innerHTML = '';
+
+        if (imageBinds.length === 0) {
+          photosWrap.innerHTML = `<div class="canvas-batch-empty-oa">Nenhuma variável de imagem no post. Marque uma foto com o botão <code>{}</code> no canvas.</div>`;
+          if (photosInfo) photosInfo.textContent = '';
+          return;
+        }
+        if (batchData.records.length === 0) {
+          photosWrap.innerHTML = `<div class="canvas-batch-empty-oa">Nenhuma linha ainda. Abra <strong>Dados do Lote</strong> e crie os posts primeiro.</div>`;
+          if (photosInfo) photosInfo.textContent = '';
+          return;
+        }
+
+        let preenchidas = 0;
+        const totalSlots = imageBinds.length * batchData.records.length;
+
+        imageBinds.forEach(bind => {
+          const group = document.createElement('div');
+          group.className = 'canvas-batch-photos-group-oa';
+
+          const head = document.createElement('div');
+          head.className = 'canvas-batch-photos-grouphead-oa';
+          const title = document.createElement('div');
+          title.className = 'canvas-batch-title-oa';
+          title.style.marginBottom = '0';
+          title.innerHTML = `<span style="color:#7C3AED;">🖼️</span> {{${bind.name}}}`;
+          head.appendChild(title);
+
+          const fillBtn = document.createElement('button');
+          fillBtn.type = 'button';
+          fillBtn.className = 'canvas-batch-mini-btn-oa';
+          fillBtn.innerHTML = '<i data-lucide="images" style="width:13px;height:13px;"></i><span>Preencher em ordem</span>';
+          fillBtn.addEventListener('click', () => {
+            pendingImageTarget = { column: bind.name };
+            imagesInput.click();
+          });
+          head.appendChild(fillBtn);
+          group.appendChild(head);
+
+          const gridEl = document.createElement('div');
+          gridEl.className = 'canvas-batch-photos-grid-oa';
+
+          batchData.records.forEach((rec, rowIndex) => {
+            const value = rec[bind.name];
+            const pending = rec['__hint_' + bind.name];
+            if (isImageSrcValue(value)) preenchidas++;
+
+            const card = document.createElement('div');
+            card.className = 'canvas-batch-photocard-oa';
+            card.title = 'Clique para escolher · ou arraste a foto aqui';
+
+            if (isImageSrcValue(value)) {
+              const img = document.createElement('img');
+              img.className = 'canvas-batch-photocard-thumb-oa';
+              img.src = value;
+              card.appendChild(img);
+            } else {
+              const empty = document.createElement('div');
+              empty.className = 'canvas-batch-photocard-empty-oa';
+              empty.innerHTML = `<i data-lucide="image-plus" style="width:18px;height:18px;"></i><span>${pending ? pending : 'sem foto'}</span>`;
+              card.appendChild(empty);
+            }
+
+            const cap = document.createElement('div');
+            cap.className = 'canvas-batch-photocard-cap-oa';
+            const capLabel = document.createElement('span');
+            capLabel.textContent = `Post ${rowIndex + 1}`;
+            cap.appendChild(capLabel);
+            if (isImageSrcValue(value)) {
+              const clear = document.createElement('button');
+              clear.type = 'button';
+              clear.className = 'canvas-batch-rowdel-oa';
+              clear.title = 'Remover esta foto';
+              clear.innerHTML = '<i data-lucide="x" style="width:12px;height:12px;"></i>';
+              clear.addEventListener('click', (e) => {
+                e.stopPropagation();
+                rec[bind.name] = '';
+                renderPhotosGrid();
+                renderBatchGrid();
+              });
+              cap.appendChild(clear);
+            }
+            card.appendChild(cap);
+
+            card.addEventListener('click', () => {
+              pendingImageTarget = { rowIndex, bindName: bind.name, from: 'photos' };
+              imagesInput.click();
+            });
+            card.addEventListener('dragover', (e) => {
+              if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
+              e.preventDefault();
+              card.classList.add('is-dragover');
+            });
+            card.addEventListener('dragleave', () => card.classList.remove('is-dragover'));
+            card.addEventListener('drop', async (e) => {
+              const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+              card.classList.remove('is-dragover');
+              if (!file || !file.type.startsWith('image/')) return;
+              e.preventDefault();
+              e.stopPropagation();
+              const url = await readFileAsDataURL(file);
+              if (!url) return;
+              rec[bind.name] = url;
+              delete rec['__hint_' + bind.name];
+              renderPhotosGrid();
+              renderBatchGrid();
+            });
+
+            gridEl.appendChild(card);
+          });
+
+          group.appendChild(gridEl);
+          photosWrap.appendChild(group);
+        });
+
+        if (photosInfo) {
+          photosInfo.textContent = preenchidas === totalSlots
+            ? `${totalSlots} de ${totalSlots} fotos prontas`
+            : `${preenchidas} de ${totalSlots} fotos escolhidas`;
+        }
+        if (window.lucide) lucide.createIcons();
+      }
+
+      function openPhotosModal() {
+        if (!photosModal) return;
+        document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+        photosModal.classList.add('open');
+        renderPhotosGrid();
+        if (window.lucide) lucide.createIcons();
+      }
+
+      function closePhotosModal() {
+        if (photosModal) photosModal.classList.remove('open');
+      }
+
+      // ----------------------------------------------------
+      // MODAL 3: EXPORTAR LOTE
+      // ----------------------------------------------------
+      function updateBatchSummary() {
+        if (!summaryBox) return;
+        const total = batchData.records.length;
+        const anchor = selectedFrame() || frames[0];
+        let slides = 1;
+        if (anchor) {
+          const chain = computePosts().find(c => c.includes(anchor.id)) || [anchor.id];
+          slides = chain.length;
+        }
+        const imageBinds = getCanvasBinds().filter(b => b.type === 'image');
+        const semFoto = batchData.records.reduce((acc, rec) =>
+          acc + imageBinds.filter(b => !isImageSrcValue(rec[b.name])).length, 0);
+
+        if (total === 0) {
+          summaryBox.innerHTML = `Nenhuma linha na tabela. Abra <strong>Dados do Lote</strong> primeiro.`;
+          return;
+        }
+        summaryBox.innerHTML =
+          `<strong>${total}</strong> ${total === 1 ? 'post' : 'posts'} × <strong>${slides}</strong> ${slides === 1 ? 'slide' : 'slides'} = <strong>${total * slides}</strong> ${total * slides === 1 ? 'imagem' : 'imagens'}` +
+          (semFoto ? `<br><span class="is-warn">⚠ ${semFoto} ${semFoto === 1 ? 'foto não escolhida usará' : 'fotos não escolhidas usarão'} a imagem original do template.</span>` : '');
+      }
+
+      function openBatchExportModal() {
+        if (!exportModal) return;
+        document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+        exportModal.classList.add('open');
+        updateBatchSummary();
+        updateBatchFooter();
+        if (progressBox) progressBox.style.display = 'none';
+        if (window.lucide) lucide.createIcons();
+      }
+
+      function closeBatchExportModal() {
+        if (exportModal) exportModal.classList.remove('open');
+      }
+
+      // Navegação entre os três modais
+      if (photosBtn) photosBtn.addEventListener('click', () => {
+        photosModal && photosModal.classList.contains('open') ? closePhotosModal() : openPhotosModal();
+      });
+      if (exportOpenBtn) exportOpenBtn.addEventListener('click', () => {
+        exportModal && exportModal.classList.contains('open') ? closeBatchExportModal() : openBatchExportModal();
+      });
+      if (gotoPhotosBtn) gotoPhotosBtn.addEventListener('click', openPhotosModal);
+      if (photosBackBtn) photosBackBtn.addEventListener('click', openBatchModal);
+      if (gotoExportBtn) gotoExportBtn.addEventListener('click', openBatchExportModal);
+      if (exportBackBtn) exportBackBtn.addEventListener('click', openPhotosModal);
+      if (photosCloseBtn) photosCloseBtn.addEventListener('click', closePhotosModal);
+      if (exportCloseBtn) exportCloseBtn.addEventListener('click', closeBatchExportModal);
+      if (photosModal) photosModal.addEventListener('click', (e) => {
+        if (e.target === photosModal) closePhotosModal();
+      });
+      if (exportModal) exportModal.addEventListener('click', (e) => {
+        if (e.target === exportModal) closeBatchExportModal();
+      });
 
       function openBatchModal() {
         document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
@@ -7292,13 +7687,17 @@
       }
 
       window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modal.classList.contains('open')) {
-          closeBatchModal();
-        }
+        if (e.key !== 'Escape') return;
+        if (modal.classList.contains('open')) closeBatchModal();
+        else if (photosModal && photosModal.classList.contains('open')) closePhotosModal();
+        else if (exportModal && exportModal.classList.contains('open')) closeBatchExportModal();
       });
 
       window.closeBatchModal = closeBatchModal;
       window.openBatchModal = openBatchModal;
+      window.openBatchPhotosModal = openPhotosModal;
+      window.openBatchExportModal = openBatchExportModal;
+      window.renderBatchPhotosGrid = renderPhotosGrid;
       window.exportFrameToBlob = exportFrameToBlob;
       window.renderFrameToCanvas = renderFrameToCanvas;
     }
