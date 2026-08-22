@@ -9317,6 +9317,7 @@
           <!-- Filtro de Categorias -->
           <div class="canvas-font-chips-oa">
             <button type="button" class="canvas-font-chip-oa ${fontCategoryFilter === 'all' ? 'is-active' : ''}" data-cat="all">Todas</button>
+            <button type="button" class="canvas-font-chip-oa ${fontCategoryFilter === 'custom' ? 'is-active' : ''}" data-cat="custom">⭐ Minhas Fontes</button>
             <button type="button" class="canvas-font-chip-oa ${fontCategoryFilter === 'sans-serif' ? 'is-active' : ''}" data-cat="sans-serif">Sans-Serif</button>
             <button type="button" class="canvas-font-chip-oa ${fontCategoryFilter === 'serif' ? 'is-active' : ''}" data-cat="serif">Serif</button>
             <button type="button" class="canvas-font-chip-oa ${fontCategoryFilter === 'display' ? 'is-active' : ''}" data-cat="display">Display</button>
@@ -9419,26 +9420,58 @@
         setupFontPreviewObserver(listEl);
 
         const q = (searchInput ? searchInput.value : '').toLowerCase().trim();
-        let results = fontCatalog;
+        let results = [];
 
-        if (fontCategoryFilter !== 'all') {
-          results = results.filter(f => f.category === fontCategoryFilter);
+        if (fontCategoryFilter === 'custom') {
+          // Apenas fontes customizadas importadas pelo usuário
+          const customList = FONTS.filter(fo => fo.custom).map(fo => ({
+            id: fo.assetId || fo.name.toLowerCase().replace(/\s+/g, '-'),
+            family: fo.name,
+            category: 'Minhas Fontes',
+            custom: true,
+            assetId: fo.assetId,
+            weights: fo.weights || [400, 700]
+          }));
+          results = customList;
+        } else if (fontCategoryFilter !== 'all') {
+          results = fontCatalog.filter(f => f.category === fontCategoryFilter);
+        } else {
+          // Em 'Todas', exibimos customizadas primeiro
+          const customList = FONTS.filter(fo => fo.custom).map(fo => ({
+            id: fo.assetId || fo.name.toLowerCase().replace(/\s+/g, '-'),
+            family: fo.name,
+            category: 'Minhas Fontes',
+            custom: true,
+            assetId: fo.assetId,
+            weights: fo.weights || [400, 700]
+          }));
+          results = [...customList, ...fontCatalog];
         }
 
         if (q) {
-          results = results.filter(f => f.family.toLowerCase().includes(q) || f.id.toLowerCase().includes(q));
+          results = results.filter(f => f.family.toLowerCase().includes(q) || (f.id && f.id.toLowerCase().includes(q)));
+        }
+
+        if (results.length === 0) {
+          if (fontCategoryFilter === 'custom') {
+            listEl.innerHTML = `
+              <div class="canvas-lib-empty-oa" style="padding: 32px 16px;">
+                <div style="font-size: 14px; font-weight: 500; margin-bottom: 6px; color: #FFFFFF;">Você ainda não importou nenhuma fonte.</div>
+                <div style="font-size: 12px; color: rgba(255, 255, 255, 0.5);">Arraste um arquivo <strong>.zip</strong>, <strong>.ttf</strong> ou <strong>.otf</strong> na área acima para importar suas fontes favoritas!</div>
+              </div>
+            `;
+          } else {
+            listEl.innerHTML = '<div class="canvas-lib-empty-oa">Nenhuma família encontrada com este filtro.</div>';
+          }
+          if (hint) hint.textContent = '0 fontes encontradas';
+          return;
         }
 
         // Limita a 50 itens para máxima performance
         const displayList = results.slice(0, 50);
 
-        if (displayList.length === 0) {
-          listEl.innerHTML = '<div class="canvas-lib-empty-oa">Nenhuma família encontrada com este filtro.</div>';
-          return;
-        }
-
         displayList.forEach(f => {
-          const isInstalled = FONTS.some(fo => fo.name.toLowerCase() === f.family.toLowerCase());
+          const isInstalled = f.custom || FONTS.some(fo => fo.name.toLowerCase() === f.family.toLowerCase());
           const card = document.createElement('div');
           card.className = 'canvas-font-card-oa';
           const weight = (f.weights && f.weights.includes(400)) ? '400' : (f.weights ? String(f.weights[0]) : '400');
@@ -9452,28 +9485,39 @@
             <div class="canvas-font-info-oa">
               <div class="canvas-font-header-row-oa">
                 <span class="canvas-font-title-oa">${f.family}</span>
-                <span class="canvas-font-badge-oa">${f.category || 'font'}</span>
+                <span class="canvas-font-badge-oa">${f.custom ? '⭐ Minhas Fontes' : (f.category || 'font')}</span>
               </div>
               <div class="canvas-font-preview-text-oa" style="font-family: '${f.family}', sans-serif;">
                 O amor é paciente e bondoso.
               </div>
             </div>
             <button type="button" class="canvas-font-action-btn-oa ${isInstalled ? 'is-installed' : ''}" data-id="${f.id}">
-              ${isInstalled ? '✓ Instalada' : '+ Adicionar'}
+              ${isInstalled ? '✓ Usar' : '+ Adicionar'}
             </button>
           `;
 
           const btn = card.querySelector('.canvas-font-action-btn-oa');
-          if (btn && !isInstalled) {
-            btn.addEventListener('click', () => installFontsourceFont(f, btn));
+          if (btn) {
+            btn.addEventListener('click', () => {
+              if (f.custom || isInstalled) {
+                if (typeof applyTextToolbarAction === 'function') {
+                  applyTextToolbarAction(c => {
+                    c.fontFamily = `"${f.family}", sans-serif`;
+                  });
+                }
+                toast.success(`Fonte "${f.family}" selecionada!`);
+              } else {
+                installFontsourceFont(f, btn);
+              }
+            });
           }
 
           listEl.appendChild(card);
-          if (fontPreviewObserver) fontPreviewObserver.observe(card);
+          if (!f.custom && fontPreviewObserver) fontPreviewObserver.observe(card);
         });
 
         if (hint) {
-          hint.textContent = `${results.length} fontes encontradas${results.length > 50 ? ' (mostrando 50 primeiras)' : ''}`;
+          hint.textContent = `${results.length} fonte${results.length === 1 ? '' : 's'} encontrada${results.length === 1 ? '' : 's'}${results.length > 50 ? ' (mostrando 50 primeiras)' : ''}`;
         }
       }
 
