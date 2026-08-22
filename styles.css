@@ -1518,6 +1518,43 @@ body {
   white-space: nowrap;
 }
 
+/* Indicador de salvamento: espelha o save() que o canvas já faz.
+   Texto secundário de propósito — não pode disputar atenção com os botões. */
+.canvas-topbar__save {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-right: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  transition: color var(--transition);
+}
+
+/* Antes do primeiro salvamento não há o que dizer */
+.canvas-topbar__save:empty {
+  display: none;
+}
+
+.canvas-topbar__save.is-error {
+  color: #FCA5A5;
+}
+
+.canvas-topbar__save-spin {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  border-top-color: rgba(255, 255, 255, 0.65);
+  animation: canvas-save-spin 620ms linear infinite;
+}
+
+@keyframes canvas-save-spin {
+  to { transform: rotate(360deg); }
+}
+
 /* Menu de formatos: cai do botão "+", ancorado à esquerda do pill */
 .canvas-formats {
   position: absolute;
@@ -3780,3 +3817,90 @@ body {
 }
 
 
+
+/* ------------------------------------------------------------
+   TOASTS — avisos curtos no canto inferior direito
+   Mesmo vidro escuro da dock e da barra do editor: o aviso pertence
+   às ferramentas, não à página. No máximo 3 empilhados.
+   ------------------------------------------------------------ */
+.oa-toast-stack {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: none;
+  /* Acima dos modais: exportar e lote avisam de dentro deles */
+  z-index: calc(var(--z-modal) + 10);
+}
+
+.oa-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  max-width: 340px;
+  padding: 10px 14px 10px 12px;
+  background: #18181B;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.42),
+              0 2px 6px rgba(0, 0, 0, 0.15),
+              inset 0 1px 1px 0 rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+  cursor: default;
+  opacity: 0;
+  transform: translateY(8px) scale(0.98);
+  transition: opacity 220ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.oa-toast.is-in {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.oa-toast.is-leaving {
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+}
+
+.oa-toast__icon {
+  display: flex;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.oa-toast__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Cor só no ícone: o aviso informa, não grita */
+.oa-toast--success .oa-toast__icon { color: #34D399; }
+.oa-toast--error   .oa-toast__icon { color: #F87171; }
+.oa-toast--info    .oa-toast__icon { color: #93B4FF; }
+
+.oa-toast__msg {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oa-toast {
+    transition-duration: 1ms;
+    transform: none;
+  }
+  .oa-toast.is-in,
+  .oa-toast.is-leaving {
+    transform: none;
+  }
+  .canvas-topbar__save-spin {
+    animation-duration: 2s;
+  }
+}

@@ -33,6 +33,87 @@
     } catch (e) { /* localStorage bloqueado: o app segue, só não lembra */ }
   }
 
+  /* --------------------------------------------------
+     0. Toasts — avisos curtos no canto inferior direito
+     O alert() do navegador congela a página inteira e obriga um clique
+     para seguir; num editor isso quebra o fluxo. Aqui o aviso aparece,
+     conta o tempo dele e sai sozinho.
+     Uso: toast.success('Copiado') · toast.error('...') · toast.info('...')
+     -------------------------------------------------- */
+  const TOAST_MAX = 3;
+  // Erro fica mais tempo porque quase sempre pede uma ação do usuário
+  const TOAST_MS = { success: 3000, info: 3000, error: 5000 };
+  const TOAST_EXIT_MS = 220; // igual à transição de saída em .oa-toast
+
+  const TOAST_ICONS = {
+    success: '<circle cx="12" cy="12" r="9"/><path d="m8.4 12.3 2.4 2.4 4.8-5"/>',
+    error: '<circle cx="12" cy="12" r="9"/><path d="M12 7.4v5.2"/><path d="M12 16.3h.01"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11.2v5"/><path d="M12 7.8h.01"/>'
+  };
+
+  function toastIconSvg(kind) {
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      (TOAST_ICONS[kind] || TOAST_ICONS.info) + '</svg>';
+  }
+
+  function toastStack() {
+    let stack = document.getElementById('oa-toast-stack');
+    if (!stack) {
+      // Fallback: se o container do HTML sumir, o aviso ainda tem onde nascer
+      stack = document.createElement('div');
+      stack.id = 'oa-toast-stack';
+      stack.className = 'oa-toast-stack';
+      stack.setAttribute('role', 'status');
+      stack.setAttribute('aria-live', 'polite');
+      document.body.appendChild(stack);
+    }
+    return stack;
+  }
+
+  function dismissToast(el) {
+    if (!el || el.dataset.leaving === '1') return;
+    el.dataset.leaving = '1';
+    clearTimeout(Number(el.dataset.timer));
+    el.classList.remove('is-in');
+    el.classList.add('is-leaving');
+    setTimeout(() => el.remove(), TOAST_EXIT_MS);
+  }
+
+  function showToast(kind, message) {
+    const msg = message == null ? '' : String(message).trim();
+    if (!msg) return null;
+
+    const stack = toastStack();
+
+    /* Teto de 3 na tela: o mais antigo sai para o novo entrar */
+    const alive = Array.from(stack.children).filter(el => el.dataset.leaving !== '1');
+    while (alive.length >= TOAST_MAX) dismissToast(alive.shift());
+
+    const el = document.createElement('div');
+    el.className = 'oa-toast oa-toast--' + kind;
+    el.innerHTML = '<span class="oa-toast__icon">' + toastIconSvg(kind) + '</span>' +
+                   '<span class="oa-toast__msg"></span>';
+    /* textContent e não innerHTML: a mensagem pode vir de err.message ou de
+       um nome de arquivo escolhido pelo usuário */
+    el.querySelector('.oa-toast__msg').textContent = msg;
+    el.addEventListener('click', () => dismissToast(el));
+    stack.appendChild(el);
+
+    // Um frame antes de animar, senão o browser junta os dois estados
+    requestAnimationFrame(() => el.classList.add('is-in'));
+
+    el.dataset.timer = String(setTimeout(() => dismissToast(el), TOAST_MS[kind] || TOAST_MS.info));
+    return el;
+  }
+
+  const toast = {
+    success: (msg) => showToast('success', msg),
+    error: (msg) => showToast('error', msg),
+    info: (msg) => showToast('info', msg)
+  };
+  window.toast = toast;
+
   // Dados crus reais carregados do Supabase (ver loadRealData).
   // Começam vazios de propósito: nada de snapshot congelado no repo.
   let rawEvents = [];
@@ -2635,7 +2716,14 @@
           const mult = ev.shiftKey ? 10 : 1;
           const next = origin + Math.round(dx / SCRUB_PX_PER_STEP) * step * mult;
           input.value = Math.min(max, Math.max(min, next)).toFixed(decimals);
-          input.dispatchEvent(new Event('input', { bubbles: true }));
+          /* O 'input' cai em quem salva (texto, imagem, crop). Como isto é um
+             arrasto, o save que vier daqui sai silencioso. */
+          quietSaveDepth++;
+          try {
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+          } finally {
+            quietSaveDepth--;
+          }
         };
 
         const onUp = () => {
@@ -2890,22 +2978,120 @@
 
     let quotaAvisado = false;
 
+    /* --------------------------------------------------
+       Indicador de salvamento na barra do topo.
+       Só espelha o save() abaixo: não salva nada por conta própria e não
+       mexe na frequência do save.
+
+       O "Salvando…" é caro visualmente, então só aparece em ação nomeada
+       (gerar lote, aplicar template, colar imagem, trocar fonte…). Arrastar,
+       redimensionar, digitar e dar zoom salvam igual, mas por saveQuiet():
+       o rótulo continua "Salvo ✓" e só o contador volta para "há 0s".
+       Sem isso o spinner reiniciava a cada mouseup e o save parecia nervoso.
+       -------------------------------------------------- */
+    const saveStatusEl = document.getElementById('canvas-save-status');
+    let quietSaveDepth = 0; // > 0 enquanto uma micro-interação está salvando
+    const SAVE_SETTLE_MS = 420; // o save é síncrono; o spinner existe para ser lido
+    let lastSavedAt = null;
+    let saveSettleTimer = null;
+    let saveTickTimer = null;
+
+    function savedAgoLabel() {
+      if (lastSavedAt == null) return '';
+      const secs = Math.max(0, Math.round((Date.now() - lastSavedAt) / 1000));
+      if (secs < 60) return `há ${secs}s`;
+      const mins = Math.floor(secs / 60);
+      if (mins < 60) return `há ${mins}min`;
+      return `há ${Math.floor(mins / 60)}h`;
+    }
+
+    function paintSaveStatus(state) {
+      if (!saveStatusEl) return;
+      if (state === 'saving') {
+        saveStatusEl.className = 'canvas-topbar__save is-saving';
+        saveStatusEl.innerHTML = '<span class="canvas-topbar__save-spin"></span><span>Salvando…</span>';
+      } else if (state === 'error') {
+        saveStatusEl.className = 'canvas-topbar__save is-error';
+        saveStatusEl.innerHTML = '<span>⚠ Não salvo</span>';
+      } else {
+        saveStatusEl.className = 'canvas-topbar__save is-saved';
+        saveStatusEl.innerHTML = '<span>Salvo ✓ · ' + savedAgoLabel() + '</span>';
+      }
+    }
+
+    function markSaving() {
+      if (!saveStatusEl) return;
+      /* Repintar a cada save reiniciaria o spinner e ele pareceria travado */
+      if (!saveStatusEl.classList.contains('is-saving')) paintSaveStatus('saving');
+      clearTimeout(saveSettleTimer);
+      saveSettleTimer = setTimeout(markSaved, SAVE_SETTLE_MS);
+    }
+
+    function markSaved() {
+      if (!saveStatusEl) return;
+      lastSavedAt = Date.now();
+      paintSaveStatus('saved');
+      if (saveTickTimer) return;
+      // Um único contador para a vida toda da página
+      saveTickTimer = setInterval(() => {
+        if (saveStatusEl.classList.contains('is-saved')) paintSaveStatus('saved');
+      }, 1000);
+    }
+
+    /* Save silencioso: não troca de estado nem acende spinner. Se um
+       "Salvando…" de ação nomeada estiver no ar, deixa ele terminar sozinho
+       — só adianta o relógio para o settle repintar já com "há 0s". */
+    function markSavedQuiet() {
+      if (!saveStatusEl) return;
+      if (saveStatusEl.classList.contains('is-saving')) {
+        lastSavedAt = Date.now();
+        return;
+      }
+      markSaved();
+    }
+
+    function markSaveError() {
+      clearTimeout(saveSettleTimer);
+      paintSaveStatus('error');
+    }
+
+    /* Mesmo save, mesmo momento, mesma frequência — muda só o feedback.
+       Usado pelos handlers de drag / digitação / zoom. */
+    function saveQuiet(recordHistory = true) {
+      quietSaveDepth++;
+      try {
+        save(recordHistory);
+      } finally {
+        quietSaveDepth--;
+      }
+    }
+
     function save(recordHistory = true) {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ cam, frames, links }));
-        quotaAvisado = false;
+        /* Voltou a salvar depois de uma falha: o aviso na barra do topo precisa
+           sair junto, senão o label fica laranja e mentindo o resto da sessão.
+           A cor sai como inline vazia para o label voltar a herdar o tema. */
+        if (quotaAvisado) {
+          quotaAvisado = false;
+          const label = document.getElementById('canvas-topbar-label');
+          if (label) label.style.color = '';
+          updateTopbar();
+        }
+        if (quietSaveDepth > 0) markSavedQuiet();
+        else markSaving();
       } catch (e) {
         /* Falhar em silêncio aqui custa o trabalho inteiro do usuário no
            próximo reload — ele precisa saber na hora. */
         console.error('[canvas] não foi possível salvar o estado:', e);
+        markSaveError();
         if (!quotaAvisado) {
           quotaAvisado = true;
+          toast.error('O armazenamento do navegador encheu: o canvas não está sendo salvo. Exporte o que precisa antes de recarregar a página.');
           const label = document.getElementById('canvas-topbar-label');
           if (label) {
             label.textContent = '⚠ Armazenamento cheio — o canvas NÃO está sendo salvo';
             label.style.color = '#B45309';
-          } else {
-            alert('O armazenamento do navegador encheu: o canvas não está sendo salvo. Exporte o que precisa antes de recarregar a página.');
           }
         }
       }
@@ -3170,7 +3356,7 @@
       cam.x = sx - before.x * cam.scale;
       cam.y = sy - before.y * cam.scale;
       applyCamera();
-      save();
+      saveQuiet(); // zoom de scroll dispara em rajada: só reinicia o contador
     }
 
     // Põe o cursor no fim do texto: focar sozinho não cria caret em contentEditable vazio
@@ -3667,7 +3853,7 @@
         if (snapGuideH) snapGuideH.classList.remove('is-active');
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        if (moved) save();
+        if (moved) saveQuiet();
       };
 
       document.addEventListener('mousemove', onMove);
@@ -3868,7 +4054,7 @@
         });
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        if (moved) save();
+        if (moved) saveQuiet();
         updateTextToolbar();
       };
 
@@ -4075,7 +4261,7 @@
           const onUp = () => {
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup', onUp);
-            save();
+            saveQuiet(); // arrasto: salva igual, sem acender o "Salvando…"
           };
 
           document.addEventListener('mousemove', onMove);
@@ -4103,7 +4289,7 @@
           const onUp = () => {
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup', onUp);
-            save();
+            saveQuiet(); // arrasto: salva igual, sem acender o "Salvando…"
           };
 
           document.addEventListener('mousemove', onMove);
@@ -4141,7 +4327,7 @@
           const onUp = () => {
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup', onUp);
-            save();
+            saveQuiet(); // arrasto: salva igual, sem acender o "Salvando…"
           };
           document.addEventListener('mousemove', onMove);
           document.addEventListener('mouseup', onUp);
@@ -4237,7 +4423,7 @@
 
       content.addEventListener('input', () => {
         syncTextHtml(child, content);
-        save();
+        saveQuiet(); // uma tecla não é "ação nomeada": não vale spinner
         updateTextToolbar(); // in case height changes, repositions toolbar
       });
 
@@ -4279,7 +4465,7 @@
           const onUp = () => {
             document.removeEventListener('mousemove', onMove);
             document.removeEventListener('mouseup', onUp);
-            save();
+            saveQuiet(); // arrasto: salva igual, sem acender o "Salvando…"
           };
           document.addEventListener('mousemove', onMove);
           document.addEventListener('mouseup', onUp);
@@ -5349,7 +5535,7 @@
           view.classList.remove('is-panning', 'is-space-grabbing');
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
-          save(false);
+          saveQuiet(false);
         };
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
@@ -5524,7 +5710,7 @@
         cam.x -= e.deltaX;
         cam.y -= e.deltaY;
         applyCamera();
-        save();
+        saveQuiet(); // pan de trackpad: dezenas de eventos por segundo
       }
     }, { passive: false });
 
@@ -5908,6 +6094,8 @@
         if (e.clipboardData) {
           e.clipboardData.setData('text/plain', payloadStr);
         }
+        // Copiar é a única ação do editor sem retorno visual nenhum
+        toast.success('Copiado');
       }
     });
 
@@ -6385,7 +6573,7 @@
           });
           updateTextToolbar();
           if (isMeasureKeyActive) updateMeasureGuides(lastMouseClientPos);
-          save();
+          saveQuiet(); // seta segurada repete: mesmo caso do arrasto
           return;
         } else if (hasFrames) {
           const framesToMove = getSelectedFrames();
@@ -6400,7 +6588,7 @@
           });
           wakeRopes();
           if (isMeasureKeyActive) updateMeasureGuides(lastMouseClientPos);
-          save();
+          saveQuiet(); // seta segurada repete: mesmo caso do arrasto
           return;
         }
       } else if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 't' && hasFrames) {
@@ -7465,7 +7653,7 @@
 
       async function runBatchExport() {
         if (!window.JSZip) {
-          alert('Biblioteca de exportação carregando, tente novamente em um instante.');
+          toast.info('Biblioteca de exportação carregando, tente novamente em um instante.');
           return;
         }
 
@@ -7602,13 +7790,13 @@
         });
 
         if (records.length === 0) {
-          alert('Preencha ou cole pelo menos uma linha de dados na tabela.');
+          toast.error('Preencha ou cole pelo menos uma linha de dados na tabela.');
           return;
         }
 
         const anchor = selectedFrame() || frames[0];
         if (!anchor) {
-          alert('Nenhum template encontrado no Canvas. Crie pelo menos um post antes de gerar.');
+          toast.error('Nenhum template encontrado no Canvas. Crie pelo menos um post antes de gerar.');
           return;
         }
 
@@ -8370,7 +8558,7 @@
       async function inserirIcone(iconId, itemEl) {
         const frame = selectedFrame() || frames[0];
         if (!frame) {
-          alert('Selecione um frame antes de inserir.');
+          toast.info('Selecione um frame antes de inserir.');
           return;
         }
         itemEl.classList.add('is-busy');
@@ -8477,7 +8665,7 @@
           applyBgBtn.addEventListener('click', async () => {
             const frame = selectedFrame() || frames[0];
             if (!frame) {
-              alert('Selecione um frame no canvas primeiro.');
+              toast.info('Selecione um frame no canvas primeiro.');
               return;
             }
             applyBgBtn.disabled = true;
@@ -8498,7 +8686,7 @@
               closeLibrary();
             } catch (err) {
               console.error('[mesh-gradient] falha ao aplicar fundo:', err);
-              alert('Falha ao renderizar gradiente mesh.');
+              toast.error('Falha ao renderizar gradiente mesh.');
             } finally {
               applyBgBtn.disabled = false;
             }
@@ -8511,7 +8699,7 @@
           insertElemBtn.addEventListener('click', async () => {
             const frame = selectedFrame() || frames[0];
             if (!frame) {
-              alert('Selecione um frame no canvas primeiro.');
+              toast.info('Selecione um frame no canvas primeiro.');
               return;
             }
             insertElemBtn.disabled = true;
@@ -8559,7 +8747,7 @@
               closeLibrary();
             } catch (err) {
               console.error('[mesh-gradient] falha ao inserir elemento:', err);
-              alert('Falha ao inserir gradiente como elemento.');
+              toast.error('Falha ao inserir gradiente como elemento.');
             } finally {
               insertElemBtn.disabled = false;
             }
@@ -8790,7 +8978,7 @@
           }
         } catch (err) {
           console.error('[fonts] falha ao instalar fonte:', fontItem.family, err);
-          alert('Não foi possível instalar a fonte ' + fontItem.family + '. Confira a conexão.');
+          toast.error('Não foi possível instalar a fonte ' + fontItem.family + '. Confira a conexão.');
           if (btnEl) {
             btnEl.disabled = false;
             btnEl.textContent = '+ Adicionar';
@@ -8845,7 +9033,7 @@
           if (hint) hint.textContent = `Fonte "${family}" instalada com sucesso!`;
         } catch (err) {
           console.error('[fonts] falha ao importar fonte local:', err);
-          alert('Erro ao carregar arquivo de fonte: ' + err.message);
+          toast.error('Erro ao carregar arquivo de fonte: ' + err.message);
         }
       }
 
@@ -9003,7 +9191,7 @@
 
           if (scope === 'all' && frames.length > 1) {
             if (!window.JSZip) {
-              alert('Carregando biblioteca de exportação...');
+              toast.info('Carregando biblioteca de exportação...');
               submitBtn.disabled = false;
               return;
             }
