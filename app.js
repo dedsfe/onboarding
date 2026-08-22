@@ -8788,7 +8788,10 @@
           const grad = dCtx.createLinearGradient(x0, y0, x1, y1);
           const n = colors.length;
           colors.forEach((col, i) => {
-            grad.addColorStop(n > 1 ? i / (n - 1) : 0, col);
+            const start = i / n;
+            const end = (i + 1) / n;
+            grad.addColorStop(start, col);
+            grad.addColorStop(end - 0.0001, col);
           });
           dCtx.fillStyle = grad;
           dCtx.fillRect(0, 0, drawW, drawH);
@@ -8799,7 +8802,10 @@
           const grad = dCtx.createRadialGradient(cx, cy, 0, cx, cy, radius);
           const n = colors.length;
           colors.forEach((col, i) => {
-            grad.addColorStop(n > 1 ? i / (n - 1) : 0, col);
+            const start = i / n;
+            const end = (i + 1) / n;
+            grad.addColorStop(start, col);
+            grad.addColorStop(end - 0.0001, col);
           });
           dCtx.fillStyle = grad;
           dCtx.fillRect(0, 0, drawW, drawH);
@@ -8811,7 +8817,10 @@
             const grad = dCtx.createConicGradient(rad, cx, cy);
             const n = colors.length;
             colors.forEach((col, i) => {
-              grad.addColorStop(n > 1 ? i / (n - 1) : 0, col);
+              const start = i / n;
+              const end = (i + 1) / n;
+              grad.addColorStop(start, col);
+              grad.addColorStop(end - 0.0001, col);
             });
             dCtx.fillStyle = grad;
             dCtx.fillRect(0, 0, drawW, drawH);
