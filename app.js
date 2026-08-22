@@ -1751,6 +1751,20 @@
       });
     }
 
+    /* Fundo de frame pode vir inline (`bgImage`, legado) ou por asset
+       (`bgAssetId`). Clonar o data URL inline em cada post estoura a cota do
+       localStorage, então tudo que é gerado em lote usa o assetId. */
+    function frameBgSrc(frame) {
+      if (!frame) return null;
+      if (frame.bgImage) return frame.bgImage;
+      if (frame.bgAssetId) return assetCache.get(frame.bgAssetId) || null;
+      return null;
+    }
+
+    function hasFrameBg(frame) {
+      return !!(frame && (frame.bgImage || frame.bgAssetId));
+    }
+
     async function saveAsset(id, dataUrl) {
       try {
         const db = await openAssetDB();
@@ -3830,7 +3844,45 @@
       clip.appendChild(img);
       el.appendChild(clip);
 
-      // Helper de sincronização de imagem
+      // Helper de sincronização de imagem com auto-ajuste de proporção natural
+      const onImageLoaded = () => {
+        const nw = img.naturalWidth || img.width;
+        const nh = img.naturalHeight || img.height;
+        if (!nw || !nh) return;
+
+        if (child.origW !== nw || child.origH !== nh) {
+          const newAspect = nw / nh;
+          child.origW = nw;
+          child.origH = nh;
+
+          // Se a imagem não tem recorte específico ativo, adapta a altura do nó para não espremer/distorcer
+          if ((!child.imgX && !child.imgY) || (child.zoom === 1 || !child.zoom)) {
+            child.h = Math.round(child.w / newAspect);
+            child.imgW = child.w;
+            child.imgH = child.h;
+            child.imgX = 0;
+            child.imgY = 0;
+          } else {
+            const maskAspect = child.w / child.h;
+            if (newAspect > maskAspect) {
+              child.imgH = child.h;
+              child.imgW = Math.round(child.h * newAspect);
+              child.imgX = Math.round((child.w - child.imgW) / 2);
+              child.imgY = 0;
+            } else {
+              child.imgW = child.w;
+              child.imgH = Math.round(child.w / newAspect);
+              child.imgX = 0;
+              child.imgY = Math.round((child.h - child.imgH) / 2);
+            }
+          }
+          updateImageNodeDOM(child, el);
+          updateTextToolbar();
+        }
+      };
+
+      img.onload = onImageLoaded;
+
       const setImgSrc = (src) => {
         img.src = src;
         ghostImg.src = src;
@@ -4508,11 +4560,19 @@
       }
 
       // 1. Imagem de fundo com overlay & blur
-      if (frame.bgImage) {
+      if (hasFrameBg(frame)) {
         const overlayAlpha = (frame.bgOverlay != null ? frame.bgOverlay : 35) / 100;
         const blurPx = frame.bgBlur || 0;
+        const bgSrc = frameBgSrc(frame);
 
-        bgLayer.style.backgroundImage = `url("${frame.bgImage}")`;
+        /* Asset ainda não veio do IndexedDB (reload): busca e redesenha o frame. */
+        if (!bgSrc && frame.bgAssetId) {
+          getAsset(frame.bgAssetId).then(src => {
+            if (src) renderFrame(frame);
+          });
+        }
+
+        bgLayer.style.backgroundImage = bgSrc ? `url("${bgSrc}")` : 'none';
         bgLayer.style.backgroundSize = 'cover';
         bgLayer.style.backgroundPosition = 'center';
         bgLayer.style.filter = blurPx > 0 ? `blur(${blurPx}px)` : 'none';
@@ -7086,10 +7146,29 @@
               }
               ctx.clip();
 
-              const imgX = child.x + (child.imgX || 0);
-              const imgY = child.y + (child.imgY || 0);
-              const imgW = child.imgW || child.w;
-              const imgH = child.imgH || child.h;
+              const natW = img.naturalWidth || img.width;
+              const natH = img.naturalHeight || img.height;
+              const newAspect = (natW && natH) ? (natW / natH) : 1;
+              const maskAspect = child.w / child.h;
+
+              let imgX = child.x + (child.imgX || 0);
+              let imgY = child.y + (child.imgY || 0);
+              let imgW = child.imgW || child.w;
+              let imgH = child.imgH || child.h;
+
+              if (natW && natH && Math.abs((imgW / imgH) - newAspect) > 0.02) {
+                if (newAspect > maskAspect) {
+                  imgH = child.h;
+                  imgW = Math.round(child.h * newAspect);
+                  imgX = child.x + Math.round((child.w - imgW) / 2);
+                  imgY = child.y;
+                } else {
+                  imgW = child.w;
+                  imgH = Math.round(child.w / newAspect);
+                  imgX = child.x;
+                  imgY = child.y + Math.round((child.h - imgH) / 2);
+                }
+              }
 
               ctx.drawImage(img, imgX, imgY, imgW, imgH);
               ctx.restore();
