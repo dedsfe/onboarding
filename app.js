@@ -3269,16 +3269,26 @@
     }
 
     function alignSelectedNodes(alignment) {
-      if (selectedChildNodes.length === 0) return;
-      selectedChildNodes.forEach(sel => {
+      let nodes = selectedChildNodes;
+      if ((!nodes || nodes.length === 0) && selectedTextNode && selectedTextNode.childId) {
+        nodes = [{ frameId: selectedTextNode.frameId, childId: selectedTextNode.childId }];
+      }
+      if (!nodes || nodes.length === 0) return;
+
+      nodes.forEach(sel => {
         const frame = frames.find(f => f.id === sel.frameId);
         if (!frame) return;
         const child = (frame.children || []).find(c => c.id === sel.childId);
         if (!child) return;
-        const el = world.querySelector(`[data-id="${child.id}"]`);
+        const frameEl = frameElOf(frame);
+        const el = frameEl 
+          ? frameEl.querySelector(`.canvas-text-node[data-id="${child.id}"], .canvas-image-node[data-id="${child.id}"]`)
+          : world.querySelector(`.canvas-text-node[data-id="${child.id}"], .canvas-image-node[data-id="${child.id}"]`);
         
-        const w = child.w || (el ? el.offsetWidth : 100);
-        const h = child.h || (el ? el.offsetHeight : 100);
+        if (!el) return;
+
+        const w = child.w || el.offsetWidth || 100;
+        const h = child.h || el.offsetHeight || 50;
 
         if (alignment === 'center-h') {
           child.x = Math.round((frame.w - w) / 2);
@@ -3297,17 +3307,15 @@
           child.y = frame.h - h - 40;
         }
 
-        if (el) {
-          el.style.left = `${child.x}px`;
-          el.style.top = `${child.y}px`;
-        }
+        el.style.left = `${child.x}px`;
+        el.style.top = `${child.y}px`;
       });
       updateTextToolbar();
       save();
       const labels = {
-        'center-h': 'Centralizado horizontalmente!',
-        'center-v': 'Centralizado verticalmente!',
-        'center-both': 'Centralizado no post!',
+        'center-h': 'Centralizado horizontalmente no post!',
+        'center-v': 'Centralizado verticalmente no post!',
+        'center-both': 'Centralizado no centro do post!',
         'left': 'Alinhado à esquerda!',
         'right': 'Alinhado à direita!',
         'top': 'Alinhado ao topo!',
@@ -6566,6 +6574,19 @@
       zoomAt(innerWidth / 2, innerHeight / 2, BASE_SCALE / cam.scale);
     });
     if (btnCenter) btnCenter.addEventListener('click', () => {
+      if (selectedChildNodes.length > 0 || (selectedTextNode && selectedTextNode.childId)) {
+        alignSelectedNodes('center-both');
+        return;
+      }
+      const selFrame = selectedFrame();
+      if (selFrame) {
+        cam.x = Math.round((innerWidth / 2) - (selFrame.x + (selFrame.w / 2)) * cam.scale);
+        cam.y = Math.round((innerHeight / 2) - (selFrame.y + (selFrame.h / 2)) * cam.scale);
+        applyCamera();
+        save();
+        toast.success('Post centralizado na tela');
+        return;
+      }
       cam = { x: 0, y: 0, scale: BASE_SCALE };
       applyCamera();
       save();
