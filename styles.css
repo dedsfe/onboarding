@@ -2115,6 +2115,17 @@ body {
   display: none;
 }
 
+/* Modo Ocultar Tags {{}}: esconde contornos roxos e crachás para visual limpo */
+.canvas-view.hide-binds .canvas-text-node.has-bind,
+.canvas-view.hide-binds .canvas-image-node.has-bind {
+  outline: none !important;
+}
+
+.canvas-view.hide-binds .canvas-node__bind,
+.canvas-view.hide-binds .canvas-frame__bind-tag {
+  display: none !important;
+}
+
 /* ------------------------------------------------------------
    TEXT NODES (DENTRO DOS FRAMES)
    ------------------------------------------------------------ */
@@ -2746,6 +2757,13 @@ body {
   height: 520px; /* Proporção e squircle idênticos ao modal padrão */
 }
 
+/* O modal de lote carrega uma tabela editável: precisa de largura real. */
+#canvas-batch-modal .canvas-batch-modal-oa {
+  max-width: 760px;
+  height: auto;
+  max-height: 88vh;
+}
+
 .canvas-batch-body-oa {
   flex: 1;
   min-height: 0;
@@ -2894,6 +2912,387 @@ body {
 .canvas-batch-mapping-select-oa:focus {
   border-color: var(--accent-blue);
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+/* ------------------------------------------------------------
+   TABELA EDITÁVEL DO LOTE (uma linha = um post)
+   ------------------------------------------------------------ */
+#canvas-batch-grid-section {
+  min-height: 0;
+}
+
+.canvas-batch-grid-head-oa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.canvas-batch-grid-actions-oa {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.canvas-batch-mini-btn-oa {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  color: #374151;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.canvas-batch-mini-btn-oa:hover {
+  background: #F9FAFB;
+  border-color: #CBD5E1;
+}
+
+.canvas-batch-mini-btn-oa.is-primary {
+  background: #111827;
+  border-color: #111827;
+  color: #FFFFFF;
+}
+
+.canvas-batch-mini-btn-oa.is-primary:hover {
+  background: #1F2937;
+  border-color: #1F2937;
+}
+
+.canvas-batch-gridwrap-oa {
+  border: 1px solid #F3F4F6;
+  border-radius: 12px;
+  background: #FFFFFF;
+  overflow: auto;
+  max-height: 320px;
+  transition: all var(--transition);
+}
+
+.canvas-batch-gridwrap-oa.is-dragover {
+  border-color: #86EFAC;
+  background: #F0FDF4;
+}
+
+.canvas-batch-grid-oa {
+  display: grid;
+  min-width: max-content;
+}
+
+.canvas-batch-cell-oa {
+  border-bottom: 1px solid #F3F4F6;
+  border-right: 1px solid #F3F4F6;
+  padding: 6px 8px;
+  display: flex;
+  align-items: center;
+  min-height: 38px;
+  box-sizing: border-box;
+}
+
+.canvas-batch-cell-oa.is-head {
+  background: #F9FAFB;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-size: 12px;
+  font-weight: 500;
+  color: #111827;
+  gap: 4px;
+  white-space: nowrap;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.canvas-batch-headtop-oa {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+}
+
+.canvas-batch-headsel-oa {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E5E7EB;
+  color: #6B7280;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 400;
+  padding: 2px 5px;
+  border-radius: 6px;
+  outline: none;
+}
+
+.canvas-batch-headsel-oa:focus {
+  border-color: var(--accent-blue);
+}
+
+.canvas-batch-cell-oa.is-idx {
+  justify-content: center;
+  font-size: 11.5px;
+  color: #9CA3AF;
+  background: #FCFCFD;
+  padding: 6px 4px;
+}
+
+.canvas-batch-cell-oa.is-act {
+  justify-content: center;
+  border-right: none;
+  padding: 6px 4px;
+}
+
+.canvas-batch-input-oa {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12.5px;
+  color: #111827;
+  line-height: 1.4;
+  resize: none;
+  padding: 2px 0;
+  max-height: 66px;
+  overflow-y: auto;
+}
+
+.canvas-batch-input-oa::placeholder {
+  color: #D1D5DB;
+}
+
+.canvas-batch-cell-oa:focus-within {
+  background: #F8FAFF;
+  box-shadow: inset 0 0 0 1.5px var(--accent-blue);
+  border-radius: 4px;
+}
+
+.canvas-batch-imgcell-oa {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+}
+
+.canvas-batch-thumb-oa {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 1px solid #E5E7EB;
+  background: #F3F4F6;
+}
+
+.canvas-batch-imgbtn-oa {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: transparent;
+  border: 1px dashed #E5E7EB;
+  border-radius: 7px;
+  padding: 3px 8px;
+  font-family: inherit;
+  font-size: 11.5px;
+  color: #9CA3AF;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all var(--transition);
+}
+
+.canvas-batch-imgbtn-oa:hover {
+  border-color: #A78BFA;
+  color: #7C3AED;
+  background: #FAF5FF;
+}
+
+.canvas-batch-imgbtn-oa.has-img {
+  border-style: solid;
+  border-color: #DDD6FE;
+  color: #6D28D9;
+}
+
+.canvas-batch-rowdel-oa {
+  background: transparent;
+  border: none;
+  color: #D1D5DB;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 5px;
+  line-height: 0;
+  transition: all var(--transition);
+}
+
+.canvas-batch-rowdel-oa:hover {
+  color: #EF4444;
+  background: #FEF2F2;
+}
+
+.canvas-batch-colfill-oa {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #9CA3AF;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 5px;
+  line-height: 0;
+  transition: all var(--transition);
+}
+
+.canvas-batch-colfill-oa:hover {
+  color: #7C3AED;
+  background: #F3E8FF;
+}
+
+.canvas-batch-hint-oa {
+  font-size: 11px;
+  color: #9CA3AF;
+  margin-top: 6px;
+  line-height: 1.4;
+}
+
+/* ------------------------------------------------------------
+   MODAIS SEPARADOS: DADOS / FOTOS / EXPORTAR
+   ------------------------------------------------------------ */
+#canvas-batch-photos-modal .canvas-batch-modal-oa {
+  max-width: 760px;
+  height: auto;
+  max-height: 88vh;
+}
+
+.canvas-batch-export-modal-oa {
+  max-width: 460px;
+  height: auto;
+}
+
+.canvas-batch-foot-info-oa {
+  margin-right: auto;
+  font-size: 12px;
+  color: #9CA3AF;
+}
+
+.canvas-batch-photos-wrap-oa {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 58vh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.canvas-batch-photos-group-oa {
+  display: flex;
+  flex-direction: column;
+}
+
+.canvas-batch-photos-grouphead-oa {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* Nome de variável é case-sensitive: {{img}} não pode virar {{IMG}} */
+.canvas-batch-photos-grouphead-oa .canvas-batch-title-oa {
+  text-transform: none;
+  font-size: 13px;
+  color: #111827;
+  letter-spacing: 0;
+}
+
+.canvas-batch-photos-grid-oa {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+}
+
+.canvas-batch-photocard-oa {
+  border: 1px solid #F3F4F6;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #FFFFFF;
+  cursor: pointer;
+  transition: all var(--transition);
+  display: flex;
+  flex-direction: column;
+}
+
+.canvas-batch-photocard-oa:hover,
+.canvas-batch-photocard-oa.is-dragover {
+  border-color: #A78BFA;
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.12);
+}
+
+.canvas-batch-photocard-thumb-oa {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  object-fit: cover;
+  display: block;
+  background: #F9FAFB;
+}
+
+.canvas-batch-photocard-empty-oa {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  background: #F9FAFB;
+  border-bottom: 1px dashed #E5E7EB;
+  color: #C4C9D2;
+  font-size: 11px;
+  text-align: center;
+  padding: 6px;
+}
+
+.canvas-batch-photocard-cap-oa {
+  padding: 5px 8px;
+  font-size: 11px;
+  color: #6B7280;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+}
+
+.canvas-batch-photocard-cap-oa span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-batch-summary-oa {
+  background: #F9FAFB;
+  border: 1px solid #F3F4F6;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 12.5px;
+  color: #374151;
+  line-height: 1.55;
+}
+
+.canvas-batch-summary-oa strong {
+  color: #111827;
+  font-weight: 500;
+}
+
+.canvas-batch-summary-oa .is-warn {
+  color: #B45309;
 }
 
 /* Botões do Rodapé Padronizados (Mesma Altura 32px e Raio 10px) */

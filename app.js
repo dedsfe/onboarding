@@ -6104,6 +6104,30 @@
       });
     }
 
+    let showBinds = localStorage.getItem('oa_canvas_show_binds') !== 'false';
+    const btnToggleBinds = document.getElementById('canvas-toggle-binds');
+
+    function updateBindsVisibility() {
+      view.classList.toggle('hide-binds', !showBinds);
+      if (btnToggleBinds) {
+        btnToggleBinds.classList.toggle('active', showBinds);
+        btnToggleBinds.title = showBinds
+          ? 'Tags de Variáveis {{}} visíveis (Clique ou aperte B para ocultar)'
+          : 'Tags de Variáveis {{}} ocultas (Clique ou aperte B para mostrar)';
+        btnToggleBinds.innerHTML = `<i data-lucide="${showBinds ? 'eye' : 'eye-off'}" style="width: 16px; height: 16px;"></i>`;
+        if (window.lucide) lucide.createIcons();
+      }
+      localStorage.setItem('oa_canvas_show_binds', showBinds);
+    }
+
+    if (btnToggleBinds) {
+      updateBindsVisibility();
+      btnToggleBinds.addEventListener('click', () => {
+        showBinds = !showBinds;
+        updateBindsVisibility();
+      });
+    }
+
     /* --------------------------------------------------
        Atalhos de Teclado (Figma/Canva Standard)
        -------------------------------------------------- */
@@ -6207,9 +6231,14 @@
         if (e.key === '[') { e.preventDefault(); e.stopPropagation(); sendChildToBack(); return; }
       }
 
-      // Não sequestra as teclas enquanto o texto de uma nota está em edição
-      if (document.activeElement && document.activeElement.isContentEditable) return;
-      if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
+      // Atalho 'B' para alternar visibilidade das tags {{}} de variáveis
+      if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        e.stopPropagation();
+        showBinds = !showBinds;
+        updateBindsVisibility();
+        return;
+      }
 
       const hasChildren = selectedChildNodes.length > 0;
       const hasFrames = selectedFrameIds.size > 0;
