@@ -731,7 +731,6 @@
           <button class="canvas-topbar__btn" id="canvas-insert-menu-btn" title="Inserir Texto, Imagem, Gradientes, Ícones ou Fontes">
             <i data-lucide="sparkles" style="width: 15px; height: 15px;"></i>
             <span class="canvas-topbar__btn-label">Inserir</span>
-            <i data-lucide="chevron-down" style="width: 11px; height: 11px; opacity: 0.6; margin-left: -2px;"></i>
           </button>
 
           <!-- Menu Vertical 2: Inserir Elementos -->
@@ -740,7 +739,7 @@
             <button class="canvas-dropdown-item" data-action="add-text">
               <i data-lucide="type" style="width: 16px; height: 16px; color: #818CF8;"></i>
               <span>Texto</span>
-              <span class="canvas-dropdown-meta">Atalho T</span>
+              <span class="canvas-dropdown-meta">T</span>
             </button>
             <button class="canvas-dropdown-item" data-action="add-image">
               <i data-lucide="image" style="width: 16px; height: 16px; color: #34D399;"></i>
@@ -751,17 +750,17 @@
             <button class="canvas-dropdown-item" data-action="open-mesh">
               <i data-lucide="blend" style="width: 16px; height: 16px; color: #F472B6;"></i>
               <span>Gradientes Mesh</span>
-              <span class="canvas-dropdown-meta">WebGL</span>
+              <span class="canvas-dropdown-meta">Mesh</span>
             </button>
             <button class="canvas-dropdown-item" data-action="open-icons">
               <i data-lucide="shapes" style="width: 16px; height: 16px; color: #FBBF24;"></i>
               <span>Ícones & Stickers</span>
-              <span class="canvas-dropdown-meta">275k</span>
+              <span class="canvas-dropdown-meta">⇧I</span>
             </button>
             <button class="canvas-dropdown-item" data-action="open-fonts">
               <i data-lucide="case-sensitive" style="width: 16px; height: 16px; color: #60A5FA;"></i>
               <span>Fontes & Tipografia</span>
-              <span class="canvas-dropdown-meta">2.096</span>
+              <span class="canvas-dropdown-meta">Fontes</span>
             </button>
           </div>
         </div>
@@ -774,7 +773,6 @@
             <i data-lucide="wand-2" style="width: 15px; height: 15px;"></i>
             <span class="canvas-topbar__btn-label">Lote CSV</span>
             <span class="canvas-topbar__badge" id="canvas-batch-binds-count" style="display: none;">0</span>
-            <i data-lucide="chevron-down" style="width: 11px; height: 11px; opacity: 0.6; margin-left: -2px;"></i>
           </button>
 
           <!-- Menu Vertical 3: Automação em Lote -->
@@ -799,7 +797,7 @@
             <button class="canvas-dropdown-item" data-action="toggle-binds">
               <i data-lucide="eye" style="width: 15px; height: 15px; color: #9CA3AF;"></i>
               <span id="canvas-menu-binds-label">Ocultar Tags {{}}</span>
-              <span class="canvas-dropdown-meta">Atalho B</span>
+              <span class="canvas-dropdown-meta">B</span>
             </button>
             <button class="canvas-dropdown-item" data-action="toggle-snap">
               <i data-lucide="magnet" style="width: 15px; height: 15px; color: #9CA3AF;"></i>
@@ -819,8 +817,8 @@
 
         <span class="canvas-topbar__sep"></span>
 
-        <!-- Status de Salvamento e Contagem -->
-        <span class="canvas-topbar__label" id="canvas-topbar-label">Nenhum frame</span>
+        <!-- Status de Salvamento Discreto (sem label redundante) -->
+        <span class="canvas-topbar__label" id="canvas-topbar-label" style="display: none;"></span>
         <span class="canvas-topbar__save" id="canvas-save-status"></span>
 
         <!-- 5. Botão de Exportação Principal -->

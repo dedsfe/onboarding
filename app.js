@@ -6597,6 +6597,20 @@
         if (e.key === '[') { e.preventDefault(); e.stopPropagation(); sendChildToBack(); return; }
       }
 
+      // Se o usuário estiver ativamente digitando num texto ou input, não intercepta atalhos simples (letras, Delete, Backspace, Setas)
+      const isTyping = document.activeElement && 
+        (document.activeElement.isContentEditable || 
+         document.activeElement.tagName === 'INPUT' || 
+         document.activeElement.tagName === 'TEXTAREA');
+
+      if (isTyping) {
+        if (e.key === 'Escape') {
+          document.activeElement.blur();
+          e.preventDefault();
+        }
+        return;
+      }
+
       // Atalho 'B' para alternar visibilidade das tags {{}} de variáveis
       if (!e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'b') {
         e.preventDefault();
