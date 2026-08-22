@@ -5707,7 +5707,33 @@
       return null;
     }
 
-    function pasteClipboardPayload(pastedText) {
+    /* Helper para garantir que qualquer data URL que chegue pelo clipboard vire asset no IndexedDB
+       e que data URLs idênticos compartilhem o mesmo assetId (dedup). */
+    async function ensureAssetForImage(dataUrl, existingAssetId = null, dedupeMap = null) {
+      if (existingAssetId && assetCache.has(existingAssetId)) {
+        if (dataUrl && dedupeMap) dedupeMap.set(dataUrl, existingAssetId);
+        return existingAssetId;
+      }
+      if (!isImageSrcValue(dataUrl)) {
+        return existingAssetId || null;
+      }
+      if (dedupeMap && dedupeMap.has(dataUrl)) {
+        return dedupeMap.get(dataUrl);
+      }
+      for (const [id, cached] of assetCache.entries()) {
+        if (cached === dataUrl) {
+          if (dedupeMap) dedupeMap.set(dataUrl, id);
+          return id;
+        }
+      }
+      const newId = (existingAssetId && !assetCache.has(existingAssetId)) ? existingAssetId : ('asset_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8));
+      assetCache.set(newId, dataUrl);
+      await saveAsset(newId, dataUrl);
+      if (dedupeMap) dedupeMap.set(dataUrl, newId);
+      return newId;
+    }
+
+    async function pasteClipboardPayload(pastedText) {
       let data = null;
       if (pastedText && typeof pastedText === 'string') {
         try {
@@ -5727,6 +5753,7 @@
       if (!data || data.type !== 'oa-canvas-clipboard') return false;
 
       const worldPt = screenToWorld(lastMouseScreen.x, lastMouseScreen.y);
+      const dedupeMap = new Map();
 
       if (data.kind === 'nodes' && Array.isArray(data.nodes) && data.nodes.length > 0) {
         let targetFrame = [...frames].reverse().find(f => 
@@ -5753,7 +5780,7 @@
         const baseLocalY = isMouseOverTarget ? Math.round(worldPt.y - targetFrame.y) : null;
 
         const newSelections = [];
-        data.nodes.forEach(orig => {
+        for (const orig of data.nodes) {
           const copy = JSON.parse(JSON.stringify(orig));
           copy.id = childSeq++;
           if (isMouseOverTarget && baseLocalX !== null) {
@@ -5763,13 +5790,22 @@
             copy.x = (orig.x || 0) + 24;
             copy.y = (orig.y || 0) + 24;
           }
-          if (copy.type === 'image') ensureImageProps(copy);
+          if (copy.type === 'image') {
+            ensureImageProps(copy);
+            if (copy.src && isImageSrcValue(copy.src)) {
+              const assetId = await ensureAssetForImage(copy.src, copy.assetId, dedupeMap);
+              if (assetId) copy.assetId = assetId;
+              delete copy.src;
+            } else if (copy.assetId && assetCache.has(copy.assetId)) {
+              delete copy.src;
+            }
+          }
 
           targetFrame.children = targetFrame.children || [];
           targetFrame.children.push(copy);
           renderChildNode(copy, targetFrame, frameEl);
           newSelections.push({ frameId: targetFrame.id, childId: copy.id });
-        });
+        }
 
         selectedFrameIds.clear();
         selectedId = null;
@@ -5791,7 +5827,7 @@
         const minY = Math.min(...data.frames.map(f => f.y || 0));
         const newFrameIds = new Set();
 
-        data.frames.forEach(orig => {
+        for (const orig of data.frames) {
           const copy = JSON.parse(JSON.stringify(orig));
           copy.id = frameSeq++;
           copy.name = orig.name ? `${orig.name} (cópia)` : '';
@@ -5799,16 +5835,35 @@
           copy.x = Math.round(worldPt.x + ((orig.x || 0) - minX));
           copy.y = Math.round(worldPt.y + ((orig.y || 0) - minY));
 
-          copy.children = (orig.children || []).map(c => {
-            const chCopy = { ...c, id: childSeq++ };
-            if (c.type === 'image') ensureImageProps(chCopy);
-            return chCopy;
-          });
+          if (copy.bgImage && isImageSrcValue(copy.bgImage)) {
+            const bgId = await ensureAssetForImage(copy.bgImage, copy.bgAssetId, dedupeMap);
+            if (bgId) copy.bgAssetId = bgId;
+            copy.bgImage = null;
+          } else if (copy.bgAssetId && assetCache.has(copy.bgAssetId)) {
+            copy.bgImage = null;
+          }
+
+          const children = [];
+          for (const c of (orig.children || [])) {
+            const chCopy = { ...JSON.parse(JSON.stringify(c)), id: childSeq++ };
+            if (chCopy.type === 'image') {
+              ensureImageProps(chCopy);
+              if (chCopy.src && isImageSrcValue(chCopy.src)) {
+                const assetId = await ensureAssetForImage(chCopy.src, chCopy.assetId, dedupeMap);
+                if (assetId) chCopy.assetId = assetId;
+                delete chCopy.src;
+              } else if (chCopy.assetId && assetCache.has(chCopy.assetId)) {
+                delete chCopy.src;
+              }
+            }
+            children.push(chCopy);
+          }
+          copy.children = children;
 
           frames.push(copy);
           renderFrame(copy);
           newFrameIds.add(copy.id);
-        });
+        }
 
         selectedChildNodes = [];
         selectedTextNode = { frameId: null, childId: null };
@@ -5863,7 +5918,7 @@
       }
     });
 
-    document.addEventListener('paste', (e) => {
+    document.addEventListener('paste', async (e) => {
       if (!view.classList.contains('is-open')) return;
 
       const isEditingText = document.activeElement && 
@@ -5872,10 +5927,13 @@
       const plainText = (e.clipboardData || window.clipboardData)?.getData('text/plain')?.trim() || '';
 
       // 1. Tenta colar nós/frames nativos copiados entre abas
-      if (!isEditingText && pasteClipboardPayload(plainText)) {
-        e.preventDefault();
-        e.stopPropagation();
-        return;
+      if (!isEditingText) {
+        const handled = await pasteClipboardPayload(plainText);
+        if (handled) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
       }
 
       // 2. Colar imagens (prints de tela, arquivos do computador ou links)
@@ -7959,6 +8017,55 @@
       return color ? `${base}&color=${encodeURIComponent(color)}` : base;
     }
 
+    /* Mapa de termos comuns em Português -> Inglês para o acervo do Iconify */
+    const PT_EN_MAP = {
+      'coracao': 'heart', 'coração': 'heart', 'amor': 'love', 'cruz': 'cross',
+      'igreja': 'church', 'oracao': 'praying', 'oração': 'praying', 'rezar': 'pray',
+      'biblia': 'book', 'bíblia': 'book', 'livro': 'book', 'livros': 'books',
+      'sol': 'sun', 'lua': 'moon', 'estrela': 'star', 'estrelas': 'stars',
+      'brilho': 'sparkle', 'brilhos': 'sparkles', 'folha': 'leaf', 'planta': 'plant',
+      'fogo': 'fire', 'chama': 'flame', 'seta': 'arrow', 'setas': 'arrows',
+      'flecha': 'arrow', 'pomba': 'dove', 'passaro': 'bird', 'pássaro': 'bird',
+      'vela': 'candle', 'agua': 'water', 'água': 'water', 'gota': 'drop',
+      'montanha': 'mountain', 'montanhas': 'mountains', 'flor': 'flower', 'flores': 'flowers',
+      'borboleta': 'butterfly', 'infinito': 'infinity', 'musica': 'music', 'música': 'music',
+      'fone': 'headphones', 'ouvir': 'listen', 'usuario': 'user', 'usuário': 'user',
+      'perfil': 'user', 'pessoa': 'person', 'pessoas': 'people', 'grupo': 'users',
+      'calendario': 'calendar', 'calendário': 'calendar', 'relogio': 'clock', 'relógio': 'clock',
+      'tempo': 'time', 'casa': 'home', 'inicio': 'home', 'início': 'home',
+      'mensagem': 'message', 'comentario': 'comment', 'comentário': 'comment',
+      'busca': 'search', 'pesquisa': 'search', 'lupa': 'search',
+      'check': 'check', 'confirmar': 'check', 'certo': 'check', 'correto': 'check',
+      'alerta': 'alert', 'aviso': 'warning', 'erro': 'error', 'perigo': 'danger',
+      'fechar': 'close', 'cancelar': 'cancel', 'olho': 'eye', 'ver': 'eye',
+      'cadeado': 'lock', 'seguranca': 'security', 'segurança': 'security',
+      'trofeu': 'trophy', 'troféu': 'trophy', 'premio': 'award', 'prêmio': 'award',
+      'coroa': 'crown', 'rei': 'king', 'rainha': 'queen', 'paz': 'peace',
+      'mao': 'hand', 'mão': 'hand', 'maos': 'hands', 'mãos': 'hands',
+      'esperanca': 'hope', 'esperança': 'hope', 'fe': 'faith', 'fé': 'faith',
+      'luz': 'light', 'lampada': 'lamp', 'lâmpada': 'bulb', 'ideia': 'idea',
+      'ceu': 'sky', 'céu': 'sky', 'nuvem': 'cloud', 'nuvens': 'clouds',
+      'chuva': 'rain', 'arco-iris': 'rainbow', 'arco iris': 'rainbow',
+      'arvore': 'tree', 'árvore': 'tree', 'cafe': 'coffee', 'café': 'coffee',
+      'foto': 'camera', 'camera': 'camera', 'câmera': 'camera', 'video': 'video',
+      'vídeo': 'video', 'play': 'play', 'ajuda': 'help', 'duvida': 'help',
+      'dúvida': 'help', 'compartilhar': 'share', 'salvar': 'bookmark', 'guardar': 'bookmark',
+      'lixeira': 'trash', 'apagar': 'delete', 'deletar': 'delete',
+      'editar': 'edit', 'lapis': 'pencil', 'lápis': 'pencil', 'caneta': 'pen',
+      'link': 'link', 'conectar': 'connect', 'cadeia': 'chain', 'globo': 'globe',
+      'mundo': 'world', 'terra': 'earth', 'mapa': 'map', 'local': 'location',
+      'dinheiro': 'money', 'moeda': 'coin', 'presente': 'gift'
+    };
+
+    function translateIconQuery(term) {
+      if (!term) return term;
+      const clean = term.toLowerCase().trim();
+      if (PT_EN_MAP[clean]) return PT_EN_MAP[clean];
+      const unaccented = clean.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      if (PT_EN_MAP[unaccented]) return PT_EN_MAP[unaccented];
+      return term;
+    }
+
     /* SVG remoto -> data URI local -> PNG. Devolve dataUrl + dimensões reais. */
     async function rasterizeIcon(iconId, color) {
       const [prefix, ...rest] = iconId.split(':');
@@ -7970,11 +8077,20 @@
       const svgText = await res.text();
       if (!svgText.trim().startsWith('<svg')) throw new Error('Ícone não encontrado');
 
-      const dataUri = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
+      const dataUri = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgText)}`;
       const img = await new Promise((resolve, reject) => {
         const i = new Image();
         i.onload = () => resolve(i);
-        i.onerror = () => reject(new Error('SVG inválido'));
+        i.onerror = () => {
+          try {
+            const i2 = new Image();
+            i2.onload = () => resolve(i2);
+            i2.onerror = () => reject(new Error('SVG inválido'));
+            i2.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgText)));
+          } catch {
+            reject(new Error('SVG inválido'));
+          }
+        };
         i.src = dataUri;
       });
 
@@ -8011,7 +8127,7 @@
       function renderResultados(ids) {
         grid.innerHTML = '';
         if (!ids.length) {
-          grid.innerHTML = '<div class="canvas-lib-empty-oa">Nada encontrado. Tente em inglês — o acervo é indexado em inglês (ex: <strong>heart</strong>, <strong>cross</strong>, <strong>arrow</strong>).</div>';
+          grid.innerHTML = '<div class="canvas-lib-empty-oa">Nada encontrado. Tente em inglês (ex: <strong>heart</strong>, <strong>cross</strong>, <strong>arrow</strong>) ou confira a ortografia.</div>';
           return;
         }
         const color = corAtual();
@@ -8041,15 +8157,33 @@
         }
 
         if (hint) hint.textContent = 'Buscando…';
+        const queryTerm = translateIconQuery(q);
+
         try {
-          let url = `${ICONIFY_API}/search?query=${encodeURIComponent(q)}&limit=64`;
+          let url = `${ICONIFY_API}/search?query=${encodeURIComponent(queryTerm)}&limit=64`;
           if (tab === 'stickers') url += `&prefixes=${STICKER_PREFIXES}`;
           const res = await fetch(url);
           const data = await res.json();
           if (seq !== buscaSeq) return; // chegou fora de ordem: descarta
-          const ids = data.icons || [];
+          let ids = data.icons || [];
+
+          if (!ids.length && queryTerm !== q) {
+            let url2 = `${ICONIFY_API}/search?query=${encodeURIComponent(q)}&limit=64`;
+            if (tab === 'stickers') url2 += `&prefixes=${STICKER_PREFIXES}`;
+            const res2 = await fetch(url2);
+            const data2 = await res2.json();
+            if (seq === buscaSeq) ids = data2.icons || [];
+          }
+
           renderResultados(ids);
-          if (hint) hint.textContent = ids.length ? `${ids.length} resultado${ids.length === 1 ? '' : 's'}` : '';
+          if (hint) {
+            if (ids.length) {
+              const transNote = queryTerm !== q ? ` (buscado por "${queryTerm}")` : '';
+              hint.textContent = `${ids.length} resultado${ids.length === 1 ? '' : 's'}${transNote}`;
+            } else {
+              hint.textContent = '';
+            }
+          }
         } catch (e) {
           if (seq !== buscaSeq) return;
           console.error('[biblioteca] busca falhou', e);
@@ -8493,458 +8627,7 @@
       }
     }
 
-    // --------------------------------------------------
-    // CENTRAL DE PLUGINS & RECURSOS (FIGMA STYLE)
-    // --------------------------------------------------
-    function initPluginsController() {
-      const modal = document.getElementById('canvas-plugins-modal');
-      const openBtn = document.getElementById('canvas-plugins-btn');
-      const closeBtn = document.getElementById('canvas-plugins-close');
-      const tabs = document.querySelectorAll('.canvas-plugins-tab-oa');
-      const content = document.getElementById('canvas-plugins-content');
-
-      if (!modal) return;
-
-      function openPluginsModal(initialPlugin = 'icons') {
-        modal.classList.add('open');
-        selectTab(initialPlugin);
-      }
-
-      function closePluginsModal() {
-        modal.classList.remove('open');
-      }
-
-      if (openBtn) openBtn.addEventListener('click', () => openPluginsModal());
-      if (closeBtn) closeBtn.addEventListener('click', closePluginsModal);
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) closePluginsModal();
-      });
-
-      // Atalho Shift + I para abrir os plugins (estilo Figma)
-      window.addEventListener('keydown', (e) => {
-        if (e.shiftKey && (e.key === 'I' || e.key === 'i')) {
-          const isTyping = document.activeElement && 
-            (document.activeElement.isContentEditable || document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
-          if (!isTyping) {
-            e.preventDefault();
-            e.stopPropagation();
-            if (modal.classList.contains('open')) closePluginsModal();
-            else openPluginsModal();
-          }
-        }
-      });
-
-      function selectTab(pluginId) {
-        tabs.forEach(t => t.classList.toggle('active', t.dataset.plugin === pluginId));
-        renderPluginView(pluginId);
-      }
-
-      tabs.forEach(t => {
-        t.addEventListener('click', () => selectTab(t.dataset.plugin));
-      });
-
-      function renderPluginView(pluginId) {
-        if (!content) return;
-        content.innerHTML = '';
-
-        if (pluginId === 'icons') renderIconsPlugin(content);
-        else if (pluginId === 'photos') renderPhotosPlugin(content);
-        else if (pluginId === 'qrcode') renderQrCodePlugin(content);
-        else if (pluginId === 'palettes') renderPalettesPlugin(content);
-        else if (pluginId === 'quotes') renderQuotesPlugin(content);
-
-        if (window.lucide) lucide.createIcons();
-      }
-
-      // API do Canvas para os Plugins
-      const api = {
-        getSelectedFrame() {
-          return selectedFrame() || frames[0] || null;
-        },
-        async addImage(dataUrlOrSvg, options = {}) {
-          const frame = this.getSelectedFrame();
-          if (!frame) {
-            alert('Crie ou selecione um post no Canvas primeiro.');
-            return;
-          }
-          const w = options.w || 120;
-          const h = options.h || 120;
-          const x = options.x !== undefined ? options.x : Math.round((frame.w - w) / 2);
-          const y = options.y !== undefined ? options.y : Math.round((frame.h - h) / 2);
-          await addImageNode(frame, dataUrlOrSvg, w, h, x, y);
-          closePluginsModal();
-        },
-        addText(text, options = {}) {
-          const frame = this.getSelectedFrame();
-          if (!frame) {
-            alert('Crie ou selecione um post no Canvas primeiro.');
-            return;
-          }
-          const w = options.w || Math.min(600, Math.round(frame.w * 0.75));
-          const x = options.x !== undefined ? options.x : Math.round((frame.w - w) / 2);
-          const y = options.y !== undefined ? options.y : Math.round((frame.h - 100) / 2);
-          const child = {
-            id: childSeq++,
-            type: 'text',
-            x, y, w,
-            text,
-            size: options.size || 28,
-            weight: options.weight || 600,
-            font: options.font || 'Inter',
-            color: options.color || '#111827',
-            align: options.align || 'center',
-            lineHeight: 1.35,
-            letterSpacing: 0,
-            opacity: 100
-          };
-          if (!frame.children) frame.children = [];
-          frame.children.push(child);
-          const frameEl = frameElOf(frame);
-          if (frameEl) renderChildNode(child, frame, frameEl);
-          selectTextNode(frame.id, child.id);
-          save();
-          closePluginsModal();
-        },
-        async setFrameBackground(imgUrlOrColor) {
-          const frame = this.getSelectedFrame();
-          if (!frame) {
-            alert('Selecione um post no Canvas primeiro.');
-            return;
-          }
-          if (isImageSrcValue(imgUrlOrColor)) {
-            const id = 'asset_bg_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-            assetCache.set(id, imgUrlOrColor);
-            await saveAsset(id, imgUrlOrColor);
-            frame.bgImage = null;
-            frame.bgAssetId = id;
-            if (frame.bgOverlay == null) frame.bgOverlay = 35;
-          } else {
-            frame.bg = imgUrlOrColor;
-            frame.bgImage = null;
-            frame.bgAssetId = null;
-          }
-          applyFrameBackground(frame);
-          save();
-          closePluginsModal();
-        }
-      };
-
-      // ------------------------------------------------
-      // PLUGIN 1: ÍCONES VETORIAIS (LUCIDE)
-      // ------------------------------------------------
-      const ICON_LIST = [
-        'heart', 'church', 'book-open', 'sun', 'moon', 'sparkles', 'cross', 'shield',
-        'flame', 'star', 'message-circle', 'bell', 'calendar', 'map-pin', 'instagram',
-        'facebook', 'youtube', 'twitter', 'send', 'share-2', 'bookmark', 'bookmark-check',
-        'arrow-right', 'arrow-left', 'arrow-up-right', 'check', 'check-circle', 'info',
-        'alert-circle', 'help-circle', 'user', 'users', 'eye', 'lock', 'play', 'music',
-        'headphones', 'quote', 'crown', 'compass', 'anchor', 'camera', 'gift', 'award',
-        'smile', 'thumbs-up', 'coffee', 'cloud', 'zap', 'feather', 'edit-3'
-      ];
-
-      let iconColor = '#8B5CF6';
-      let iconSize = 64;
-
-      function renderIconsPlugin(container) {
-        const toolbar = document.createElement('div');
-        toolbar.className = 'canvas-plugins-toolbar-oa';
-
-        const searchWrap = document.createElement('div');
-        searchWrap.className = 'canvas-plugins-search-wrap';
-        searchWrap.innerHTML = `
-          <i data-lucide="search" style="width: 14px; height: 14px;"></i>
-          <input type="text" class="canvas-plugins-search-input" id="plugin-icon-search" placeholder="Buscar ícone (ex: heart, church, sun, star, book)...">
-        `;
-        toolbar.appendChild(searchWrap);
-
-        const colorWrap = document.createElement('div');
-        colorWrap.style.display = 'flex';
-        colorWrap.style.alignItems = 'center';
-        colorWrap.style.gap = '6px';
-        colorWrap.innerHTML = `
-          <span style="font-size: 11.5px; font-weight: 500; color: #4B5563;">Cor:</span>
-          <input type="color" id="plugin-icon-color" value="${iconColor}" style="width: 28px; height: 28px; border-radius: 6px; border: 1px solid #E5E7EB; cursor: pointer;">
-        `;
-        toolbar.appendChild(colorWrap);
-
-        const sizeWrap = document.createElement('div');
-        sizeWrap.style.display = 'flex';
-        sizeWrap.style.alignItems = 'center';
-        sizeWrap.style.gap = '6px';
-        sizeWrap.innerHTML = `
-          <span style="font-size: 11.5px; font-weight: 500; color: #4B5563;">Tam:</span>
-          <select id="plugin-icon-size" class="canvas-batch-mapping-select-oa" style="padding: 4px 8px; font-size: 11.5px; width: 75px;">
-            <option value="32">32px</option>
-            <option value="48">48px</option>
-            <option value="64" selected>64px</option>
-            <option value="96">96px</option>
-            <option value="128">128px</option>
-          </select>
-        `;
-        toolbar.appendChild(sizeWrap);
-        container.appendChild(toolbar);
-
-        const grid = document.createElement('div');
-        grid.className = 'canvas-plugins-icons-grid';
-        container.appendChild(grid);
-
-        function drawIcons(filter = '') {
-          grid.innerHTML = '';
-          const q = filter.toLowerCase().trim();
-          const filtered = ICON_LIST.filter(name => !q || name.toLowerCase().includes(q));
-
-          if (filtered.length === 0) {
-            grid.innerHTML = '<div style="grid-column: 1/-1; text-align: center; color: #9CA3AF; padding: 20px; font-size: 13px;">Nenhum ícone encontrado.</div>';
-            return;
-          }
-
-          filtered.forEach(name => {
-            const item = document.createElement('div');
-            item.className = 'canvas-plugins-icon-item';
-            item.title = `Inserir ${name}`;
-            item.innerHTML = `
-              <i data-lucide="${name}" style="width: 24px; height: 24px; color: ${iconColor};"></i>
-              <span>${name}</span>
-            `;
-
-            item.addEventListener('click', async () => {
-              const svgEl = item.querySelector('svg');
-              if (!svgEl) return;
-              const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" fill="none" stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${svgEl.innerHTML}</svg>`;
-              const dataUrl = 'data:image/svg+xml;utf8,' + encodeURIComponent(svgString);
-              await api.addImage(dataUrl, { w: iconSize, h: iconSize });
-            });
-
-            grid.appendChild(item);
-          });
-          if (window.lucide) lucide.createIcons();
-        }
-
-        drawIcons();
-
-        const searchInput = toolbar.querySelector('#plugin-icon-search');
-        searchInput.addEventListener('input', (e) => drawIcons(e.target.value));
-
-        const colorInput = toolbar.querySelector('#plugin-icon-color');
-        colorInput.addEventListener('input', (e) => {
-          iconColor = e.target.value;
-          drawIcons(searchInput.value);
-        });
-
-        const sizeSelect = toolbar.querySelector('#plugin-icon-size');
-        sizeSelect.addEventListener('change', (e) => {
-          iconSize = Number(e.target.value);
-        });
-      }
-
-      // ------------------------------------------------
-      // PLUGIN 2: BANCO DE FOTOS GRATUITAS (UNSPLASH)
-      // ------------------------------------------------
-      const PHOTO_PRESETS = [
-        { title: 'Paz & Céu', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1080&q=80' },
-        { title: 'Bíblia & Luz', url: 'https://images.unsplash.com/photo-1504052434569-70ad5836ab65?auto=format&fit=crop&w=1080&q=80' },
-        { title: 'Montanhas & Fé', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1080&q=80' },
-        { title: 'Pôr do Sol Dourado', url: 'https://images.unsplash.com/photo-1495616811223-4d98c6e9c869?auto=format&fit=crop&w=1080&q=80' },
-        { title: 'Café & Manhã', url: 'https://images.unsplash.com/photo-1447933601403-0c6688de566e?auto=format&fit=crop&w=1080&q=80' },
-        { title: 'Floresta & Calmaria', url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1080&q=80' },
-        { title: 'Céu Estrelado', url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1080&q=80' },
-        { title: 'Textura Minimalista', url: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?auto=format&fit=crop&w=1080&q=80' },
-        { title: 'Vela & Oração', url: 'https://images.unsplash.com/photo-1543258103-a62bd9669e7b?auto=format&fit=crop&w=1080&q=80' }
-      ];
-
-      function renderPhotosPlugin(container) {
-        const toolbar = document.createElement('div');
-        toolbar.className = 'canvas-plugins-toolbar-oa';
-        toolbar.innerHTML = `
-          <div style="font-size: 12px; color: #6B7280;">Fotos em alta resolução gratuitas para seus posts.</div>
-        `;
-        container.appendChild(toolbar);
-
-        const grid = document.createElement('div');
-        grid.className = 'canvas-plugins-photos-grid';
-
-        PHOTO_PRESETS.forEach(photo => {
-          const card = document.createElement('div');
-          card.className = 'canvas-plugins-photo-card';
-          card.innerHTML = `
-            <img src="${photo.url}" alt="${photo.title}" loading="lazy">
-            <div class="canvas-plugins-photo-overlay">
-              <button type="button" class="canvas-plugins-photo-btn" data-action="insert">
-                <i data-lucide="plus" style="width: 12px; height: 12px;"></i>
-                <span>Inserir no Post</span>
-              </button>
-              <button type="button" class="canvas-plugins-photo-btn" data-action="bg" style="background: #8B5CF6; color: #FFF;">
-                <i data-lucide="image" style="width: 12px; height: 12px;"></i>
-                <span>Usar de Fundo</span>
-              </button>
-            </div>
-          `;
-
-          card.querySelector('[data-action="insert"]').addEventListener('click', async (e) => {
-            e.stopPropagation();
-            await api.addImage(photo.url, { w: 600, h: 450 });
-          });
-
-          card.querySelector('[data-action="bg"]').addEventListener('click', async (e) => {
-            e.stopPropagation();
-            await api.setFrameBackground(photo.url);
-          });
-
-          grid.appendChild(card);
-        });
-
-        container.appendChild(grid);
-      }
-
-      // ------------------------------------------------
-      // PLUGIN 3: GERADOR DE QR CODE
-      // ------------------------------------------------
-      function renderQrCodePlugin(container) {
-        const wrap = document.createElement('div');
-        wrap.className = 'canvas-plugins-qrcode-wrap';
-
-        const previewBox = document.createElement('div');
-        previewBox.className = 'canvas-plugins-qrcode-preview';
-        const canvas = document.createElement('canvas');
-        canvas.width = 160;
-        canvas.height = 160;
-        canvas.style.borderRadius = '8px';
-        previewBox.appendChild(canvas);
-
-        const form = document.createElement('div');
-        form.className = 'canvas-plugins-qrcode-form';
-        form.innerHTML = `
-          <div>
-            <label style="font-size: 12px; font-weight: 500; color: #374151; display: block; margin-bottom: 4px;">Link ou Texto:</label>
-            <input type="text" id="plugin-qr-text" class="canvas-plugins-search-input" value="https://oracaodiaria.space" placeholder="https://..." style="padding-left: 12px;">
-          </div>
-          <div style="display: flex; gap: 12px;">
-            <div style="flex: 1;">
-              <label style="font-size: 11.5px; font-weight: 500; color: #4B5563; display: block; margin-bottom: 4px;">Cor do QR:</label>
-              <input type="color" id="plugin-qr-color" value="#000000" style="width: 100%; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; cursor: pointer;">
-            </div>
-            <div style="flex: 1;">
-              <label style="font-size: 11.5px; font-weight: 500; color: #4B5563; display: block; margin-bottom: 4px;">Fundo:</label>
-              <input type="color" id="plugin-qr-bg" value="#ffffff" style="width: 100%; height: 32px; border-radius: 6px; border: 1px solid #E5E7EB; cursor: pointer;">
-            </div>
-          </div>
-          <button type="button" class="openpanel-btn-primary" id="plugin-qr-insert-btn" style="margin-top: 6px;">
-            <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
-            <span>Adicionar QR Code ao Post</span>
-          </button>
-        `;
-
-        wrap.appendChild(previewBox);
-        wrap.appendChild(form);
-        container.appendChild(wrap);
-
-        function drawQr() {
-          const text = form.querySelector('#plugin-qr-text').value.trim() || 'https://oracaodiaria.space';
-          const fg = form.querySelector('#plugin-qr-color').value;
-          const bg = form.querySelector('#plugin-qr-bg').value;
-          const ctx = canvas.getContext('2d');
-          ctx.fillStyle = bg;
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(text)}&color=${fg.replace('#', '')}&bgcolor=${bg.replace('#', '')}`;
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-          };
-          img.src = qrUrl;
-        }
-
-        form.querySelector('#plugin-qr-text').addEventListener('input', drawQr);
-        form.querySelector('#plugin-qr-color').addEventListener('input', drawQr);
-        form.querySelector('#plugin-qr-bg').addEventListener('input', drawQr);
-
-        form.querySelector('#plugin-qr-insert-btn').addEventListener('click', async () => {
-          const text = form.querySelector('#plugin-qr-text').value.trim() || 'https://oracaodiaria.space';
-          const fg = form.querySelector('#plugin-qr-color').value;
-          const bg = form.querySelector('#plugin-qr-bg').value;
-          const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(text)}&color=${fg.replace('#', '')}&bgcolor=${bg.replace('#', '')}`;
-          await api.addImage(qrUrl, { w: 180, h: 180 });
-        });
-
-        drawQr();
-      }
-
-      // ------------------------------------------------
-      // PLUGIN 4: PALETAS DE CORES HARMÔNICAS
-      // ------------------------------------------------
-      const PALETTES = [
-        { name: 'Oração & Céu', colors: ['#0F172A', '#1E293B', '#8B5CF6', '#F8FAFC'] },
-        { name: 'Natureza & Paz', colors: ['#064E3B', '#047857', '#F59E0B', '#F0FDF4'] },
-        { name: 'Pôr do Sol Esperança', colors: ['#4C0519', '#9F1239', '#F43F5E', '#FFF1F2'] },
-        { name: 'Minimalista Neutro', colors: ['#18181B', '#27272A', '#71717A', '#FAFAFA'] },
-        { name: 'Dourado Sagrado', colors: ['#1C1917', '#78350F', '#D97706', '#FEF3C7'] },
-        { name: 'Pastel Devocional', colors: ['#312E81', '#4F46E5', '#A5B4FC', '#EEF2FF'] }
-      ];
-
-      function renderPalettesPlugin(container) {
-        const grid = document.createElement('div');
-        grid.className = 'canvas-plugins-palettes-grid';
-
-        PALETTES.forEach(pal => {
-          const card = document.createElement('div');
-          card.className = 'canvas-plugins-palette-card';
-          card.innerHTML = `
-            <div class="canvas-plugins-palette-title">
-              <span>${pal.name}</span>
-              <span style="font-size: 11px; font-weight: 500; color: #8B5CF6;">Aplicar Fundo →</span>
-            </div>
-            <div class="canvas-plugins-swatches">
-              ${pal.colors.map(c => `<div class="canvas-plugins-swatch" style="background: ${c};" title="${c}"></div>`).join('')}
-            </div>
-          `;
-
-          card.addEventListener('click', async () => {
-            await api.setFrameBackground(pal.colors[0]);
-          });
-
-          grid.appendChild(card);
-        });
-
-        container.appendChild(grid);
-      }
-
-      // ------------------------------------------------
-      // PLUGIN 5: VERSÍCULOS & FRASES RÁPIDAS
-      // ------------------------------------------------
-      const QUOTES = [
-        { text: 'O Senhor é o meu pastor; de nada terei falta.', ref: 'Salmos 23:1' },
-        { text: 'Tudo posso naquele que me fortalece.', ref: 'Filipenses 4:13' },
-        { text: 'Porque sou eu que conheço os planos que tenho para vocês, diz o Senhor.', ref: 'Jeremias 29:11' },
-        { text: 'Aquele que habita no abrigo do Altíssimo e descansa à sombra do Todo-Poderoso.', ref: 'Salmos 91:1' },
-        { text: 'Mas os que esperam no Senhor renovam as suas forças.', ref: 'Isaías 40:31' },
-        { text: 'Confie no Senhor de todo o seu coração e não se apoie em seu próprio entendimento.', ref: 'Provérbios 3:5' }
-      ];
-
-      function renderQuotesPlugin(container) {
-        const list = document.createElement('div');
-        list.className = 'canvas-plugins-quotes-list';
-
-        QUOTES.forEach(q => {
-          const item = document.createElement('div');
-          item.className = 'canvas-plugins-quote-item';
-          item.innerHTML = `
-            <div class="canvas-plugins-quote-text">"${q.text}"</div>
-            <div class="canvas-plugins-quote-ref">${q.ref} · <span style="font-weight: 400; color: #6B7280;">Clique para inserir</span></div>
-          `;
-
-          item.addEventListener('click', () => {
-            api.addText(`"${q.text}"\n— ${q.ref}`, { size: 30, weight: 600 });
-          });
-
-          list.appendChild(item);
-        });
-
-        container.appendChild(list);
-      }
-    }
-
-    initPluginsController();
+    initIconLibraryController();
     initFrameToolbarController();
     initBatchCreateController();
     initCanvaExportController();
