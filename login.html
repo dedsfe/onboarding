@@ -10,11 +10,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
   
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-  
+  <!-- Lucide Icons — versão fixa + integrity.
+       Esta é a página onde o usuário digita a senha: qualquer script de terceiro aqui
+       lê o formulário. @latest deixava o fornecedor (ou quem comprometesse o CDN)
+       publicar código novo direto nesta página, sem revisão. -->
+  <script src="https://unpkg.com/lucide@1.33.0/dist/umd/lucide.min.js"
+          integrity="sha384-tCQ4YYVYKuOFYH+pnSIPOS3PaT3+5AmX2okMauzDJlLLxkQfJfSwmgpZPceZWs1F"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
   <!-- Supabase JS SDK & Auth Controller -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4/dist/umd/supabase.js"
+          integrity="sha384-ysv13JVP3fufiEXfjML9OdCa/rRbMJvUBOWyor82wfuK8INNZAvmbxHgKIHi+oqz"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="supabase-auth.js"></script>
 
   <style>

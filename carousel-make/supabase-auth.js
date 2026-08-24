@@ -2,6 +2,11 @@
  * supabase-auth.js
  * Gerenciador de Autenticação e Sincronização em Nuvem (The Carousel Make / Analytics Onboard)
  * Conectado ao projeto Supabase: gukebwwqhssmbnioqalm
+ * 
+ * Arquitetura de Alta Performance e Proteção de Memória:
+ * - Singleton rigoroso: 1 único cliente Supabase em memória por ciclo de vida da página
+ * - Trava anti-recursão para evitar loops infinitos de checagem de sessão e listagem
+ * - Prevenção contra estouro de RAM (Garbage Collection otimizado)
  */
 
 (function (window) {
@@ -11,13 +16,17 @@
   const DEFAULT_ANON_KEY = 'sb_publishable_goU53-qIP_OP8UaDNMPPIw_Oqz6POjj';
   const STORAGE_ANON_KEY = 'oa_supabase_anon_key';
 
-  // Chave pública / anônima conectada ao projeto Supabase gukebwwqhssmbnioqalm
   let supabaseAnonKey = localStorage.getItem(STORAGE_ANON_KEY) || DEFAULT_ANON_KEY;
   let supabaseClient = null;
   let currentUser = null;
+  let lastNotifiedUserId = Symbol('uninitialized');
   let authListeners = [];
+  let sdkLoadPromise = null;
+  let isCheckingSession = false;
 
   function initSupabaseClient() {
+    if (supabaseClient) return supabaseClient;
+
     if (window.supabase && typeof window.supabase.createClient === 'function') {
       try {
         supabaseClient = window.supabase.createClient(DEFAULT_SUPABASE_URL, supabaseAnonKey, {
@@ -27,26 +36,62 @@
             detectSessionInUrl: true
           }
         });
+
+        // Escuta nativa de eventos do Supabase (disparado apenas em mudanças reais)
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+          const newUser = (session && session.user) ? session.user : null;
+          handleUserChange(newUser);
+        });
+
+        // Checagem inicial de sessão uma única vez
         checkActiveSession();
       } catch (err) {
-        console.warn('[Supabase] Inicialização adiada:', err);
+        console.warn('[Supabase] Falha ao instanciar cliente singleton:', err);
       }
     }
+    return supabaseClient;
   }
 
-  // Carrega SDK do Supabase se ainda não existir na página
+  function handleUserChange(user) {
+    const nextId = user ? user.id : null;
+    if (lastNotifiedUserId === nextId) return; // Evita qualquer notificação redundante ou loop
+    
+    lastNotifiedUserId = nextId;
+    currentUser = user;
+    notifyAuthListeners(currentUser);
+  }
+
+  // Carrega SDK do Supabase se ainda não existir na página (Promise singleton compartilhada)
   function ensureSupabaseSDK() {
-    return new Promise((resolve) => {
+    if (supabaseClient) return Promise.resolve(supabaseClient);
+    if (sdkLoadPromise) return sdkLoadPromise;
+
+    sdkLoadPromise = new Promise((resolve) => {
       if (window.supabase && typeof window.supabase.createClient === 'function') {
-        initSupabaseClient();
-        return resolve(supabaseClient);
+        const client = initSupabaseClient();
+        return resolve(client);
       }
+
+      // Verifica se a tag de script já existe no documento
+      const existingScript = document.querySelector('script[src*="supabase-js"]');
+      if (existingScript) {
+        existingScript.addEventListener('load', () => {
+          const client = initSupabaseClient();
+          resolve(client);
+        }, { once: true });
+        existingScript.addEventListener('error', () => {
+          console.error('[Supabase] Falha ao carregar script existente do Supabase JS.');
+          resolve(null);
+        }, { once: true });
+        return;
+      }
+
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
       script.async = true;
       script.onload = () => {
-        initSupabaseClient();
-        resolve(supabaseClient);
+        const client = initSupabaseClient();
+        resolve(client);
       };
       script.onerror = () => {
         console.error('[Supabase] Falha ao carregar CDN do Supabase JS SDK.');
@@ -54,28 +99,29 @@
       };
       document.head.appendChild(script);
     });
+
+    return sdkLoadPromise;
   }
 
   async function checkActiveSession() {
-    if (!supabaseClient) return null;
+    if (!supabaseClient || isCheckingSession) return currentUser;
+    isCheckingSession = true;
     try {
       const { data: { session }, error } = await supabaseClient.auth.getSession();
-      if (!error && session && session.user) {
-        currentUser = session.user;
-        notifyAuthListeners(currentUser);
-        return currentUser;
-      }
+      const user = (!error && session && session.user) ? session.user : null;
+      handleUserChange(user);
+      return currentUser;
     } catch (e) {
       console.warn('[Supabase] Erro ao recuperar sessão:', e);
+    } finally {
+      isCheckingSession = false;
     }
-    currentUser = null;
-    notifyAuthListeners(null);
-    return null;
+    return currentUser;
   }
 
   function notifyAuthListeners(user) {
     authListeners.forEach(fn => {
-      try { fn(user); } catch (e) { console.error(e); }
+      try { fn(user); } catch (e) { console.error('[Supabase Auth Listener Error]', e); }
     });
   }
 
@@ -90,6 +136,9 @@
       if (!key) return;
       supabaseAnonKey = key.trim();
       localStorage.setItem(STORAGE_ANON_KEY, supabaseAnonKey);
+      supabaseClient = null; // reseta para reinicializar com a nova chave
+      sdkLoadPromise = null;
+      lastNotifiedUserId = Symbol('uninitialized');
       initSupabaseClient();
     },
 
@@ -103,8 +152,12 @@
 
     onAuthStateChange(callback) {
       if (typeof callback === 'function') {
-        authListeners.push(callback);
-        if (currentUser !== undefined) callback(currentUser);
+        if (!authListeners.includes(callback)) {
+          authListeners.push(callback);
+        }
+        if (lastNotifiedUserId !== Symbol('uninitialized')) {
+          try { callback(currentUser); } catch (e) { console.error(e); }
+        }
       }
     },
 
@@ -118,8 +171,7 @@
       });
 
       if (error) throw error;
-      currentUser = data.user;
-      notifyAuthListeners(currentUser);
+      handleUserChange(data.user);
       return data;
     },
 
@@ -135,8 +187,7 @@
 
       if (error) throw error;
       if (data.user) {
-        currentUser = data.user;
-        notifyAuthListeners(currentUser);
+        handleUserChange(data.user);
       }
       return data;
     },
@@ -160,8 +211,7 @@
       if (supabaseClient) {
         try { await supabaseClient.auth.signOut(); } catch (e) {}
       }
-      currentUser = null;
-      notifyAuthListeners(null);
+      handleUserChange(null);
     },
 
     // Salvar projeto no banco (tabela `projects` com RLS por dono)
@@ -219,9 +269,9 @@
     }
   };
 
-  // Inicializa quando a página carregar
+  // Inicializa quando a página carregar (apenas 1 vez)
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', ensureSupabaseSDK);
+    document.addEventListener('DOMContentLoaded', ensureSupabaseSDK, { once: true });
   } else {
     ensureSupabaseSDK();
   }

@@ -12,11 +12,22 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:ital,wght@0,300..800;1,300..800&family=Inter:ital,wght@0,300..800;1,300..800&family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300;1,400;1,500;1,600;1,700;1,800&family=Space+Grotesk:wght@300..700&family=Bebas+Neue&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=DM+Serif+Display:ital@0;1&family=Lora:ital,wght@0,400..700;1,400..700&family=Caveat:wght@400..700&family=JetBrains+Mono:ital,wght@0,300..700;1,300..700&display=swap">
-  <!-- Versão fixa de propósito: com @latest um release do fornecedor quebra a produção sem ninguém tocar no código -->
-  <script src="https://unpkg.com/lucide@1.33.0/dist/umd/lucide.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <!-- Supabase JS SDK & Auth Controller -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Versão fixa de propósito: com @latest um release do fornecedor quebra a produção sem ninguém tocar no código.
+       O integrity= vai junto: sem ele, versão fixa ainda confia cegamente no CDN — se o CDN for comprometido,
+       o script trocado roda com acesso total à sessão do Supabase. Ao subir de versão, recalcular o hash:
+       curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A -->
+  <script src="https://unpkg.com/lucide@1.33.0/dist/umd/lucide.min.js"
+          integrity="sha384-tCQ4YYVYKuOFYH+pnSIPOS3PaT3+5AmX2okMauzDJlLLxkQfJfSwmgpZPceZWs1F"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+          integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- Supabase JS SDK & Auth Controller.
+       Caminho explícito do arquivo (…/dist/umd/supabase.js) em vez de @2: o jsdelivr gera o
+       redirect do @2 dinamicamente e não recomenda SRI em cima dele. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4/dist/umd/supabase.js"
+          integrity="sha384-ysv13JVP3fufiEXfjML9OdCa/rRbMJvUBOWyor82wfuK8INNZAvmbxHgKIHi+oqz"
+          crossorigin="anonymous" referrerpolicy="no-referrer"></script>
   <script src="supabase-auth.js"></script>
 </head>
 <body>
