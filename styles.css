@@ -792,9 +792,159 @@ body {
               0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
+/* Máscara do frame (estilo Canva/Figma): fundo + textos + imagens ficam
+   presos dentro dos limites do post. Rótulo, guias, safezone e portas
+   moram fora deste wrapper justamente pra não serem cortados. */
+.canvas-frame__content {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+/* Chrome de seleção: vive FORA da máscara para as alças de resize e o botão
+   de rotação nunca serem cortados quando a imagem encosta na borda do frame. */
+.canvas-frame__chrome {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+}
+
+.canvas-image-chrome {
+  position: absolute;
+  pointer-events: none;
+  box-shadow: 0 0 0 calc(1.5px * var(--inv, 1)) #2563EB;
+}
+
+.canvas-chrome-handle {
+  position: absolute;
+  background: #FFFFFF;
+  border: 1.5px solid #2563EB;
+  pointer-events: auto;
+  transform: scale(var(--inv, 1));
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.canvas-chrome-handle--nw,
+.canvas-chrome-handle--ne,
+.canvas-chrome-handle--sw,
+.canvas-chrome-handle--se {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+/* Os deslocamentos também compensam o zoom (--inv): sem isso, em zoom baixo
+   as alças entravam para dentro da imagem e encostavam umas nas outras. */
+.canvas-chrome-handle--nw { left: calc(-6px * var(--inv, 1)); top: calc(-6px * var(--inv, 1)); cursor: nwse-resize; }
+.canvas-chrome-handle--se { right: calc(-6px * var(--inv, 1)); bottom: calc(-6px * var(--inv, 1)); cursor: nwse-resize; }
+.canvas-chrome-handle--ne { right: calc(-6px * var(--inv, 1)); top: calc(-6px * var(--inv, 1)); cursor: nesw-resize; }
+.canvas-chrome-handle--sw { left: calc(-6px * var(--inv, 1)); bottom: calc(-6px * var(--inv, 1)); cursor: nesw-resize; }
+
+.canvas-chrome-handle--n,
+.canvas-chrome-handle--s {
+  width: 18px;
+  height: 8px;
+  border-radius: 4px;
+  left: 50%;
+  margin-left: calc(-9px * var(--inv, 1));
+}
+
+.canvas-chrome-handle--n { top: calc(-4px * var(--inv, 1)); cursor: ns-resize; }
+.canvas-chrome-handle--s { bottom: calc(-4px * var(--inv, 1)); cursor: ns-resize; }
+
+.canvas-chrome-handle--e,
+.canvas-chrome-handle--w {
+  width: 8px;
+  height: 18px;
+  border-radius: 4px;
+  top: 50%;
+  margin-top: calc(-9px * var(--inv, 1));
+}
+
+.canvas-chrome-handle--e { right: calc(-4px * var(--inv, 1)); cursor: ew-resize; }
+.canvas-chrome-handle--w { left: calc(-4px * var(--inv, 1)); cursor: ew-resize; }
+
+/* Botão de rotação dentro do chrome sempre visível */
+.canvas-image-chrome .canvas-node__rotate-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Faixa panorâmica: divisórias marcam onde a exportação corta cada post.
+   As medidas usam --inv (1/zoom) para a linha ficar fina em qualquer zoom.
+   z-index alto: por cima de fundo colorido, fotos e textos — é guia de
+   corte, precisa sempre visível (mas sem capturar clique). */
+.canvas-frame__pano-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 45;
+}
+
+.canvas-frame__pano-cell {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-right: calc(1.5px * var(--inv, 1)) dashed rgba(37, 99, 235, 0.55);
+  /* Traço duplo (azul + branco) para ler sobre fundo escuro OU claro */
+  box-shadow: inset calc(-1.5px * var(--inv, 1)) 0 0 rgba(255, 255, 255, 0.45);
+}
+
+.canvas-frame__pano-cell.is-last {
+  border-right: none;
+}
+
+.canvas-frame__pano-tag {
+  position: absolute;
+  top: calc(10px * var(--inv, 1));
+  left: calc(10px * var(--inv, 1));
+  padding: calc(2px * var(--inv, 1)) calc(7px * var(--inv, 1));
+  border-radius: calc(6px * var(--inv, 1));
+  background: rgba(37, 99, 235, 0.9);
+  color: #FFFFFF;
+  font-size: calc(11px * var(--inv, 1));
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Durante a rajada de zoom o desfoque do fundo sai (é o filtro mais caro do
+   editor e o que fazia a tela quebrar/piscar); volta quando o zoom para. */
+.canvas-view.is-zooming .canvas-frame__bg-layer {
+  filter: none !important;
+}
+
+/* Faixa panorâmica: o desfoque é rasterizado em pedaços e é a maior fonte de
+   flicker nela — em zoom fica sem filter e sem transição, direto. */
+.canvas-view.is-zooming .canvas-frame.is-dragging-huge .canvas-frame__bg-layer,
+.canvas-frame.is-dragging-huge .canvas-frame__bg-layer {
+  filter: none !important;
+  transition: none !important;
+}
+
+/* Elementos em arraste também viajam por transform */
+.canvas-image-node.is-dragging,
+.canvas-text-node.is-dragging {
+  will-change: transform;
+}
+
+
 .canvas-frame.is-dragging {
+  /* O arraste acontece por transform: promove a camada e o conteúdo do frame
+     (divisórias, hachuras, rótulo) viaja junto sem ser repintado. */
+  will-change: transform;
   cursor: grabbing;
   box-shadow: 0 26px 52px -16px rgba(0, 0, 0, 0.4);
+}
+
+/* Frame maior que o tile de GPU do Chrome (4096px): promover a camada o
+   fatia em texturas e re-rasteriza durante o arrasto — o frame "pisca"
+   branco. Neles o arraste anda por left/top, sem will-change. */
+.canvas-frame.is-dragging-huge {
+  will-change: auto;
 }
 
 .canvas-frame__bg-container {
@@ -818,6 +968,30 @@ body {
   background-repeat: no-repeat;
   overflow: hidden;
   transition: background 0.15s ease, filter 0.15s ease;
+  /* Sem will-change permanente: numa faixa panorâmica (5400px) isso mantinha
+     uma textura gigante promovida que o Chrome fatia/re-rasterizava sem parar
+     — o flicker. Promoção só na hora da interação (regras abaixo). */
+}
+
+/* Camada interna só é promovida em frame pequeno; em faixa panorâmica
+   nenhuma camada interna vira textura. */
+.canvas-frame.is-repositioning-bg .canvas-frame__bg-layer {
+  will-change: transform;
+}
+
+/* Elementos em arraste também viajam por transform */
+.canvas-image-node.is-dragging,
+.canvas-text-node.is-dragging {
+  will-change: transform;
+}
+
+/* Faixa panorâmica grande: nenhuma camada interna promove — imagens e
+   fundos gigantes fatiados em textura são o flicker. */
+.canvas-frame.is-dragging-huge .canvas-frame__bg-layer,
+.canvas-frame.is-dragging-huge .canvas-image-node,
+.canvas-frame.is-dragging-huge .canvas-image-node__img,
+.canvas-frame.is-dragging-huge .canvas-text-node {
+  will-change: auto !important;
 }
 
 .canvas-frame__bg-overlay {
@@ -1508,9 +1682,13 @@ body {
 /* Alça de Rotação 360° (Texto e Imagens) */
 .canvas-node__rotate-handle {
   position: absolute;
-  top: -26px;
+  /* Fica ABAIXO do elemento: em cima ele disputava espaço com a alça do meio
+     e com a barra de edição, que nasce acima da seleção.
+     A distância usa --inv para não mudar conforme o zoom. */
+  top: auto;
+  bottom: calc(-30px * var(--inv, 1));
   left: 50%;
-  margin-left: -9px;
+  margin-left: calc(-9px * var(--inv, 1));
   width: 18px;
   height: 18px;
   background: #FFFFFF;
@@ -1521,7 +1699,7 @@ body {
   opacity: 0;
   pointer-events: none;
   transform: scale(var(--inv, 1));
-  transform-origin: center bottom;
+  transform-origin: center top;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   display: flex;
   align-items: center;
@@ -1533,7 +1711,7 @@ body {
 .canvas-node__rotate-handle::before {
   content: '';
   position: absolute;
-  top: 16px;
+  bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
   width: 1.5px;
@@ -1542,10 +1720,15 @@ body {
   pointer-events: none;
 }
 
-.canvas-text-node.is-selected .canvas-node__rotate-handle,
-.canvas-image-node.is-selected:not(.is-cropping) .canvas-node__rotate-handle {
+.canvas-text-node.is-selected .canvas-node__rotate-handle {
   opacity: 1;
   pointer-events: auto;
+}
+
+/* Na imagem o botão de rotação mora no chrome externo; o interno fica oculto */
+.canvas-image-node.is-selected:not(.is-cropping) .canvas-node__rotate-handle {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .canvas-node__rotate-handle:hover,
@@ -1587,10 +1770,10 @@ body.is-rotating-element * {
   position: absolute;
   z-index: 2;
   cursor: grab;
-  transform-origin: center center;
   box-shadow: 0 0 0 0 transparent; /* base para transição suave */
   transition: box-shadow 0.1s ease, border-radius 0.1s ease;
   user-select: none;
+  transform-origin: center center;
 }
 
 .canvas-image-node.is-dragging {
@@ -1638,8 +1821,8 @@ body.is-rotating-element * {
 }
 
 .canvas-image-node.is-selected:not(.is-cropping) .canvas-image-node__resize {
-  opacity: 1;
-  pointer-events: auto;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .canvas-image-node__resize--se {
@@ -6675,7 +6858,8 @@ body.is-rotating-element * {
 /* ------------------------------------------------------------
    CANVA-INSPIRED EXPORT MODAL (COM NOSSO DESIGN OA)
    ------------------------------------------------------------ */
-#canvas-export-modal .canva-export-modal-card {
+/* Sem escopo de id de propósito: o modal do panorâmico usa a mesma carcaça */
+.canva-export-modal-card {
   width: 380px;
   max-width: 92vw;
   background: rgba(18, 18, 22, 0.94);
@@ -7027,6 +7211,13 @@ body.is-rotating-element * {
   flex-shrink: 0;
 }
 
+/* Muitas opções: quebram em grade de 3 colunas em vez de espremer numa linha */
+.canva-export-segmented--wrap {
+  grid-template-columns: repeat(3, 1fr) !important;
+  border-radius: 12px !important;
+  gap: 4px;
+}
+
 .canva-export-segmented {
   display: grid;
   grid-template-columns: 1fr 1.3fr 1.2fr;
@@ -7175,10 +7366,6 @@ body.is-rotating-element * {
   background: rgba(255, 255, 255, 0.08) !important;
   border-color: rgba(255, 255, 255, 0.08) !important;
 }
-
-/* ============================================================
-   MODAL DE TEMPLATES DE CARROSSEL (3D CASCADING DECK)
-   ============================================================ */
 
 /* ============================================================
    MODAL DE TEMPLATES DE CARROSSEL (3D CASCADING DECK & FILMSTRIP)
@@ -8007,4 +8194,15 @@ body.is-rotating-element * {
 
 .canvas-frame.is-panoramic.is-last-panoramic::after {
   display: none;
+}
+
+/* ------------------------------------------------------------
+   TEMPLATES OCULTOS (temporário)
+   Botão da topbar, item do menu Inserir, ação do menu de ações e o
+   modal inteiro. O JS continua válido — só não há como abrir.
+   ------------------------------------------------------------ */
+#canvas-templates-btn,
+#canvas-templates-modal,
+#canvas-insert-menu [data-action="open-templates"] {
+  display: none !important;
 }
