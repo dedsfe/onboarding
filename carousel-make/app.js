@@ -294,6 +294,10 @@
       { css: '"Inter", sans-serif',            name: 'Inter',            weights: [300, 400, 500, 600, 700, 800] },
       { css: '"Poppins", sans-serif',          name: 'Poppins',          weights: [300, 400, 500, 600, 700, 800] },
       { css: '"Space Grotesk", sans-serif',    name: 'Space Grotesk',    weights: [300, 400, 500, 600, 700] },
+      // Arredondadas: da mais discreta (Nunito) à mais redonda (Fredoka)
+      { css: '"Nunito", sans-serif',           name: 'Nunito Rounded',   weights: [300, 400, 500, 600, 700, 800] },
+      { css: '"Quicksand", sans-serif',        name: 'Quicksand Rounded', weights: [300, 400, 500, 600, 700] },
+      { css: '"Fredoka", sans-serif',          name: 'Fredoka Rounded',  weights: [300, 400, 500, 600] },
       { css: '"Bebas Neue", sans-serif',       name: 'Bebas Neue',       weights: [400] },
       { css: '"Playfair Display", serif',      name: 'Playfair Display', weights: [400, 500, 600, 700, 800, 900] },
       { css: '"DM Serif Display", serif',      name: 'DM Serif Display', weights: [400] },
@@ -896,7 +900,13 @@
         ghostImg.style.width = `${child.imgW}px`;
         ghostImg.style.height = `${child.imgH}px`;
       }
+
+      // Mantém o chrome de seleção colado na imagem
+      const chrome = world.querySelector(`.canvas-image-chrome[data-id="${child.id}"]`);
+      if (chrome) positionImageChrome(chrome, child);
+
     }
+
 
     function enterCropMode(frameId, childId) {
       const frame = frames.find(f => f.id === frameId);
@@ -1918,13 +1928,11 @@
     function reorderChildDOM(frame) {
       const frameEl = frameElOf(frame);
       if (!frameEl || !frame.children) return;
-      const port = frameEl.querySelector('.canvas-frame__port--out');
+      const contentMask = frameEl.querySelector('.canvas-frame__content');
+      if (!contentMask) return;
       frame.children.forEach(child => {
-        const childEl = frameEl.querySelector(`[data-id="${child.id}"]`);
-        if (childEl) {
-          if (port) frameEl.insertBefore(childEl, port);
-          else frameEl.appendChild(childEl);
-        }
+        const childEl = contentMask.querySelector(`[data-id="${child.id}"]`);
+        if (childEl) contentMask.appendChild(childEl);
       });
     }
 
@@ -1993,6 +2001,8 @@
       }
       if (!nodes || nodes.length === 0) return;
 
+      let panoLabel = null;
+
       nodes.forEach(sel => {
         const frame = frames.find(f => f.id === sel.frameId);
         if (!frame) return;
@@ -2008,17 +2018,22 @@
         const w = child.w || el.offsetWidth || 100;
         const h = child.h || el.offsetHeight || 50;
 
+        // A referência horizontal é a fatia (o post) onde o elemento está
+        const slice = sliceBoundsFor(frame, (child.x || 0) + w / 2);
+        if (slice.total > 1) panoLabel = `${slice.index + 1}/${slice.total}`;
+        const sliceCenterX = Math.round(slice.left + (slice.width - w) / 2);
+
         if (alignment === 'center-h') {
-          child.x = Math.round((frame.w - w) / 2);
+          child.x = sliceCenterX;
         } else if (alignment === 'center-v') {
           child.y = Math.round((frame.h - h) / 2);
         } else if (alignment === 'center-both') {
-          child.x = Math.round((frame.w - w) / 2);
+          child.x = sliceCenterX;
           child.y = Math.round((frame.h - h) / 2);
         } else if (alignment === 'left') {
-          child.x = 40;
+          child.x = Math.round(slice.left) + 40;
         } else if (alignment === 'right') {
-          child.x = frame.w - w - 40;
+          child.x = Math.round(slice.left + slice.width) - w - 40;
         } else if (alignment === 'top') {
           child.y = 40;
         } else if (alignment === 'bottom') {
@@ -2039,7 +2054,11 @@
         'top': 'Alinhado ao topo!',
         'bottom': 'Alinhado à base!'
       };
-      if (labels[alignment]) toast.success(labels[alignment]);
+      if (labels[alignment]) {
+        // Na faixa, dizer em qual post caiu evita a dúvida de "centralizou onde?"
+        const sufixo = (panoLabel && nodes.length === 1) ? ` (post ${panoLabel})` : '';
+        toast.success(labels[alignment].replace(/!$/, '') + sufixo + '!');
+      }
     }
 
     function rotateSelectedNodes(val) {
@@ -2048,8 +2067,6 @@
         nodes = [{ frameId: selectedTextNode.frameId, childId: selectedTextNode.childId }];
       }
       if (!nodes || nodes.length === 0) return;
-
-      pushHistory();
 
       nodes.forEach(sel => {
         const frame = frames.find(f => f.id === sel.frameId);
@@ -2060,7 +2077,7 @@
           child.rotation = 0;
         } else {
           const cur = child.rotation || 0;
-          child.rotation = ((Math.round(cur + val) % 360) + 360) % 360;
+          child.rotation = ((cur + val) % 360 + 360) % 360;
         }
         const el = nodeElement(child.id);
         if (el) {
@@ -2070,7 +2087,7 @@
       });
       updateTextToolbar();
       save();
-      if (val === 'reset') toast.success('Rotação redefinida para 0°');
+      if (val === 'reset') toast.success('Rotação resetada para 0°');
       else toast.success(`Rotacionado para ${(selectedChild() && selectedChild().rotation) || 0}°`);
     }
 
@@ -2158,9 +2175,21 @@
       updateTextToolbar(); // Reposiciona ao mover a câmera
     }
 
+    /* Zoom re-rasteriza tudo que está na tela. Um fundo de foto com desfoque é
+       de longe o item mais caro dessa conta — durante a rajada de zoom ele sai
+       do ar e volta sozinho quando a roda para. */
+    let zoomSettleTimer = null;
+    function markZooming() {
+      if (!view) return;
+      view.classList.add('is-zooming');
+      clearTimeout(zoomSettleTimer);
+      zoomSettleTimer = setTimeout(() => view.classList.remove('is-zooming'), 180);
+    }
+
     function zoomAt(sx, sy, factor) {
       const next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, cam.scale * factor));
       if (next === cam.scale) return;
+      markZooming();
       // Mantém sob o cursor o mesmo ponto do mundo antes e depois do zoom
       const before = screenToWorld(sx, sy);
       cam.scale = next;
@@ -2278,6 +2307,162 @@
       save();
     }
 
+    /* Chrome de imagem (estilo Figma): contorno + 8 alças de resize + botão de
+       rotação, todos FORA da máscara do frame pra nunca serem cortados. */
+    function imageChromeOf(child) {
+      if (!child || child.type !== 'image') return null;
+      return world.querySelector(`.canvas-image-chrome[data-id="${child.id}"]`);
+    }
+
+    function getChromeLayer(frame) {
+      const frameEl = frameElOf(frame);
+      if (!frameEl) return null;
+      let layer = frameEl.querySelector(':scope > .canvas-frame__chrome');
+      if (!layer) {
+        layer = document.createElement('div');
+        layer.className = 'canvas-frame__chrome';
+        frameEl.appendChild(layer);
+      }
+      return layer;
+    }
+
+    function removeImageChrome(childId) {
+      const chrome = world.querySelector(`.canvas-image-chrome[data-id="${childId}"]`);
+      if (chrome) chrome.remove();
+    }
+
+    function syncImageChrome() {
+      // Limpa chromes de quem não está mais selecionado
+      world.querySelectorAll('.canvas-image-chrome').forEach(chrome => {
+        const cId = Number(chrome.dataset.id);
+        if (!selectedChildNodes.some(n => n.childId === cId)) chrome.remove();
+      });
+      if (selectedChildNodes.length !== 1) return;
+
+      const sel = selectedChildNodes[0];
+      const frame = frames.find(f => f.id === sel.frameId);
+      if (!frame) return;
+      const child = (frame.children || []).find(c => c.id === sel.childId);
+      if (!child || child.type !== 'image' || (croppingImage && croppingImage.childId === child.id)) return;
+
+      // Reaproveita o chrome existente
+      let chrome = imageChromeOf(child);
+      if (!chrome) {
+        chrome = document.createElement('div');
+        chrome.className = 'canvas-image-chrome';
+        chrome.dataset.id = child.id;
+
+        const dirs = ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'];
+        dirs.forEach(dir => {
+          const h = document.createElement('div');
+          h.className = `canvas-chrome-handle canvas-chrome-handle--${dir}`;
+          h.dataset.chromeHandle = dir;
+          chrome.appendChild(h);
+        });
+
+        const rotBtn = document.createElement('div');
+        rotBtn.className = 'canvas-node__rotate-handle';
+        rotBtn.title = 'Girar imagem (Shift trava a cada 15°)';
+        rotBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" width="10" height="10" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/>
+            <path d="M21 3v5h-5"/>
+          </svg>
+        `;
+        chrome.appendChild(rotBtn);
+
+        chrome.addEventListener('mousedown', (e) => {
+          if (e.target.closest('.canvas-node__rotate-handle')) {
+            startRotateNode(e, child, frame, nodeElement(child.id));
+            return;
+          }
+          const handle = e.target.closest('[data-chrome-handle]');
+          if (!handle) return;
+          e.stopPropagation();
+          e.preventDefault();
+          startChromeResize(e, child, frame, handle.dataset.chromeHandle, chrome);
+        });
+
+        const layer = getChromeLayer(frame);
+        if (layer) layer.appendChild(chrome);
+      }
+
+      positionImageChrome(chrome, child);
+    }
+
+    function positionImageChrome(chrome, child) {
+      chrome.style.left = `${child.x}px`;
+      chrome.style.top = `${child.y}px`;
+      chrome.style.width = `${child.w}px`;
+      chrome.style.height = `${child.h}px`;
+      chrome.style.borderRadius = `${child.borderRadius || 0}px`;
+      if (child.rotation) {
+        chrome.style.transform = `rotate(${child.rotation}deg)`;
+      } else {
+        chrome.style.transform = '';
+      }
+    }
+
+    /* Resize por qualquer borda: mantém proporção da imagem e cresce a foto
+       junto (imgW/imgH/imgX/imgY escalam proporcionalmente). */
+    function startChromeResize(e, child, frame, dir, chrome) {
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const o = { x: child.x, y: child.y, w: child.w, h: child.h, imgW: child.imgW, imgH: child.imgH, imgX: child.imgX, imgY: child.imgY };
+      const ratio = o.w / o.h;
+      const el = nodeElement(child.id);
+
+      const onMove = ev => {
+        const dx = (ev.clientX - startX) / cam.scale;
+        const dy = (ev.clientY - startY) / cam.scale;
+        let x = o.x, y = o.y, w = o.w, h = o.h;
+
+        if (dir === 'se') { w = o.w + dx; h = w / ratio; }
+        else if (dir === 'nw') { w = o.w - dx; h = w / ratio; x = o.x + (o.w - w); y = o.y + (o.h - h); }
+        else if (dir === 'ne') { w = o.w + dx; h = w / ratio; y = o.y + (o.h - h); }
+        else if (dir === 'sw') { w = o.w - dx; h = w / ratio; x = o.x + (o.w - w); }
+        else if (dir === 'n') { h = Math.max(20, o.h - dy); y = o.y + (o.h - h); }
+        else if (dir === 's') { h = Math.max(20, o.h + dy); }
+        else if (dir === 'e') { w = Math.max(20, o.w + dx); }
+        else if (dir === 'w') { w = Math.max(20, o.w - dx); x = o.x + (o.w - w); }
+
+        /* Cantos: trava a proporção e refaz a âncora com o tamanho JÁ limitado.
+           Sem isso, ao bater no mínimo a imagem escorregava para o lado. */
+        if (dir.length === 2) {
+          w = Math.max(20, w);
+          h = w / ratio;
+          x = dir.includes('w') ? o.x + (o.w - w) : o.x;
+          y = dir.includes('n') ? o.y + (o.h - h) : o.y;
+        }
+
+        const scale = dir.length === 2 ? w / o.w : 1;
+        child.x = Math.round(x);
+        child.y = Math.round(y);
+        child.w = Math.round(w);
+        child.h = Math.round(h);
+        if (dir.length === 2) {
+          /* imgX/imgY são medidos dentro do próprio nó (não no frame), então
+             escalam junto com ele — misturar com x/y do nó desalinhava o
+             recorte a cada arrasto. */
+          child.imgW = Math.round(o.imgW * scale);
+          child.imgH = Math.round(o.imgH * scale);
+          child.imgX = Math.round(o.imgX * scale);
+          child.imgY = Math.round(o.imgY * scale);
+        }
+        updateImageNodeDOM(child, el);
+        positionImageChrome(chrome, child);
+        updateTextToolbar();
+      };
+
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        saveQuiet();
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    }
+
     function selectTextNode(frameId, childId, isMulti = false) {
       if (croppingImage && (croppingImage.childId !== childId || isMulti)) {
         exitCropMode();
@@ -2321,6 +2506,8 @@
         const isSel = selectedChildNodes.some(n => n.childId === cId);
         el.classList.toggle('is-selected', isSel);
       });
+
+      syncImageChrome();
 
       world.querySelectorAll('.canvas-frame').forEach(el => {
         const fId = Number(el.dataset.id);
@@ -2670,6 +2857,12 @@
             nodeDom.style.transform = c.rotation ? `rotate(${c.rotation}deg)` : '';
             nodeDom.style.transformOrigin = 'center center';
           }
+          /* As 8 alças moram numa camada fora da máscara do frame: sem isto
+             elas ficavam paradas enquanto a imagem girava. */
+          if (c.type === 'image') {
+            const chromeDom = imageChromeOf(c);
+            if (chromeDom) positionImageChrome(chromeDom, c);
+          }
         });
 
         updateHud(targetAngle, ev.clientX, ev.clientY);
@@ -2740,22 +2933,77 @@
             let targetX = orig.x + dx;
             let targetY = orig.y + dy;
             const nodeH = el.offsetHeight || child.h || 40;
-            const nodeCenterX = targetX + child.w / 2;
+            const nodeW = child.w || el.offsetWidth || 100;
+            const nodeCenterX = targetX + nodeW / 2;
             const nodeCenterY = targetY + nodeH / 2;
-            const frameCenterX = frame.w / 2;
+            // O ímã horizontal mira o centro da fatia sob o elemento, não da faixa
+            const slice = sliceBoundsFor(frame, nodeCenterX);
+            const frameCenterX = slice.left + slice.width / 2;
             const frameCenterY = frame.h / 2;
             const SNAP_DIST = 16;
 
-            if (Math.abs(nodeCenterX - frameCenterX) < SNAP_DIST) {
-              targetX = Math.round(frameCenterX - child.w / 2);
+            /* Ímã de largura (estilo Figma): centro, bordas da fatia e
+               metades da fatia — cobre os encaixes que importam num post. */
+            const magnetXs = [
+              { at: slice.left + slice.width / 2, edge: 'center' },
+              { at: slice.left, edge: 'left' },
+              { at: slice.left + slice.width, edge: 'right' },
+              { at: slice.left + slice.width / 4, edge: 'quarter-l' },
+              { at: slice.left + (slice.width * 3) / 4, edge: 'quarter-r' }
+            ];
+            let bestX = null;
+            let bestGuideX = null;
+            magnetXs.forEach(m => {
+              // Testa o centro do nó e cada borda dele contra o ímã
+              const probes = [nodeCenterX, targetX, targetX + nodeW];
+              probes.forEach((probe, pi) => {
+                if (Math.abs(probe - m.at) < SNAP_DIST && (bestX === null || Math.abs(probe - m.at) < Math.abs(bestX.probe - bestX.m.at))) {
+                  const shift = m.at - probe;
+                  bestX = { probe, m, shift };
+                  bestGuideX = m.at;
+                }
+              });
+            });
+            if (bestX) {
+              targetX = Math.round(targetX + bestX.shift);
               dx = targetX - orig.x;
-              if (snapGuideV) snapGuideV.classList.add('is-active');
+              if (snapGuideV) {
+                snapGuideV.style.left = `${bestGuideX}px`;
+                snapGuideV.classList.add('is-active');
+              }
             } else if (snapGuideV) {
               snapGuideV.classList.remove('is-active');
             }
 
-            if (Math.abs(nodeCenterY - frameCenterY) < SNAP_DIST) {
-              targetY = Math.round(frameCenterY - nodeH / 2);
+            /* A guia vertical rosa respeita a fatia em que o elemento está:
+               ela nasce na borda esquerda e morre na direita do post atual. */
+            if (snapGuideV) {
+              snapGuideV.style.left = `${slice.left}px`;
+              snapGuideV.style.width = `${slice.width}px`;
+              snapGuideV.style.right = 'auto';
+              snapGuideV.style.transform = 'none';
+              snapGuideV.style.background = 'transparent';
+              snapGuideV.style.borderLeft = `calc(1px * var(--inv, 1)) solid #EC4899`;
+              snapGuideV.style.boxSizing = 'border-box';
+            }
+
+            /* Ímã vertical: centro, topo e base da faixa (Figma: edges + center) */
+            const magnetYs = [
+              { at: frameCenterY },
+              { at: 0 },
+              { at: frame.h }
+            ];
+            let bestY = null;
+            magnetYs.forEach(m => {
+              const probes = [nodeCenterY, targetY, targetY + nodeH];
+              probes.forEach(probe => {
+                if (Math.abs(probe - m.at) < SNAP_DIST && (bestY === null || Math.abs(probe - m.at) < Math.abs(bestY.probe - bestY.m.at))) {
+                  bestY = { probe, m, shift: m.at - probe };
+                }
+              });
+            });
+            if (bestY) {
+              targetY = Math.round(targetY + bestY.shift);
               dy = targetY - orig.y;
               if (snapGuideH) snapGuideH.classList.add('is-active');
             } else if (snapGuideH) {
@@ -2773,10 +3021,18 @@
 
           c.x = Math.round(orig.x + dx);
           c.y = Math.round(orig.y + dy);
+          /* Mesma regra do frame: no arraste anda por transform (camada
+             composta), senão uma foto grande é repintada inteira a cada
+             quadro e a tela engasga. A rotação entra junto, senão o elemento
+             girado voltava ao ângulo zero assim que era arrastado. */
           const cEl = nodeElement(c.id);
-          if (cEl) {
-            cEl.style.left = `${c.x}px`;
-            cEl.style.top = `${c.y}px`;
+          const giro = c.rotation ? ` rotate(${c.rotation}deg)` : '';
+          const passo = `translate3d(${c.x - orig.x}px, ${c.y - orig.y}px, 0)${giro}`;
+          if (cEl) cEl.style.transform = passo;
+          // As alças vivem noutra camada: sem isto ficavam paradas no lugar antigo
+          if (c.type === 'image') {
+            const chromeDom = imageChromeOf(c);
+            if (chromeDom) chromeDom.style.transform = passo;
           }
         });
         updateTextToolbar();
@@ -2784,8 +3040,21 @@
 
       const onUp = () => {
         nodesToMove.forEach(n => {
+          const f = frames.find(fr => fr.id === n.frameId);
+          const c = f && (f.children || []).find(ch => ch.id === n.childId);
           const cEl = nodeElement(n.childId);
-          if (cEl) cEl.classList.remove('is-dragging');
+          if (!cEl) return;
+          // Devolve a posição definitiva e mantém a rotação que o nó já tinha
+          cEl.style.transform = (c && c.rotation) ? `rotate(${c.rotation}deg)` : '';
+          if (c) {
+            cEl.style.left = `${c.x}px`;
+            cEl.style.top = `${c.y}px`;
+            if (c.type === 'image') {
+              const chromeDom = imageChromeOf(c);
+              if (chromeDom) positionImageChrome(chromeDom, c);
+            }
+          }
+          cEl.classList.remove('is-dragging');
         });
         if (snapGuideV) snapGuideV.classList.remove('is-active');
         if (snapGuideH) snapGuideH.classList.remove('is-active');
@@ -2968,6 +3237,10 @@
           }
         }
 
+        /* Durante o arraste o frame anda por transform, não por left/top:
+           left/top refaz o layout a cada quadro (é o que fazia o frame e o que
+           está em volta dele tremerem). O transform vira uma camada composta e
+           o desenho de dentro nem é repintado. A posição real entra no soltar. */
         framesToMove.forEach(f => {
           const orig = originPositions.get(f.id);
           if (orig) {
@@ -2975,8 +3248,19 @@
             f.y = Math.round(orig.y + dy);
             const fEl = frameElOf(f);
             if (fEl) {
-              fEl.style.left = `${f.x}px`;
-              fEl.style.top = `${f.y}px`;
+              /* Frame gigante (panorâmica de 5400px) não pode virar textura GPU:
+                 acima do tile de 4096px do Chrome ele é fatiado e re-rasterizado
+                 no meio do arrasto — era o piscar branco. Neles a posição anda
+                 por left/top, sem promover a camada. */
+              const huge = f.w > 4000 || f.h > 4000;
+              fEl.classList.toggle('is-dragging-huge', huge);
+              if (huge) {
+                fEl.style.transform = '';
+                fEl.style.left = `${f.x}px`;
+                fEl.style.top = `${f.y}px`;
+              } else {
+                fEl.style.transform = `translate3d(${f.x - orig.x}px, ${f.y - orig.y}px, 0)`;
+              }
             }
           }
         });
@@ -2988,7 +3272,12 @@
         if (worldGuideH) worldGuideH.style.display = 'none';
         framesToMove.forEach(f => {
           const fEl = frameElOf(f);
-          if (fEl) fEl.classList.remove('is-dragging');
+          if (!fEl) return;
+          // Troca o transform do arraste pela posição definitiva
+          fEl.style.transform = '';
+          fEl.style.left = `${f.x}px`;
+          fEl.style.top = `${f.y}px`;
+          fEl.classList.remove('is-dragging', 'is-dragging-huge');
         });
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
@@ -3296,7 +3585,10 @@
         startChildNodeDrag(e, child, frame, el);
       });
 
-      frameEl.appendChild(el);
+      // Dentro da máscara do frame: imagem grande demais é cortada nas bordas
+      const contentMask = frameEl.querySelector('.canvas-frame__content');
+      if (contentMask) contentMask.appendChild(el);
+      else frameEl.appendChild(el);
       return el;
     }
 
@@ -3331,6 +3623,14 @@
         el.appendChild(tag);
       }
       tag.textContent = `{{${child.bind}}}`;
+    }
+
+    /* Qualquer código que pinte is-selected nos nós sem passar por
+       selectTextNode (marquee, undo, delete, paste) também precisa manter
+       o chrome em sincronia — este observer cobre todos de uma vez. */
+    function watchSelectionForChrome() {
+      const mo = new MutationObserver(() => syncImageChrome());
+      mo.observe(world, { subtree: true, attributeFilter: ['class'], attributeOldValue: false });
     }
 
     function nodeElement(childId) {
@@ -3548,7 +3848,10 @@
         enterTextEditing(content, e.clientX, e.clientY);
       });
 
-      frameEl.appendChild(el);
+      // Dentro da máscara do frame: texto além da borda é cortado
+      const contentMask = frameEl.querySelector('.canvas-frame__content');
+      if (contentMask) contentMask.appendChild(el);
+      else frameEl.appendChild(el);
       return el;
     }
 
@@ -3687,6 +3990,55 @@
       });
       selectTextNode(null, null);
       save();
+    }
+
+    function isPanoramicFrame(frame) {
+      return !!(frame && frame.panoramic && frame.panoramic.slices > 1);
+    }
+
+    function panoramicSliceCount(frame) {
+      return isPanoramicFrame(frame) ? frame.panoramic.slices : 1;
+    }
+
+    /* Numa faixa panorâmica o "post" é a fatia, não a faixa inteira. Centralizar
+       e o ímã têm que mirar a fatia onde o elemento está — senão o texto do post
+       5 voa para o meio da faixa, que é a emenda entre o post 2 e o 3. */
+    function sliceBoundsFor(frame, centerX) {
+      if (!isPanoramicFrame(frame)) {
+        return { left: 0, width: frame.w, index: 0, total: 1 };
+      }
+      const total = frame.panoramic.slices;
+      const width = frame.w / total;
+      const index = Math.min(total - 1, Math.max(0, Math.floor((centerX || 0) / width)));
+      return { left: index * width, width, index, total };
+    }
+
+    function frameFormatBadge(frame, fmt) {
+      if (!isPanoramicFrame(frame)) return `${fmt.name} · ${frame.w} × ${frame.h}`;
+      const n = frame.panoramic.slices;
+      return `${fmt.name} · ${n} posts · ${frame.w} × ${frame.h}`;
+    }
+
+    /* As divisórias são o contrato visual da faixa: o que fica dentro de cada
+       célula é exatamente o que sai naquele post. */
+    function createPanoramicGuides(frame) {
+      const slices = frame.panoramic.slices;
+      const sliceW = frame.w / slices;
+      const layer = document.createElement('div');
+      layer.className = 'canvas-frame__pano-guides';
+      for (let i = 0; i < slices; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'canvas-frame__pano-cell';
+        if (i === slices - 1) cell.classList.add('is-last');
+        cell.style.left = `${i * sliceW}px`;
+        cell.style.width = `${sliceW}px`;
+        const tag = document.createElement('span');
+        tag.className = 'canvas-frame__pano-tag';
+        tag.textContent = `${i + 1}/${slices}`;
+        cell.appendChild(tag);
+        layer.appendChild(cell);
+      }
+      return layer;
     }
 
     function createSafeZoneElement(frame) {
@@ -3849,6 +4201,51 @@
       return container;
     }
 
+    /* Desfoque de fundo assado no bitmap: `filter: blur()` numa foto grande é
+       recalculado a cada zoom (era isso que fazia a tela quebrar e piscar).
+       Aqui o desfoque é aplicado uma vez num canvas menor e vira imagem comum,
+       então o zoom não custa mais nada. O export continua usando o original. */
+    const blurredBgCache = new Map();
+    let bgBakeSeq = 0;
+
+    function makeBlurredBg(src, blurPx, frameW, frameH) {
+      const key = `${blurPx}|${frameW}x${frameH}|${src.length}|${src.slice(-48)}`;
+      if (blurredBgCache.has(key)) return Promise.resolve(blurredBgCache.get(key));
+      return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          try {
+            const natW = img.naturalWidth || img.width;
+            const natH = img.naturalHeight || img.height;
+            if (!natW || !natH) return resolve(null);
+            const MAX_W = 1600;
+            const k = Math.min(1, MAX_W / natW);
+            const outW = Math.max(1, Math.round(natW * k));
+            const outH = Math.max(1, Math.round(natH * k));
+            /* O raio é medido no tamanho em que a foto aparece no post (cover),
+               então volta para a escala do bitmap antes de ser aplicado. */
+            const disp = Math.max(frameW / natW, frameH / natH) || 1;
+            const radius = Math.max(0.5, (blurPx / disp) * k);
+            const canvas = document.createElement('canvas');
+            canvas.width = outW;
+            canvas.height = outH;
+            const ctx = canvas.getContext('2d');
+            ctx.filter = `blur(${radius}px)`;
+            ctx.drawImage(img, 0, 0, outW, outH);
+            const url = canvas.toDataURL('image/jpeg', 0.82);
+            blurredBgCache.set(key, url);
+            resolve(url);
+          } catch (e) {
+            // Foto de outro domínio suja o canvas: segue com o filtro em CSS
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = src;
+      });
+    }
+
     function applyFrameBackground(frame, frameEl) {
       const el = frameEl || frameElOf(frame);
       if (!el) return;
@@ -3857,7 +4254,10 @@
       if (!bgContainer) {
         bgContainer = document.createElement('div');
         bgContainer.className = 'canvas-frame__bg-container';
-        el.prepend(bgContainer);
+        // Fundo mora dentro da máscara (se existir) pro clip valer também pra ele
+        const contentMask = el.querySelector('.canvas-frame__content');
+        if (contentMask) contentMask.prepend(bgContainer);
+        else el.prepend(bgContainer);
       }
 
       let bgLayer = bgContainer.querySelector('.canvas-frame__bg-layer');
@@ -3895,10 +4295,25 @@
 
         /* Asset ainda não veio do IndexedDB (reload): pinta a camada que já
            existe quando chegar — recriar o frame aqui duplicaria o elemento. */
+        /* Mostra na hora com o filtro em CSS e, quando a versão já desfocada
+           fica pronta, troca por ela e desliga o filtro. */
+        const bakeInto = (layerRef, src) => {
+          if (!src || blurPx <= 0) return;
+          const stamp = String(++bgBakeSeq);
+          layerRef.dataset.bakeStamp = stamp;
+          makeBlurredBg(src, blurPx, frame.w || 1080, frame.h || 1350).then(url => {
+            if (!url || layerRef.dataset.bakeStamp !== stamp) return;
+            layerRef.style.backgroundImage = `url("${url}")`;
+            layerRef.style.filter = 'none';
+          });
+        };
+
         if (!bgSrc && frame.bgAssetId) {
           const layerRef = bgLayer;
           getAsset(frame.bgAssetId).then(src => {
-            if (src) layerRef.style.backgroundImage = `url("${src}")`;
+            if (!src) return;
+            layerRef.style.backgroundImage = `url("${src}")`;
+            bakeInto(layerRef, src);
           });
         }
 
@@ -3909,6 +4324,8 @@
         bgLayer.style.transformOrigin = `${posX}% ${posY}%`;
         bgLayer.style.filter = blurPx > 0 ? `blur(${blurPx}px)` : 'none';
         bgLayer.style.transform = totalScale !== 1 ? `scale(${totalScale})` : 'none';
+
+        bakeInto(bgLayer, bgSrc);
         bgLayer.style.backgroundColor = frame.bg || 'transparent';
 
         if (overlayAlpha > 0) {
@@ -4012,6 +4429,15 @@
       el.style.top = `${frame.y}px`;
       el.style.width = `${frame.w}px`;
       el.style.height = `${frame.h}px`;
+      // Marca desde o nascimento quem é maior que o tile de GPU: essas camadas
+      // internas nunca são promovidas (a promoção é o flicker do panorâmico)
+      if (frame.w > 4000 || frame.h > 4000) el.classList.add('is-dragging-huge');
+
+      // Máscara de conteúdo: tudo que é post (fundo + filhos) mora aqui dentro
+      const contentMask = document.createElement('div');
+      contentMask.className = 'canvas-frame__content';
+      el.appendChild(contentMask);
+
       applyFrameBackground(frame, el);
 
       const label = document.createElement('div');
@@ -4019,7 +4445,7 @@
       const displayName = formatFrameDisplayName(frame);
       label.innerHTML = `
         <span class="canvas-frame__name-badge" title="Clique duas vezes para renomear">${escapeHtml(displayName)}</span>
-        <span class="canvas-frame__format-badge">${fmt.name} · ${frame.w} × ${frame.h}</span>
+        <span class="canvas-frame__format-badge">${frameFormatBadge(frame, fmt)}</span>
       `;
       const nameBadge = label.querySelector('.canvas-frame__name-badge');
       if (nameBadge) {
@@ -4053,7 +4479,23 @@
       el.appendChild(snapGuideH);
 
       // Overlay de Safe Zone específico do formato
-      el.appendChild(createSafeZoneElement(frame));
+      /* Na faixa panorâmica cada fatia é um post de verdade, então o visor de
+         área segura da rede aparece repetido, um por fatia. */
+      if (isPanoramicFrame(frame)) {
+        const slices = frame.panoramic.slices;
+        const sliceW = frame.w / slices;
+        for (let i = 0; i < slices; i++) {
+          const safeZone = createSafeZoneElement(frame);
+          safeZone.style.left = `${i * sliceW}px`;
+          safeZone.style.right = 'auto';
+          safeZone.style.width = `${sliceW}px`;
+          el.appendChild(safeZone);
+        }
+        // Mostra onde a exportação vai cortar cada post
+        el.appendChild(createPanoramicGuides(frame));
+      } else {
+        el.appendChild(createSafeZoneElement(frame));
+      }
       
       // Renderiza textos e imagens guardados
       if (frame.children) {
@@ -4281,53 +4723,44 @@
       applyCamera();
     }
 
+    /* Panorâmico é UM post largo, não vários colados: a pessoa desenha numa
+       faixa de (largura do formato × nº de posts) e a exportação corta a faixa
+       nas fatias do tamanho exato da rede. Nada atravessa nada. */
     function createPanoramicCarousel(count = 5, formatKey = 'ig-feed') {
       const key = (formatKey && FORMATS[formatKey]) ? formatKey : 'ig-feed';
       const fmt = FORMATS[key];
-      const numSlides = Math.max(2, Math.min(10, count));
-      
-      let startX, startY;
+      const slices = Math.max(2, Math.min(10, count));
+      const totalW = fmt.w * slices;
+
+      let x, y;
       if (frames.length) {
         const last = frames[frames.length - 1];
-        startX = last.x + last.w + FRAME_GAP;
-        startY = last.y;
+        x = last.x + last.w + FRAME_GAP;
+        y = last.y;
       } else {
         const center = screenToWorld(innerWidth / 2, innerHeight / 2);
-        const totalW = numSlides * fmt.w;
-        startX = Math.round(center.x - totalW / 2);
-        startY = Math.round(center.y - fmt.h / 2);
+        x = Math.round(center.x - totalW / 2);
+        y = Math.round(center.y - fmt.h / 2);
       }
 
-      const newCreatedFrames = [];
-      const newFrameIds = new Set();
-
-      for (let i = 0; i < numSlides; i++) {
-        const posX = startX + i * fmt.w;
-        const posY = startY;
-        const frameName = `Post ${i + 1}/${numSlides} (Panorâmico)`;
-        const frame = {
-          id: frameSeq++,
-          name: frameName,
-          format: key,
-          x: posX,
-          y: posY,
-          w: fmt.w,
-          h: fmt.h,
-          bg: '#FFFFFF',
-          isPanoramic: true,
-          panoramicIndex: i,
-          panoramicTotal: numSlides,
-          children: []
-        };
-
-        // Adiciona um título de exemplo bem limpo no primeiro slide
-        if (i === 0) {
-          frame.children.push({
+      const frame = {
+        id: frameSeq++,
+        name: `Panorâmico ${slices} posts`,
+        format: key,
+        x,
+        y,
+        w: totalW,
+        h: fmt.h,
+        bg: '#FFFFFF',
+        panoramic: { slices },
+        children: [
+          {
             id: childSeq++,
             type: 'text',
             text: 'SEU TÍTULO AQUI',
             x: 80,
             y: 140,
+            w: Math.min(900, fmt.w - 160),
             fontSize: 68,
             fontFamily: 'Inter',
             fontWeight: 800,
@@ -4335,67 +4768,19 @@
             align: 'left',
             lineHeight: 1.15,
             letterSpacing: -0.02
-          });
-          frame.children.push({
-            id: childSeq++,
-            type: 'text',
-            text: 'Subtítulo ou introdução que instiga o leitor a arrastar para o lado.',
-            x: 80,
-            y: 300,
-            fontSize: 28,
-            fontFamily: 'Inter',
-            fontWeight: 500,
-            fill: '#71717A',
-            align: 'left',
-            lineHeight: 1.35
-          });
-        }
-
-        frames.push(frame);
-        newCreatedFrames.push(frame);
-        newFrameIds.add(frame.id);
-        renderFrame(frame);
-
-        // Cria conexão entre os frames consecutivos
-        if (i > 0) {
-          const prevFrame = newCreatedFrames[i - 1];
-          links.push({
-            id: linkSeq++,
-            from: prevFrame.id,
-            to: frame.id
-          });
-        }
-      }
-
-      // Renderiza as novas conexões
-      renderLinks();
-
-      // Marca o último como is-last-panoramic para não desenhar linha pontilhada no final
-      newCreatedFrames.forEach((f, idx) => {
-        const el = world.querySelector(`.canvas-frame[data-id="${f.id}"]`);
-        if (el) {
-          el.classList.add('is-panoramic');
-          if (idx === newCreatedFrames.length - 1) {
-            el.classList.add('is-last-panoramic');
           }
-        }
-      });
+        ]
+      };
 
-      selectedFrameIds = newFrameIds;
-      selectedId = newCreatedFrames[0].id;
-      world.querySelectorAll('.canvas-frame').forEach((el) => {
-        const fId = Number(el.dataset.id);
-        el.classList.toggle('is-selected', selectedFrameIds.has(fId));
-      });
-
-      updateTopbar();
+      frames.push(frame);
+      renderFrame(frame);
+      selectFrame(frame.id);
       updateFrameMeta();
       updateFrameLabels();
       save();
 
-      // Ajusta o zoom e a câmera para enquadrar a esteira inteira
-      zoomToFitFrames(newCreatedFrames);
-      toast.success(`Carrossel panorâmico criado: ${numSlides} posts contínuos`);
+      zoomToFitFrames([frame]);
+      toast.success(`Faixa panorâmica criada: ${slices} posts de ${fmt.w} × ${fmt.h}`);
     }
 
     function addFrame(formatKey = 'ig-feed') {
@@ -4696,7 +5081,7 @@
         label.innerHTML = `
           <span class="canvas-frame__name-badge" title="Clique duas vezes para renomear">${escapeHtml(displayName)}${pagination}</span>
           ${bindTag}
-          <span class="canvas-frame__format-badge">${fmt.name} · ${frame.w} × ${frame.h}</span>
+          <span class="canvas-frame__format-badge">${frameFormatBadge(frame, fmt)}</span>
         `;
 
         const nameBadge = label.querySelector('.canvas-frame__name-badge');
@@ -4907,7 +5292,11 @@
       renderLinks();
       updateFrameMeta();
       applyCamera();
+      syncImageChrome();
     }
+
+    // Observer global: qualquer mudança de is-selected re-sincroniza o chrome
+    watchSelectionForChrome();
 
     /* --------------------------------------------------
        Pan (com Espaço / Botão do Meio) e Seleção Múltipla (Marquee / Lasso)
@@ -8623,6 +9012,37 @@
         return new Promise(resolve => canvas.toBlob(resolve, mime, quality));
       }
 
+      /* Corta a faixa panorâmica nas fatias do tamanho da rede. Renderiza a
+         faixa inteira uma única vez: é o mesmo desenho, só recortado, então a
+         emenda entre um post e outro fecha no pixel. */
+      function sliceCanvasIntoPosts(canvas, slices) {
+        const parts = [];
+        const sliceW = Math.round(canvas.width / slices);
+        for (let i = 0; i < slices; i++) {
+          const part = document.createElement('canvas');
+          part.width = sliceW;
+          part.height = canvas.height;
+          const pctx = part.getContext('2d');
+          pctx.imageSmoothingEnabled = false;
+          pctx.drawImage(canvas, i * sliceW, 0, sliceW, canvas.height, 0, 0, sliceW, canvas.height);
+          parts.push(part);
+        }
+        return parts;
+      }
+
+      /* Um frame comum vira 1 arquivo; uma faixa panorâmica vira N. */
+      async function exportFrameToBlobs(frame, options = {}) {
+        const canvas = await renderFrameToCanvas(frame, options);
+        const format = options.format || 'png';
+        const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+        const quality = format === 'jpeg' ? 0.95 : undefined;
+        const slices = panoramicSliceCount(frame);
+        const parts = slices > 1 ? sliceCanvasIntoPosts(canvas, slices) : [canvas];
+        return Promise.all(parts.map(part =>
+          new Promise(resolve => part.toBlob(resolve, mime, quality))
+        ));
+      }
+
       // Execução da Exportação em Lote
       if (startBtn) {
         startBtn.addEventListener('click', runBatchExport);
@@ -8682,10 +9102,15 @@
                 ? `Gerando post ${i + 1} de ${totalRows} · slide ${s + 1}/${chain.length}...`
                 : `Gerando post ${i + 1} de ${totalRows}...`;
             }
-            const blob = await exportFrameToBlob(chain[s], { scale, format, overrides });
-            zip.file(isCarousel
-              ? `carrossel_${postNum}/slide_${s + 1}.${ext}`
-              : `post_${postNum}.${ext}`, blob);
+            /* Faixa panorâmica devolve várias fatias para o mesmo slide: cada
+               uma entra como um post do carrossel. */
+            const blobs = await exportFrameToBlobs(chain[s], { scale, format, overrides });
+            blobs.forEach((blob, sliceIdx) => {
+              const slideNum = blobs.length > 1 ? `${s + 1}-${sliceIdx + 1}` : `${s + 1}`;
+              zip.file(isCarousel || blobs.length > 1
+                ? `carrossel_${postNum}/slide_${slideNum}.${ext}`
+                : `post_${postNum}.${ext}`, blob);
+            });
           }
 
           // Permite que o navegador respire e renderize o progresso
@@ -8998,6 +9423,7 @@
       window.openBatchModal = openBatchModal;
       window.renderStep1BindsStatus = renderStep1BindsStatus;
       window.exportFrameToBlob = exportFrameToBlob;
+      window.exportFrameToBlobs = exportFrameToBlobs;
       window.renderFrameToCanvas = renderFrameToCanvas;
       window.selectFrame = selectFrame;
       window.addTextToSelectedFrame = addTextToSelectedFrame;
@@ -11006,59 +11432,58 @@
             return;
           }
 
-          // Se for mais de 1 post, exporta como ZIP elegante
-          if (framesToExport.length > 1) {
+          /* Cada frame vira um arquivo — menos a faixa panorâmica, que vira
+             um arquivo por post. Só depois de montar a lista é que se decide
+             entre download direto e .zip. */
+          const files = [];
+          for (let i = 0; i < framesToExport.length; i++) {
+            const f = framesToExport[i];
+            const pct = Math.round(((i + 1) / framesToExport.length) * 100);
+            if (progressText) {
+              progressText.textContent = framesToExport.length > 1
+                ? `Gerando ${i + 1} de ${framesToExport.length}...`
+                : 'Gerando imagem em alta resolução...';
+            }
+            if (progressPct) progressPct.textContent = `${pct}%`;
+            if (progressFill) progressFill.style.width = `${pct}%`;
+
+            const blobs = await window.exportFrameToBlobs(f, { scale, format });
+            const base = sanitizeFilename(userFilename) || sanitizeFilename(f.name) || `post_${f.id}`;
+            const prefix = framesToExport.length > 1 ? `${i + 1}_` : '';
+            blobs.forEach((blob, sliceIdx) => {
+              const suffix = blobs.length > 1 ? `_${sliceIdx + 1}` : '';
+              files.push({ blob, name: `${prefix}${base}${suffix}.${ext}` });
+            });
+            await new Promise(r => setTimeout(r, 10));
+          }
+
+          const saveBlob = (blob, filename) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          };
+
+          if (files.length > 1) {
             if (!window.JSZip) {
               toast.info('Carregando biblioteca de exportação...');
               submitBtn.disabled = false;
               return;
             }
-            const zip = new JSZip();
-            const zipBaseName = sanitizeFilename(userFilename) || 'carrossel';
-
-            for (let i = 0; i < framesToExport.length; i++) {
-              const f = framesToExport[i];
-              const pct = Math.round(((i + 1) / framesToExport.length) * 100);
-              if (progressText) progressText.textContent = `Exportando slide ${i + 1} de ${framesToExport.length}...`;
-              if (progressPct) progressPct.textContent = `${pct}%`;
-              if (progressFill) progressFill.style.width = `${pct}%`;
-
-              const blob = await window.exportFrameToBlob(f, { scale, format });
-              const slideNamePart = sanitizeFilename(f.name) || `slide_${i + 1}`;
-              const slideFilename = `${i + 1}_${slideNamePart}.${ext}`;
-              zip.file(slideFilename, blob);
-              await new Promise(r => setTimeout(r, 10));
-            }
-
             if (progressText) progressText.textContent = 'Criando arquivo ZIP...';
+            const zip = new JSZip();
+            files.forEach(file => zip.file(file.name, file.blob));
+            const zipBaseName = sanitizeFilename(userFilename) || 'carrossel';
             const zipBlob = await zip.generateAsync({ type: 'blob' });
-            const url = URL.createObjectURL(zipBlob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${zipBaseName}.zip`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            toast.success(`Carrossel exportado: ${zipBaseName}.zip`);
-          } else {
-            // Post único
-            const frame = framesToExport[0];
-            if (progressText) progressText.textContent = 'Gerando imagem em alta resolução...';
-            if (progressPct) progressPct.textContent = '100%';
-            if (progressFill) progressFill.style.width = '100%';
-
-            const blob = await window.exportFrameToBlob(frame, { scale, format });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const singleName = sanitizeFilename(userFilename) || sanitizeFilename(frame.name) || `post_${frame.id}`;
-            a.download = `${singleName}.${ext}`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            toast.success(`Post exportado: ${singleName}.${ext}`);
+            saveBlob(zipBlob, `${zipBaseName}.zip`);
+            toast.success(`${files.length} imagens exportadas: ${zipBaseName}.zip`);
+          } else if (files.length === 1) {
+            saveBlob(files[0].blob, files[0].name);
+            toast.success(`Post exportado: ${files[0].name}`);
           }
 
           if (progressText) progressText.textContent = '✓ Download concluído!';

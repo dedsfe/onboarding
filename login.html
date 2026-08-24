@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign in — The Carousel Make / Analytics Onboard</title>
+  
+  <!-- Tipografia OA Design: Inter & Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Supabase JS SDK & Auth Controller -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-auth.js"></script>
+
+  <style>
+    /* ============================================================
+       OA DESIGN & LIQUID GLASS TOKENS
+       ============================================================ */
+    :root {
+      --bg-stage: #EBE8E1;
+      --bg-card: #FAF8F5;
+      --ink-primary: #1A1A1E;
+      --ink-secondary: #6B6A72;
+      --ink-muted: #9E9DA6;
+      --ink-border: rgba(26, 26, 30, 0.09);
+      --ink-border-focus: #1A1A1E;
+      --brand-amber: #F59E0B;
+      --brand-blue: #2563EB;
+      --radius-card: 32px;
+      --radius-pill: 9999px;
+      --radius-input: 12px;
+      --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-serif: 'Playfair Display', Georgia, serif;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      min-height: 100vh;
+      width: 100%;
+      background-color: var(--bg-stage);
+      background-image: 
+        radial-gradient(at 10% 15%, rgba(245, 158, 11, 0.07) 0px, transparent 50%),
+        radial-gradient(at 90% 85%, rgba(37, 99, 235, 0.06) 0px, transparent 50%),
+        radial-gradient(at 50% 50%, rgba(255, 255, 255, 0.4) 0px, transparent 100%);
+      font-family: var(--font-main);
+      color: var(--ink-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* SVG Filter para Efeito Liquid Glass Refraction */
+    .liquid-glass-svg-defs {
+      position: absolute;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+
+    /* Container Principal */
+    .auth-viewport {
+      width: 100%;
+      max-width: 1080px;
+      min-height: 680px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      perspective: 1200px;
+    }
+
+    /* Card com Split Screen e Superfície Liquid Glass */
+    .liquid-glass-card {
+      width: 100%;
+      min-height: 660px;
+      background: var(--bg-card);
+      border-radius: var(--radius-card);
+      border: 1px solid rgba(255, 255, 255, 0.85);
+      box-shadow: 
+        0 30px 60px -15px rgba(26, 26, 30, 0.12),
+        0 12px 24px -10px rgba(26, 26, 30, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.95),
+        inset 0 -1px 1px rgba(0, 0, 0, 0.03);
+      display: grid;
+      grid-template-columns: 1.15fr 0.95fr;
+      position: relative;
+      overflow: hidden;
+      transition: transform 320ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 320ms ease;
+    }
+
+    /* Brilho Especular Orgânico que Segue o Mouse */
+    .liquid-glass-sheen {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        700px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+        rgba(255, 255, 255, 0.45),
+        transparent 55%
+      );
+      pointer-events: none;
+      z-index: 15;
+      opacity: 0.85;
+      transition: opacity 240ms ease;
+    }
+
+    /* ============================================================
+       COLUNA DA ESQUERDA (FORMULÁRIO EDITORIAL)
+       ============================================================ */
+    .auth-card-left {
+      padding: 44px 56px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      z-index: 10;
+    }
+
+    /* Marca / Logo */
+    .auth-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      text-decoration: none;
+      color: var(--ink-primary);
+      width: fit-content;
+      cursor: pointer;
+    }
+
+    .auth-brand-badge {
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: #F59E0B;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(245, 158, 11, 0.35);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .auth-brand-badge::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 60%);
+    }
+
+    .auth-brand-badge svg {
+      width: 15px;
+      height: 15px;
+      color: #FFFFFF;
+    }
+
+    .auth-brand-name {
+      font-size: 19px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--ink-primary);
+      font-family: var(--font-main);
+    }
+
+    /* Centro do Formulário */
+    .auth-form-wrap {
+      max-width: 360px;
+      width: 100%;
+      margin: 24px auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    /* Avatar Stack Sobreposto */
+    .auth-avatar-stack {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      padding-left: 12px;
+    }
+
+    .auth-avatar-disc {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 3px solid var(--bg-card);
+      margin-left: -12px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+      overflow: hidden;
+      background: #E5E7EB;
+      position: relative;
+      transition: transform 180ms ease, z-index 180ms ease;
+    }
+
+    .auth-avatar-disc:hover {
+      transform: translateY(-3px) scale(1.08);
+      z-index: 10;
+    }
+
+    .auth-avatar-disc img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Títulos */
+    .auth-title {
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--ink-primary);
+      letter-spacing: -0.025em;
+      margin-bottom: 6px;
+    }
+
+    .auth-subtitle {
+      font-size: 13.5px;
+      color: var(--ink-secondary);
+      line-height: 1.45;
+      margin-bottom: 24px;
+    }
+
+    /* Botões Sociais */
+    .auth-social-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      width: 100%;
+      margin-bottom: 18px;
+    }
+
+    .auth-social-btn {
+      height: 42px;
+      background: #FFFFFF;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: var(--radius-input);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ink-primary);
+      font-family: inherit;
+      cursor: pointer;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+      transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .auth-social-btn:hover {
+      background: #FAFAFA;
+      border-color: rgba(0, 0, 0, 0.2);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
+    }
+
+    .auth-social-btn:active {
+      transform: translateY(0);
+    }
+
+    .auth-social-btn svg {
+      width: 17px;
+      height: 17px;
+      flex-shrink: 0;
+    }
+
+    /* Divisor "or" */
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      margin-bottom: 20px;
+      position: relative;
+    }
+
+    .auth-divider::before {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--ink-border);
+    }
+
+    .auth-divider-text {
+      padding: 0 12px;
+      font-size: 12px;
+      color: var(--ink-muted);
+      font-weight: 500;
+    }
+
+    .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--ink-border);
+    }
+
+    /* Formulário de Campos */
+    .auth-fields-form {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .auth-input-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    .auth-input {
+      width: 100%;
+      height: 44px;
+      background: #FFFFFF;
+      border: 1px solid var(--ink-border);
+      border-radius: var(--radius-input);
+      padding: 0 14px;
+      font-size: 13.5px;
+      color: var(--ink-primary);
+      font-family: inherit;
+      outline: none;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+      transition: all 140ms ease;
+    }
+
+    .auth-input::placeholder {
+      color: var(--ink-muted);
+      font-size: 13px;
+    }
+
+    .auth-input:focus {
+      border-color: var(--ink-border-focus);
+      box-shadow: 0 0 0 3px rgba(26, 26, 30, 0.08);
+    }
+
+    .auth-input-toggle-pw {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: transparent;
+      border: none;
+      color: var(--ink-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+    }
+
+    .auth-input-toggle-pw:hover {
+      color: var(--ink-primary);
+    }
+
+    /* Botão Principal */
+    .auth-submit-btn {
+      width: 100%;
+      height: 44px;
+      background: #232326;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-input);
+      color: #FFFFFF;
+      font-size: 13.5px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 14px rgba(26, 26, 30, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
+      margin-top: 4px;
+    }
+
+    .auth-submit-btn:hover {
+      background: #151517;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(26, 26, 30, 0.35);
+    }
+
+    .auth-submit-btn:active {
+      transform: translateY(0);
+    }
+
+    .auth-submit-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Alternador de Modo (Sign in / Sign up) */
+    .auth-switch-row {
+      margin-top: 16px;
+      font-size: 12.5px;
+      color: var(--ink-secondary);
+    }
+
+    .auth-switch-btn {
+      background: transparent;
+      border: none;
+      color: var(--brand-blue);
+      font-weight: 600;
+      font-family: inherit;
+      font-size: inherit;
+      cursor: pointer;
+      text-decoration: none;
+      padding: 0 2px;
+    }
+
+    .auth-switch-btn:hover {
+      text-decoration: underline;
+    }
+
+    /* Notice / Alerta de Erro ou Sucesso */
+    .auth-notice-strip {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 9px;
+      font-size: 12px;
+      line-height: 1.4;
+      text-align: left;
+      display: none;
+      margin-top: 8px;
+    }
+
+    .auth-notice-strip.is-error {
+      display: block;
+      background: #FEF2F2;
+      border: 1px solid #FCA5A5;
+      color: #991B1B;
+    }
+
+    .auth-notice-strip.is-success {
+      display: block;
+      background: #F0FDF4;
+      border: 1px solid #86EFAC;
+      color: #166534;
+    }
+
+    /* Rodapé com Termos */
+    .auth-footer {
+      text-align: center;
+      font-size: 11.5px;
+      color: var(--ink-muted);
+    }
+
+    .auth-footer a {
+      color: var(--ink-secondary);
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    .auth-footer a:hover {
+      color: var(--ink-primary);
+    }
+
+    /* ============================================================
+       COLUNA DA DIREITA (IMAGEM EDITORIAL COM LIQUID GLASS)
+       ============================================================ */
+    .auth-card-right {
+      position: relative;
+      height: 100%;
+      min-height: 660px;
+      background: #D9D2C7;
+      overflow: hidden;
+      border-top-right-radius: calc(var(--radius-card) - 1px);
+      border-bottom-right-radius: calc(var(--radius-card) - 1px);
+    }
+
+    .auth-editorial-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 600ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .liquid-glass-card:hover .auth-editorial-img {
+      transform: scale(1.02);
+    }
+
+    /* Overlay de Luz e Sombra Editorial */
+    .auth-img-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.25) 100%);
+      pointer-events: none;
+    }
+
+    /* Badge Flutuante Liquid Glass na Imagem */
+    .auth-floating-glass-badge {
+      position: absolute;
+      bottom: 28px;
+      left: 28px;
+      right: 28px;
+      background: rgba(255, 255, 255, 0.72);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      border-radius: 20px;
+      padding: 16px 20px;
+      box-shadow: 
+        0 20px 40px -10px rgba(0, 0, 0, 0.25),
+        inset 0 1px 1px rgba(255, 255, 255, 0.85);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      color: #1A1A1E;
+      z-index: 20;
+      transition: transform 220ms ease;
+    }
+
+    .auth-floating-glass-badge:hover {
+      transform: translateY(-2px);
+    }
+
+    .auth-badge-left {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .auth-badge-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #1A1A1E;
+    }
+
+    .auth-badge-sub {
+      font-size: 11.5px;
+      color: rgba(26, 26, 30, 0.7);
+    }
+
+    .auth-badge-pill {
+      background: #1A1A1E;
+      color: #FFFFFF;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: var(--radius-pill);
+      white-space: nowrap;
+      text-decoration: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Botão Voltar ao Canvas */
+    .auth-back-btn {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      z-index: 30;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.9);
+      border-radius: var(--radius-pill);
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #1A1A1E;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      transition: all 140ms ease;
+    }
+
+    .auth-back-btn:hover {
+      background: #FFFFFF;
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+    }
+
+    /* Responsivo */
+    @media (max-width: 900px) {
+      .liquid-glass-card {
+        grid-template-columns: 1fr;
+        max-width: 480px;
+        min-height: auto;
+      }
+      .auth-card-right {
+        display: none;
+      }
+      .auth-card-left {
+        padding: 36px 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SVG Defs para Efeito Óptico Liquid Glass -->
+  <svg class="liquid-glass-svg-defs" aria-hidden="true">
+    <defs>
+      <filter id="liquid-refraction" x="-20%" y="-20%" width="140%" height="140%">
+        <feTurbulence type="fractalNoise" baseFrequency="0.015 0.015" numOctaves="2" result="noise" />
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="4" xChannelSelector="R" yChannelSelector="G" result="displaced" />
+        <feComposite in="SourceGraphic" in2="displaced" operator="in" />
+      </filter>
+    </defs>
+  </svg>
+
+  <div class="auth-viewport">
+    
+    <!-- Botão de Voltar ao Canvas -->
+    <a href="index.html" class="auth-back-btn">
+      <i data-lucide="arrow-left" style="width: 14px; height: 14px;"></i>
+      <span>Voltar ao Studio</span>
+    </a>
+
+    <!-- Card Split-Screen com Efeito Liquid Glass -->
+    <div class="liquid-glass-card" id="liquid-glass-card">
+      <div class="liquid-glass-sheen" id="liquid-glass-sheen"></div>
+
+      <!-- LADO ESQUERDO: FORMULÁRIO -->
+      <div class="auth-card-left">
+        
+        <!-- Topo: Marca -->
+        <a href="index.html" class="auth-brand">
+          <div class="auth-brand-badge">
+            <i data-lucide="sparkles" style="width: 14px; height: 14px;"></i>
+          </div>
+          <span class="auth-brand-name">twin</span>
+        </a>
+
+        <!-- Conteúdo Central -->
+        <div class="auth-form-wrap">
+          
+          <!-- Stack de 4 Avatares Ilustrados -->
+          <div class="auth-avatar-stack">
+            <div class="auth-avatar-disc" title="Carrosséis de Alta Conversão">
+              <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&h=120&q=80" alt="Avatar 1">
+            </div>
+            <div class="auth-avatar-disc" title="Design Editorial">
+              <img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=120&h=120&q=80" alt="Avatar 2">
+            </div>
+            <div class="auth-avatar-disc" title="Criadores de Conteúdo">
+              <img src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=120&h=120&q=80" alt="Avatar 3">
+            </div>
+            <div class="auth-avatar-disc" title="Comunidade">
+              <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=120&h=120&q=80" alt="Avatar 4">
+            </div>
+          </div>
+
+          <!-- Título & Subtítulo Dinâmicos -->
+          <h1 class="auth-title" id="auth-title">Sign in with Twin</h1>
+          <p class="auth-subtitle" id="auth-subtitle">Welcome back. Let’s get back to work.</p>
+
+          <!-- Botões de Login Social -->
+          <div class="auth-social-row" id="auth-social-row">
+            <button type="button" class="auth-social-btn" id="btn-oauth-google" title="Entrar com o Google">
+              <svg viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.25 21.36 7.31 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.17 0 9.99 0 12s.46 3.83 1.26 5.42l4.02-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.25 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+              </svg>
+              <span>Google</span>
+            </button>
+
+            <button type="button" class="auth-social-btn" id="btn-oauth-microsoft" title="Entrar com a Microsoft">
+              <svg viewBox="0 0 24 24">
+                <path fill="#F25022" d="M1 1h10v10H1z"/>
+                <path fill="#7FBA00" d="M13 1h10v10H13z"/>
+                <path fill="#00A4EF" d="M1 13h10v10H1z"/>
+                <path fill="#FFB900" d="M13 13h10v10H13z"/>
+              </svg>
+              <span>Microsoft</span>
+            </button>
+          </div>
+
+          <!-- Divisor "or" -->
+          <div class="auth-divider">
+            <span class="auth-divider-text">or</span>
+          </div>
+
+          <!-- Formulário -->
+          <form class="auth-fields-form" id="auth-form">
+            
+            <div class="auth-input-wrap" id="wrap-name" style="display: none;">
+              <input type="text" class="auth-input" id="input-name" placeholder="Seu nome completo" autocomplete="name">
+            </div>
+
+            <div class="auth-input-wrap">
+              <input type="email" class="auth-input" id="input-email" placeholder="Enter your work email address" required autocomplete="email">
+            </div>
+
+            <div class="auth-input-wrap" id="wrap-password">
+              <input type="password" class="auth-input" id="input-password" placeholder="Enter your password" required autocomplete="current-password">
+              <button type="button" class="auth-input-toggle-pw" id="btn-toggle-pw" title="Mostrar/ocultar senha">
+                <i data-lucide="eye" style="width: 15px; height: 15px;"></i>
+              </button>
+            </div>
+
+            <!-- Faixa de aviso / status -->
+            <div class="auth-notice-strip" id="auth-notice"></div>
+
+            <button type="submit" class="auth-submit-btn" id="btn-submit">
+              <span id="btn-submit-label">Sign In</span>
+            </button>
+
+          </form>
+
+          <!-- Alternador de Modo -->
+          <div class="auth-switch-row">
+            <span id="switch-prompt">Don’t have an account yet?</span>
+            <button type="button" class="auth-switch-btn" id="btn-switch-mode">Sign Up</button>
+          </div>
+
+        </div>
+
+        <!-- Rodapé: Termos -->
+        <div class="auth-footer">
+          By signing in, you agree to our <a href="#" target="_blank">terms of use</a>.
+        </div>
+
+      </div>
+
+      <!-- LADO DIREITO: IMAGEM EDITORIAL COM LIQUID GLASS BADGE -->
+      <div class="auth-card-right">
+        <img 
+          class="auth-editorial-img" 
+          src="https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=85" 
+          alt="Luxury Resort Poolside & Tropical Palms Editorial"
+        >
+        <div class="auth-img-overlay"></div>
+
+        <!-- Liquid Glass Floating Badge -->
+        <div class="auth-floating-glass-badge">
+          <div class="auth-badge-left">
+            <div class="auth-badge-title">The Carousel Make Studio</div>
+            <div class="auth-badge-sub">Cloud sync · 4K Panoramas · Batch CSV</div>
+          </div>
+          <span class="auth-badge-pill">v2.4 Pro</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script>
+    // Inicialização de Ícones Lucide
+    if (window.lucide) lucide.createIcons();
+
+    // Mouse Parallax & Liquid Glass Sheen Interativo
+    const card = document.getElementById('liquid-glass-card');
+    const sheen = document.getElementById('liquid-glass-sheen');
+
+    if (card) {
+      card.addEventListener('mousemove', (e) => {
+        const rect = card.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        card.style.setProperty('--mouse-x', `${x}px`);
+        card.style.setProperty('--mouse-y', `${y}px`);
+      });
+    }
+
+    // Gerenciador de Estados de Autenticação (Sign In / Sign Up)
+    let authMode = 'signin'; // 'signin' | 'signup'
+
+    const form = document.getElementById('auth-form');
+    const title = document.getElementById('auth-title');
+    const subtitle = document.getElementById('auth-subtitle');
+    const inputEmail = document.getElementById('input-email');
+    const inputPassword = document.getElementById('input-password');
+    const inputName = document.getElementById('input-name');
+    const wrapName = document.getElementById('wrap-name');
+    const btnSubmit = document.getElementById('btn-submit');
+    const btnSubmitLabel = document.getElementById('btn-submit-label');
+    const btnSwitchMode = document.getElementById('btn-switch-mode');
+    const switchPrompt = document.getElementById('switch-prompt');
+    const notice = document.getElementById('auth-notice');
+    const btnTogglePw = document.getElementById('btn-toggle-pw');
+    const btnGoogle = document.getElementById('btn-oauth-google');
+    const btnMicrosoft = document.getElementById('btn-oauth-microsoft');
+
+    function setAuthMode(mode) {
+      authMode = mode;
+      clearNotice();
+      if (mode === 'signin') {
+        title.textContent = 'Sign in with Twin';
+        subtitle.textContent = 'Welcome back. Let’s get back to work.';
+        btnSubmitLabel.textContent = 'Sign In';
+        switchPrompt.textContent = "Don’t have an account yet?";
+        btnSwitchMode.textContent = 'Sign Up';
+        if (wrapName) wrapName.style.display = 'none';
+      } else {
+        title.textContent = 'Create your account';
+        subtitle.textContent = 'Start creating high-converting carousels in seconds.';
+        btnSubmitLabel.textContent = 'Create Account';
+        switchPrompt.textContent = 'Already have an account?';
+        btnSwitchMode.textContent = 'Sign In';
+        if (wrapName) wrapName.style.display = 'block';
+      }
+    }
+
+    btnSwitchMode.addEventListener('click', () => {
+      setAuthMode(authMode === 'signin' ? 'signup' : 'signin');
+    });
+
+    // Mostrar / Ocultar Senha
+    if (btnTogglePw && inputPassword) {
+      btnTogglePw.addEventListener('click', () => {
+        const isPass = inputPassword.type === 'password';
+        inputPassword.type = isPass ? 'text' : 'password';
+        btnTogglePw.innerHTML = `<i data-lucide="${isPass ? 'eye-off' : 'eye'}" style="width: 15px; height: 15px;"></i>`;
+        if (window.lucide) lucide.createIcons();
+      });
+    }
+
+    function showNotice(type, msg) {
+      if (!notice) return;
+      notice.className = `auth-notice-strip is-${type}`;
+      notice.textContent = msg;
+    }
+
+    function clearNotice() {
+      if (!notice) return;
+      notice.className = 'auth-notice-strip';
+      notice.textContent = '';
+    }
+
+    // Submit do Formulário (Email + Senha)
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearNotice();
+
+      const email = inputEmail.value.trim();
+      const password = inputPassword.value;
+      const name = inputName ? inputName.value.trim() : '';
+
+      if (!email || !password) {
+        showNotice('error', 'Por favor, preencha todos os campos obrigatórios.');
+        return;
+      }
+
+      btnSubmit.disabled = true;
+      const originalLabel = btnSubmitLabel.textContent;
+      btnSubmitLabel.innerHTML = `<i data-lucide="loader-2" style="width: 15px; height: 15px; animation: spin 1s linear infinite;"></i> Processando…`;
+      if (window.lucide) lucide.createIcons();
+
+      try {
+        if (!window.SupabaseAuth) throw new Error('Módulo de autenticação não carregado.');
+
+        if (authMode === 'signin') {
+          await window.SupabaseAuth.signIn({ email, password });
+          showNotice('success', '✓ Login realizado com sucesso! Redirecionando…');
+          setTimeout(() => {
+            window.location.href = 'index.html';
+          }, 600);
+        } else {
+          await window.SupabaseAuth.signUp({ email, password, metadata: { full_name: name } });
+          showNotice('success', '✓ Conta criada com sucesso! Verifique seu e-mail ou faça login.');
+          setTimeout(() => {
+            setAuthMode('signin');
+          }, 1200);
+        }
+      } catch (err) {
+        console.error('Erro de autenticação:', err);
+        const msg = err.message || 'Erro ao processar sua solicitação.';
+        showNotice('error', msg.includes('Invalid login') ? 'E-mail ou senha incorretos.' : msg);
+      } finally {
+        btnSubmit.disabled = false;
+        btnSubmitLabel.textContent = originalLabel;
+      }
+    });
+
+    // OAuth Social Logins
+    if (btnGoogle) {
+      btnGoogle.addEventListener('click', async () => {
+        try {
+          if (window.SupabaseAuth) await window.SupabaseAuth.signInWithOAuth('google');
+        } catch (e) {
+          showNotice('error', 'Não foi possível conectar com o Google no momento.');
+        }
+      });
+    }
+
+    if (btnMicrosoft) {
+      btnMicrosoft.addEventListener('click', async () => {
+        try {
+          if (window.SupabaseAuth) await window.SupabaseAuth.signInWithOAuth('azure');
+        } catch (e) {
+          showNotice('error', 'Não foi possível conectar com a Microsoft no momento.');
+        }
+      });
+    }
+  </script>
+
+  <style>
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+  </style>
+
+</body>
+</html>

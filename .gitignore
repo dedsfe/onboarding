@@ -13,3 +13,9 @@ node_modules/
 .claude/
 supabase/.temp/
 .env*
+*.env
+*.pem
+*.key
+*.cert
+client_secret*.json
+credentials*.json

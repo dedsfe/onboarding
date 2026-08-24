@@ -19,7 +19,8 @@ create index if not exists idx_analytics_events_created on public.analytics_even
 create index if not exists idx_analytics_events_platform_created on public.analytics_events(platform, created_at desc);
 create index if not exists idx_analytics_events_event on public.analytics_events(event);
 
--- RLS: Permite inserção anônima e leitura dos eventos
+-- RLS: escrita anônima liberada (app registra eventos), leitura NUNCA anônima.
+-- (A função get_waitlist_count mora na migration da waitlist, 20260823.)
 alter table public.analytics_events enable row level security;
 
 drop policy if exists "anon pode registrar eventos" on public.analytics_events;
@@ -28,20 +29,11 @@ create policy "anon pode registrar eventos"
   to anon
   with check (true);
 
-drop policy if exists "anon pode ler eventos de analytics" on public.analytics_events;
-create policy "anon pode ler eventos de analytics"
+drop policy if exists "analytics_auth_select" on public.analytics_events;
+create policy "analytics_auth_select"
   on public.analytics_events for select
-  to anon
+  to authenticated
   using (true);
-
--- Função Segura para Obter Contagem da Waitlist
-create or replace function public.get_waitlist_count()
-returns integer
-language sql
-security definer
-as $$
-  select count(*)::integer from public.waitlist;
-$$;
 
 -- NOTA: o seed de eventos fictícios foi removido de propósito.
 -- Este arquivo roda contra o projeto de PRODUÇÃO; inserir linhas de exemplo
