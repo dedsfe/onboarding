@@ -818,7 +818,6 @@ body {
   background-repeat: no-repeat;
   overflow: hidden;
   transition: background 0.15s ease, filter 0.15s ease;
-  will-change: transform, filter;
 }
 
 .canvas-frame__bg-overlay {

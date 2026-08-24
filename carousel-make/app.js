@@ -1683,7 +1683,7 @@
        -------------------------------------------------- */
     const undoStack = [];
     const redoStack = [];
-    const MAX_HISTORY = 50;
+    const MAX_HISTORY = 16;
     let isRestoringHistory = false;
 
     function getCanvasSnapshot() {
@@ -5597,7 +5597,40 @@
     function readFileAsDataUrl(file) {
       return new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onload = (ev) => resolve(ev.target.result);
+        reader.onload = (ev) => {
+          const raw = ev.target.result;
+          if (!file || !file.type || !file.type.startsWith('image/') || file.type.includes('svg')) {
+            return resolve(raw);
+          }
+          const img = new Image();
+          img.onload = () => {
+            const maxDim = 1600;
+            let w = img.naturalWidth || img.width || 800;
+            let h = img.naturalHeight || img.height || 600;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              } else {
+                w = Math.round((w * maxDim) / h);
+                h = maxDim;
+              }
+              const cvs = document.createElement('canvas');
+              cvs.width = w;
+              cvs.height = h;
+              const ctx = cvs.getContext('2d');
+              ctx.drawImage(img, 0, 0, w, h);
+              const compressed = cvs.toDataURL('image/jpeg', 0.88);
+              cvs.width = 0;
+              cvs.height = 0;
+              resolve(compressed);
+            } else {
+              resolve(raw);
+            }
+          };
+          img.onerror = () => resolve(raw);
+          img.src = raw;
+        };
         reader.onerror = () => resolve(null);
         reader.readAsDataURL(file);
       });
@@ -5606,9 +5639,8 @@
     function loadImageAndDimensions(srcOrDataUrl) {
       return new Promise((resolve, reject) => {
         let url = srcOrDataUrl;
-        // Se for URL de foto do Unsplash com resolução restrita (ex: &w=200 ou &w=400), aprimora para alta resolução
         if (url.includes('images.unsplash.com') && url.includes('w=')) {
-          url = url.replace(/w=\d+/, 'w=1400');
+          url = url.replace(/w=\d+/, 'w=1200');
         }
 
         const img = new Image();
@@ -5616,21 +5648,7 @@
         img.onload = () => {
           const origW = img.naturalWidth || img.width || 800;
           const origH = img.naturalHeight || img.height || 600;
-          let rawData = url;
-
-          if (url.startsWith('http://') || url.startsWith('https://')) {
-            try {
-              const cvs = document.createElement('canvas');
-              cvs.width = origW;
-              cvs.height = origH;
-              const ctx = cvs.getContext('2d');
-              ctx.drawImage(img, 0, 0);
-              rawData = cvs.toDataURL('image/png');
-            } catch {
-              rawData = url;
-            }
-          }
-          resolve({ rawData, origW, origH });
+          resolve({ rawData: url, origW, origH });
         };
         img.onerror = () => {
           const fallback = new Image();
