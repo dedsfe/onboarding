@@ -1,14 +1,14 @@
-# [ISSUE] Landing Page & Transição do The Carousel Make para Produto Independente
+# [ISSUE] Landing Page & Transição do The Carousel Maker para Produto Independente
 
 **Status**: 🚀 Pronto para Planejamento & Execução  
-**Produto**: **The Carousel Make** (`carousel-make/`)  
+**Produto**: **The Carousel Maker** (`carousel-make/`)  
 **Repositório Origem**: `AnalyticsOnboard`  
 **Autor**: André Felipe & Antigravity Pair  
 
 ---
 
 ## 🎯 1. Contexto & Objetivo
-O **The Carousel Make** evoluiu de uma ferramenta interna do Analytics para um **estúdio visual de carrosséis e criação em lote (Batch Studio)** com capacidade comercial imediata e independente.
+O **The Carousel Maker** evoluiu de uma ferramenta interna do Analytics para um **estúdio visual de carrosséis e criação em lote (Batch Studio)** com capacidade comercial imediata e independente.
 
 Para viabilizar a monetização, tração e distribuição do produto:
 1. **Desacoplamento Completo**: Separar o código de `carousel-make/` em um repositório próprio e independente.
@@ -57,9 +57,9 @@ flowchart TD
 * **Card 2 (Automação em Lote)**: De planilha para 50 posts prontos com troca dinâmica de fotos e textos.
 * **Card 3 (Continuidade Narrativa)**: Cordinhas que garantem a harmonia estética e visual do carrossel.
 
-### Seção 3: Comparativo de Mercado (The Carousel Make vs Tradicional)
+### Seção 3: Comparativo de Mercado (The Carousel Maker vs Tradicional)
 
-| No Canva / Photoshop Tradicional 😫 | No The Carousel Make 🚀 |
+| No Canva / Photoshop Tradicional 😫 | No The Carousel Maker 🚀 |
 | :--- | :--- |
 | Duplicar post e trocar textos manualmente 30 vezes | Copiar da planilha e colar: **30 posts prontos de uma vez** |
 | Baixar um por um ou esperar renderização lenta na nuvem | **Exportação instantânea em ZIP 4K** processada localmente na GPU |

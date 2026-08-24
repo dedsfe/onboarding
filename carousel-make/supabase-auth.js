@@ -1,6 +1,6 @@
 /**
  * supabase-auth.js
- * Gerenciador de Autenticação e Sincronização em Nuvem (The Carousel Make / Analytics Onboard)
+ * Gerenciador de Autenticação e Sincronização em Nuvem (The Carousel Maker / Analytics Onboard)
  * Conectado ao projeto Supabase: gukebwwqhssmbnioqalm
  * 
  * Arquitetura de Alta Performance e Proteção de Memória:
