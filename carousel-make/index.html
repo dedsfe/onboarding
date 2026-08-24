@@ -974,12 +974,6 @@
           <span class="canvas-topbar__btn-label">Salvar</span>
         </button>
 
-        <!-- Botão de Autenticação / Login -->
-        <button class="canvas-topbar__btn" id="canvas-auth-btn" title="Entrar na sua conta / Sincronizar">
-          <i data-lucide="user" style="width: 15px; height: 15px;"></i>
-          <span class="canvas-topbar__btn-label" id="canvas-auth-label">Entrar</span>
-        </button>
-
         <button class="canvas-topbar__btn canvas-topbar__btn--primary" id="canvas-export-btn" title="Exportar Post / Carrossel (PNG, JPG, 4K)">
           <i data-lucide="download" style="width: 15px; height: 15px;"></i>
           <span class="canvas-topbar__btn-label">Exportar</span>
@@ -997,6 +991,86 @@
         <button id="canvas-toggle-binds" style="display: none;"></button>
         <button id="canvas-batch-photos-btn" style="display: none;"></button>
         <button id="canvas-batch-export-btn" style="display: none;"></button>
+      </div>
+    </div>
+
+    <!-- Widget de Usuário / Google Profile (Bolinha no Canto Superior Direito) -->
+    <div class="canvas-user-account-widget" id="canvas-user-account-widget">
+      <button type="button" class="canvas-user-avatar-btn" id="canvas-user-profile-btn" title="Conta & Perfil">
+        <!-- Avatar / Círculo com iniciais ou foto -->
+        <div class="canvas-user-avatar-disc" id="canvas-user-avatar-disc">
+          <i data-lucide="user" id="canvas-user-avatar-icon" style="width: 16px; height: 16px;"></i>
+          <img id="canvas-user-avatar-img" alt="Avatar" style="display: none;">
+          <span id="canvas-user-avatar-initials" style="display: none;"></span>
+        </div>
+        <!-- Indicador de status online/sincronizado -->
+        <span class="canvas-user-status-dot" id="canvas-user-status-dot"></span>
+      </button>
+
+      <!-- Card Flutuante de Perfil (Estilo Google / OA Design) -->
+      <div class="canvas-user-popover" id="canvas-user-popover">
+        <!-- Cabeçalho do Usuário -->
+        <div class="canvas-user-pop-head">
+          <div class="canvas-user-pop-avatar-lg" id="canvas-user-pop-avatar-lg">
+            <i data-lucide="user" id="canvas-user-pop-icon-lg" style="width: 24px; height: 24px;"></i>
+            <img id="canvas-user-pop-img-lg" alt="Avatar" style="display: none;">
+            <span id="canvas-user-pop-initials-lg" style="display: none;"></span>
+          </div>
+          <div class="canvas-user-pop-meta">
+            <div class="canvas-user-pop-name" id="canvas-user-pop-name">Visitante</div>
+            <div class="canvas-user-pop-email" id="canvas-user-pop-email">Não autenticado</div>
+            <div class="canvas-user-pop-badges">
+              <span class="canvas-user-badge canvas-user-badge--plan" id="canvas-user-plan-badge">FREE TIER</span>
+              <span class="canvas-user-badge canvas-user-badge--cloud" id="canvas-user-cloud-badge">Offline</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Card de Plano / Upgrade -->
+        <div class="canvas-user-plan-card" id="canvas-user-plan-card">
+          <div class="canvas-user-plan-card-info">
+            <div class="canvas-user-plan-card-title">The Carousel Make PRO</div>
+            <div class="canvas-user-plan-card-sub">Exportação 4K ilimitada, nuvem e lotes automáticos.</div>
+          </div>
+          <button type="button" class="canvas-user-upgrade-btn" id="canvas-user-upgrade-btn">
+            <i data-lucide="sparkles" style="width: 13px; height: 13px;"></i>
+            <span>Upgrade PRO</span>
+          </button>
+        </div>
+
+        <!-- Estatísticas da Nuvem -->
+        <div class="canvas-user-stats-row">
+          <div class="canvas-user-stat-item">
+            <span class="canvas-user-stat-val" id="canvas-user-projects-count">0</span>
+            <span class="canvas-user-stat-lbl">Projetos Salvos</span>
+          </div>
+          <div class="canvas-user-stat-sep"></div>
+          <div class="canvas-user-stat-item">
+            <span class="canvas-user-stat-val" id="canvas-user-storage-val">Nuvem</span>
+            <span class="canvas-user-stat-lbl" id="canvas-user-storage-lbl">Supabase RLS</span>
+          </div>
+        </div>
+
+        <!-- Lista de Ações Rápidas -->
+        <div class="canvas-user-menu-list">
+          <button type="button" class="canvas-user-menu-btn" id="canvas-user-action-save">
+            <i data-lucide="cloud-upload"></i>
+            <span>Salvar Carrossel na Nuvem</span>
+          </button>
+          <button type="button" class="canvas-user-menu-btn" id="canvas-user-action-projects">
+            <i data-lucide="folder-kanban"></i>
+            <span>Meus Projetos Salvos</span>
+          </button>
+          <button type="button" class="canvas-user-menu-btn" id="canvas-user-action-templates">
+            <i data-lucide="layout-template"></i>
+            <span>Biblioteca de Templates</span>
+          </button>
+          <div class="canvas-user-menu-divider"></div>
+          <button type="button" class="canvas-user-menu-btn canvas-user-menu-btn--auth" id="canvas-user-action-auth">
+            <i data-lucide="log-in" id="canvas-user-action-auth-icon"></i>
+            <span id="canvas-user-action-auth-label">Entrar na Conta</span>
+          </button>
+        </div>
       </div>
     </div>
 

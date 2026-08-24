@@ -3811,6 +3811,371 @@ body.is-rotating-element * {
 }
 
 /* ------------------------------------------------------------
+   WIDGET DE CONTA/PERFIL ESTILO GOOGLE (CANTO SUPERIOR DIREITO)
+   ------------------------------------------------------------ */
+.canvas-user-account-widget {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: var(--z-sticky-bar);
+  pointer-events: auto;
+  user-select: none;
+}
+
+.canvas-user-avatar-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(22, 22, 26, 0.85);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: transform 160ms cubic-bezier(0.16, 1, 0.3, 1), border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.canvas-user-avatar-btn:hover {
+  transform: scale(1.06);
+  border-color: rgba(255, 255, 255, 0.35);
+  box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.canvas-user-avatar-btn:active {
+  transform: scale(0.96);
+}
+
+.canvas-user-avatar-disc {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #334155, #1E293B);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #F1F5F9;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.canvas-user-avatar-disc img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.canvas-user-status-dot {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #64748B;
+  border: 2px solid #121216;
+  transition: background-color 200ms ease;
+}
+
+.canvas-user-status-dot.is-online {
+  background: #10B981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+}
+
+/* POPOVER CARD ESTILO GOOGLE / OA DESIGN */
+.canvas-user-popover {
+  position: absolute;
+  top: 48px;
+  right: 0;
+  width: 310px;
+  background: rgba(20, 20, 24, 0.96);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  box-shadow: 0 28px 64px -12px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px) scale(0.96);
+  transform-origin: top right;
+  transition: opacity 180ms cubic-bezier(0.16, 1, 0.3, 1), transform 180ms cubic-bezier(0.16, 1, 0.3, 1), visibility 180ms;
+}
+
+.canvas-user-popover.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0) scale(1);
+}
+
+/* Header com Foto Grande e Nome */
+.canvas-user-pop-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.canvas-user-pop-avatar-lg {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.canvas-user-pop-avatar-lg img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.canvas-user-pop-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.canvas-user-pop-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #F8FAFC;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+.canvas-user-pop-email {
+  font-size: 11.5px;
+  color: #94A3B8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 1px;
+}
+
+.canvas-user-pop-badges {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.canvas-user-badge {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.canvas-user-badge--plan {
+  background: rgba(255, 255, 255, 0.08);
+  color: #CBD5E1;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.canvas-user-badge--plan.is-pro {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(217, 119, 6, 0.35));
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.2);
+}
+
+.canvas-user-badge--cloud {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.canvas-user-badge--cloud.is-offline {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94A3B8;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+/* Card de Plano / Upgrade */
+.canvas-user-plan-card {
+  background: linear-gradient(145deg, rgba(37, 99, 235, 0.12), rgba(30, 41, 59, 0.4));
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 14px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.canvas-user-plan-card.is-pro {
+  background: linear-gradient(145deg, rgba(245, 158, 11, 0.12), rgba(30, 41, 59, 0.4));
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.canvas-user-plan-card-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #F8FAFC;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.canvas-user-plan-card-sub {
+  font-size: 11px;
+  color: #94A3B8;
+  line-height: 1.35;
+}
+
+.canvas-user-upgrade-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  width: 100%;
+  background: #3B82F6;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 9999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: background-color 150ms, transform 150ms;
+}
+
+.canvas-user-upgrade-btn:hover {
+  background: #2563EB;
+  transform: translateY(-1px);
+}
+
+/* Estatísticas Rápidas */
+.canvas-user-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+
+.canvas-user-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.canvas-user-stat-val {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #F8FAFC;
+}
+
+.canvas-user-stat-lbl {
+  font-size: 10px;
+  color: #64748B;
+  font-weight: 500;
+}
+
+.canvas-user-stat-sep {
+  width: 1px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Menu de Ações Rápidas */
+.canvas-user-menu-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.canvas-user-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  color: #CBD5E1;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+  text-align: left;
+}
+
+.canvas-user-menu-btn svg {
+  width: 14px;
+  height: 14px;
+  color: #94A3B8;
+  transition: color 140ms;
+}
+
+.canvas-user-menu-btn:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #F8FAFC;
+}
+
+.canvas-user-menu-btn:hover svg {
+  color: #60A5FA;
+}
+
+.canvas-user-menu-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 3px 0;
+}
+
+.canvas-user-menu-btn--auth {
+  color: #F87171;
+}
+
+.canvas-user-menu-btn--auth:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #FCA5A5;
+}
+
+.canvas-user-menu-btn--auth:hover svg {
+  color: #F87171;
+}
+
+.canvas-user-menu-btn--auth.is-signin {
+  color: #60A5FA;
+}
+
+.canvas-user-menu-btn--auth.is-signin:hover {
+  background: rgba(59, 130, 246, 0.12);
+  color: #93C5FD;
+}
+
+.canvas-user-menu-btn--auth.is-signin:hover svg {
+  color: #60A5FA;
+}
+
+/* ------------------------------------------------------------
    BIBLIOTECA DE ÍCONES E STICKERS
    ------------------------------------------------------------ */
 .canvas-lib-controls-oa {

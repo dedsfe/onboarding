@@ -12595,8 +12595,33 @@
     }
 
     function initAuthAndCloudController() {
-      const authBtn = document.getElementById('canvas-auth-btn');
-      const authLabel = document.getElementById('canvas-auth-label');
+      // Widget Flutuante Estilo Google (Canto Superior Direito)
+      const userWidget = document.getElementById('canvas-user-account-widget');
+      const profileBtn = document.getElementById('canvas-user-profile-btn');
+      const userPopover = document.getElementById('canvas-user-popover');
+      const avatarIcon = document.getElementById('canvas-user-avatar-icon');
+      const avatarImg = document.getElementById('canvas-user-avatar-img');
+      const avatarInitials = document.getElementById('canvas-user-avatar-initials');
+      const statusDot = document.getElementById('canvas-user-status-dot');
+
+      const popIconLg = document.getElementById('canvas-user-pop-icon-lg');
+      const popImgLg = document.getElementById('canvas-user-pop-img-lg');
+      const popInitialsLg = document.getElementById('canvas-user-pop-initials-lg');
+      const popName = document.getElementById('canvas-user-pop-name');
+      const popEmail = document.getElementById('canvas-user-pop-email');
+      const planBadge = document.getElementById('canvas-user-plan-badge');
+      const cloudBadge = document.getElementById('canvas-user-cloud-badge');
+      const planCard = document.getElementById('canvas-user-plan-card');
+      const upgradeBtn = document.getElementById('canvas-user-upgrade-btn');
+      const projectsCount = document.getElementById('canvas-user-projects-count');
+
+      const actionSave = document.getElementById('canvas-user-action-save');
+      const actionProjects = document.getElementById('canvas-user-action-projects');
+      const actionTemplates = document.getElementById('canvas-user-action-templates');
+      const actionAuth = document.getElementById('canvas-user-action-auth');
+      const actionAuthLabel = document.getElementById('canvas-user-action-auth-label');
+      const actionAuthIcon = document.getElementById('canvas-user-action-auth-icon');
+
       const cloudSaveBtn = document.getElementById('canvas-cloud-save-btn');
       const modal = document.getElementById('canvas-auth-modal');
       const closeBtn = document.getElementById('canvas-auth-close');
@@ -12623,6 +12648,7 @@
       let authMode = 'signin'; // 'signin' | 'signup'
 
       function openAuthModal(initialNotice = '') {
+        closeUserPopover();
         document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
         modal.classList.add('open');
         clearNotice();
@@ -12635,18 +12661,50 @@
         clearNotice();
       }
 
+      function toggleUserPopover() {
+        if (!userPopover) return;
+        const isOpen = userPopover.classList.contains('is-open');
+        if (isOpen) {
+          closeUserPopover();
+        } else {
+          userPopover.classList.add('is-open');
+        }
+      }
+
+      function closeUserPopover() {
+        if (userPopover) userPopover.classList.remove('is-open');
+      }
+
+      if (profileBtn) {
+        profileBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleUserPopover();
+        });
+      }
+
+      if (userPopover) {
+        userPopover.addEventListener('click', (e) => {
+          e.stopPropagation();
+        });
+      }
+
+      document.addEventListener('click', () => {
+        closeUserPopover();
+      });
+
       if (closeBtn) closeBtn.addEventListener('click', closeAuthModal);
       modal.addEventListener('click', (e) => {
         if (e.target === modal) closeAuthModal();
       });
 
       window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modal.classList.contains('open')) {
-          closeAuthModal();
+        if (e.key === 'Escape') {
+          if (userPopover && userPopover.classList.contains('is-open')) closeUserPopover();
+          if (modal.classList.contains('open')) closeAuthModal();
         }
       });
 
-      // Efeito Parallax Liquid Glass no card
+      // Efeito Parallax Liquid Glass no card do modal
       if (card) {
         card.addEventListener('mousemove', (e) => {
           const rect = card.getBoundingClientRect();
@@ -12704,48 +12762,171 @@
         notice.textContent = '';
       }
 
-      // Atualiza UI com base no usuário logado
-      function updateAuthUI(user) {
+      // Atualiza a bolinha flutuante e o card estilo Google com os dados do usuário
+      async function updateAuthUI(user) {
         if (user) {
-          const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuário';
-          if (authLabel) authLabel.textContent = displayName.length > 10 ? displayName.slice(0, 8) + '…' : displayName;
-          if (authBtn) {
-            authBtn.title = `Conectado como ${user.email} (Clique para opções)`;
-            authBtn.classList.add('is-active');
+          const meta = user.user_metadata || {};
+          const displayName = meta.full_name || meta.name || user.email?.split('@')[0] || 'Usuário';
+          const email = user.email || '';
+          const avatarUrl = meta.avatar_url || meta.picture || null;
+          const initials = (displayName.split(' ').map(w => w[0]).join('').slice(0, 2) || displayName.slice(0, 2)).toUpperCase();
+
+          // Botão Circular no topo
+          if (profileBtn) profileBtn.title = `${displayName} (${email})`;
+          if (statusDot) {
+            statusDot.className = 'canvas-user-status-dot is-online';
+            statusDot.title = 'Conectado à nuvem';
+          }
+
+          if (avatarUrl) {
+            if (avatarImg) { avatarImg.src = avatarUrl; avatarImg.style.display = 'block'; }
+            if (avatarIcon) avatarIcon.style.display = 'none';
+            if (avatarInitials) avatarInitials.style.display = 'none';
+
+            if (popImgLg) { popImgLg.src = avatarUrl; popImgLg.style.display = 'block'; }
+            if (popIconLg) popIconLg.style.display = 'none';
+            if (popInitialsLg) popInitialsLg.style.display = 'none';
+          } else {
+            if (avatarImg) avatarImg.style.display = 'none';
+            if (avatarIcon) avatarIcon.style.display = 'none';
+            if (avatarInitials) { avatarInitials.textContent = initials; avatarInitials.style.display = 'inline'; }
+
+            if (popImgLg) popImgLg.style.display = 'none';
+            if (popIconLg) popIconLg.style.display = 'none';
+            if (popInitialsLg) { popInitialsLg.textContent = initials; popInitialsLg.style.display = 'inline'; }
+          }
+
+          // Card Popover
+          if (popName) popName.textContent = displayName;
+          if (popEmail) popEmail.textContent = email;
+          if (cloudBadge) {
+            cloudBadge.textContent = 'Nuvem Ativa';
+            cloudBadge.className = 'canvas-user-badge canvas-user-badge--cloud';
+          }
+          if (planBadge) {
+            const isPro = meta.is_pro || meta.plan === 'pro';
+            planBadge.textContent = isPro ? '✨ PLANO PRO' : 'FREE TIER';
+            planBadge.className = `canvas-user-badge canvas-user-badge--plan ${isPro ? 'is-pro' : ''}`;
+            if (planCard) planCard.className = `canvas-user-plan-card ${isPro ? 'is-pro' : ''}`;
+          }
+
+          if (actionAuth) {
+            actionAuth.className = 'canvas-user-menu-btn canvas-user-menu-btn--auth';
+            if (actionAuthLabel) actionAuthLabel.textContent = 'Sair da Conta (Logout)';
+            if (actionAuthIcon) actionAuthIcon.setAttribute('data-lucide', 'log-out');
+          }
+
+          // Carrega contagem de projetos do usuário
+          try {
+            if (window.SupabaseAuth && window.SupabaseAuth.listProjects) {
+              const list = await window.SupabaseAuth.listProjects();
+              if (projectsCount) projectsCount.textContent = (list && list.length) || 0;
+            }
+          } catch (e) {
+            console.warn('[Supabase] Erro ao carregar contagem de projetos:', e);
           }
         } else {
-          if (authLabel) authLabel.textContent = 'Entrar';
-          if (authBtn) {
-            authBtn.title = 'Entrar na sua conta / Sincronizar';
-            authBtn.classList.remove('is-active');
+          // Deslogado / Visitante
+          if (profileBtn) profileBtn.title = 'Entrar na sua conta / Google Login';
+          if (statusDot) {
+            statusDot.className = 'canvas-user-status-dot';
+            statusDot.title = 'Offline';
+          }
+
+          if (avatarImg) avatarImg.style.display = 'none';
+          if (avatarInitials) avatarInitials.style.display = 'none';
+          if (avatarIcon) avatarIcon.style.display = 'block';
+
+          if (popImgLg) popImgLg.style.display = 'none';
+          if (popInitialsLg) popInitialsLg.style.display = 'none';
+          if (popIconLg) popIconLg.style.display = 'block';
+
+          if (popName) popName.textContent = 'Visitante';
+          if (popEmail) popEmail.textContent = 'Não autenticado';
+          if (cloudBadge) {
+            cloudBadge.textContent = 'Offline';
+            cloudBadge.className = 'canvas-user-badge canvas-user-badge--cloud is-offline';
+          }
+          if (planBadge) {
+            planBadge.textContent = 'FREE TIER';
+            planBadge.className = 'canvas-user-badge canvas-user-badge--plan';
+          }
+          if (projectsCount) projectsCount.textContent = '0';
+
+          if (actionAuth) {
+            actionAuth.className = 'canvas-user-menu-btn canvas-user-menu-btn--auth is-signin';
+            if (actionAuthLabel) actionAuthLabel.textContent = 'Entrar com Google / E-mail';
+            if (actionAuthIcon) actionAuthIcon.setAttribute('data-lucide', 'log-in');
           }
         }
+
+        if (window.lucide) lucide.createIcons();
       }
 
       if (window.SupabaseAuth) {
         window.SupabaseAuth.onAuthStateChange(updateAuthUI);
       }
 
-      // Clique no botão de Auth do Topbar
-      if (authBtn) {
-        authBtn.addEventListener('click', () => {
+      // Ações do Menu Flutuante
+      if (actionAuth) {
+        actionAuth.addEventListener('click', () => {
+          closeUserPopover();
           const user = window.SupabaseAuth ? window.SupabaseAuth.getUser() : null;
-          if (!user) {
-            openAuthModal();
-          } else {
-            if (confirm(`Conectado como: ${user.email}\n\nDeseja salvar o projeto atual na nuvem ou desconectar? (OK para Salvar, Cancelar para Sair)`)) {
-              handleCloudSave();
-            } else {
-              if (confirm('Deseja realmente sair da sua conta?')) {
-                window.SupabaseAuth.signOut();
-                toast.info('Sessão encerrada com sucesso.');
-              }
+          if (user) {
+            if (confirm('Deseja realmente encerrar sua sessão?')) {
+              window.SupabaseAuth.signOut();
+              toast.info('Sessão encerrada.');
             }
+          } else {
+            openAuthModal();
           }
         });
       }
 
-      // Salvar na nuvem
+      if (actionSave) {
+        actionSave.addEventListener('click', () => {
+          closeUserPopover();
+          handleCloudSave();
+        });
+      }
+
+      if (actionProjects) {
+        actionProjects.addEventListener('click', async () => {
+          closeUserPopover();
+          const user = window.SupabaseAuth ? window.SupabaseAuth.getUser() : null;
+          if (!user) {
+            openAuthModal('Faça login para acessar seus projetos salvos.');
+            return;
+          }
+          try {
+            const list = await window.SupabaseAuth.listProjects();
+            if (!list || list.length === 0) {
+              toast.info('Nenhum projeto salvo na nuvem ainda. Salve o carrossel atual!');
+            } else {
+              toast.success(`Você tem ${list.length} projeto(s) salvo(s) na sua conta.`);
+            }
+          } catch (e) {
+            toast.error('Erro ao consultar projetos: ' + e.message);
+          }
+        });
+      }
+
+      if (actionTemplates) {
+        actionTemplates.addEventListener('click', () => {
+          closeUserPopover();
+          const tplBtn = document.getElementById('canvas-templates-btn');
+          if (tplBtn) tplBtn.click();
+        });
+      }
+
+      if (upgradeBtn) {
+        upgradeBtn.addEventListener('click', () => {
+          closeUserPopover();
+          toast.info('✨ Plano PRO: Em breve com recursos avançados de IA e exportação em alta escala!');
+        });
+      }
+
+      // Salvar na nuvem (usado tanto pelo botão da barra superior quanto pelo menu)
       async function handleCloudSave() {
         if (!window.SupabaseAuth) {
           toast.error('Supabase Auth não inicializado.');
@@ -12788,6 +12969,10 @@
             title: firstFrameTitle,
             data: projectData
           });
+
+          // Atualiza contador de projetos
+          const list = await window.SupabaseAuth.listProjects();
+          if (projectsCount) projectsCount.textContent = (list && list.length) || 1;
 
           toast.success('✓ Carrossel salvo na nuvem com sucesso!');
         } catch (err) {
