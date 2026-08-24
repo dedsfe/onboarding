@@ -12737,18 +12737,18 @@
         authMode = mode;
         clearNotice();
         if (mode === 'signin') {
-          if (title) title.textContent = 'Sign in with Twin';
-          if (subtitle) subtitle.textContent = 'Welcome back. Let’s get back to work.';
-          if (btnSubmitLabel) btnSubmitLabel.textContent = 'Sign In';
-          if (switchPrompt) switchPrompt.textContent = "Don’t have an account yet?";
-          if (btnSwitchMode) btnSwitchMode.textContent = 'Sign Up';
+          if (title) title.textContent = 'Entrar na sua conta';
+          if (subtitle) subtitle.textContent = 'Bem-vindo de volta! Acesse seus carrosséis e projetos na nuvem.';
+          if (btnSubmitLabel) btnSubmitLabel.textContent = 'Entrar';
+          if (switchPrompt) switchPrompt.textContent = 'Ainda não tem uma conta?';
+          if (btnSwitchMode) btnSwitchMode.textContent = 'Cadastre-se';
           if (wrapName) wrapName.style.display = 'none';
         } else {
-          if (title) title.textContent = 'Create your account';
-          if (subtitle) subtitle.textContent = 'Start creating high-converting carousels in seconds.';
-          if (btnSubmitLabel) btnSubmitLabel.textContent = 'Create Account';
-          if (switchPrompt) switchPrompt.textContent = 'Already have an account?';
-          if (btnSwitchMode) btnSwitchMode.textContent = 'Sign In';
+          if (title) title.textContent = 'Criar sua conta';
+          if (subtitle) subtitle.textContent = 'Comece a criar carrosséis de alto impacto em segundos.';
+          if (btnSubmitLabel) btnSubmitLabel.textContent = 'Criar Conta';
+          if (switchPrompt) switchPrompt.textContent = 'Já possui uma conta?';
+          if (btnSwitchMode) btnSwitchMode.textContent = 'Fazer Login';
           if (wrapName) wrapName.style.display = 'block';
         }
       }
@@ -13060,16 +13060,6 @@
             if (window.SupabaseAuth) await window.SupabaseAuth.signInWithOAuth('google');
           } catch (e) {
             showNotice('error', 'Não foi possível conectar com o Google.');
-          }
-        });
-      }
-
-      if (btnMicrosoft) {
-        btnMicrosoft.addEventListener('click', async () => {
-          try {
-            if (window.SupabaseAuth) await window.SupabaseAuth.signInWithOAuth('azure');
-          } catch (e) {
-            showNotice('error', 'Não foi possível conectar com a Microsoft.');
           }
         });
       }

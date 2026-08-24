@@ -206,7 +206,51 @@
     const DB_NAME = 'oa_canvas_assets_db';
     const DB_VERSION = 1;
     const STORE_NAME = 'assets';
-    const assetCache = new Map();
+
+    /* assetCache guarda o base64 em resolução cheia. Sem teto ele só cresce:
+       toda imagem aberta na sessão fica presa aqui até fechar a aba, e uma foto
+       de celular passa fácil de 10MB em base64.
+
+       O IndexedDB é a fonte da verdade e getAsset() volta lá sozinho quando
+       falta, então descartar aqui não perde dado nenhum — no máximo custa um
+       await a mais na próxima vez que aquela imagem aparecer.
+
+       Mantém a API de Map (get/set/has/entries) que o resto do arquivo usa. */
+    const MAX_ASSET_CACHE_BYTES = 64 * 1024 * 1024;
+
+    const assetCache = (() => {
+      const map = new Map();
+      let bytes = 0;
+      const custo = (v) => (typeof v === 'string' ? v.length : 0);
+
+      return {
+        has: (id) => map.has(id),
+        entries: () => map.entries(),
+
+        get(id) {
+          if (!map.has(id)) return undefined;
+          const v = map.get(id);
+          map.delete(id);
+          map.set(id, v);   // reinserir no fim = marcar como recém-usado
+          return v;
+        },
+
+        set(id, v) {
+          if (map.has(id)) bytes -= custo(map.get(id));
+          map.delete(id);
+          map.set(id, v);
+          bytes += custo(v);
+          // Descarta o mais antigo até caber, mas nunca o que acabou de entrar
+          for (const k of Array.from(map.keys())) {
+            if (bytes <= MAX_ASSET_CACHE_BYTES || map.size <= 1) break;
+            if (k === id) continue;
+            bytes -= custo(map.get(k));
+            map.delete(k);
+          }
+          return this;
+        }
+      };
+    })();
 
     function openAssetDB() {
       return new Promise((resolve) => {
@@ -230,10 +274,12 @@
     /* Fundo de frame pode vir inline (`bgImage`, legado) ou por asset
        (`bgAssetId`). Clonar o data URL inline em cada post estoura a cota do
        localStorage, então tudo que é gerado em lote usa o assetId. */
+    /* Só o render usa isto — devolve a versão de exibição (reduzida).
+       Quem exporta lê o original por getAsset(). */
     function frameBgSrc(frame) {
       if (!frame) return null;
       if (frame.bgImage) return frame.bgImage;
-      if (frame.bgAssetId) return assetCache.get(frame.bgAssetId) || null;
+      if (frame.bgAssetId) return displayAssetIfReady(frame.bgAssetId) || null;
       return null;
     }
 
@@ -273,7 +319,94 @@
         return null;
       }
     }
-    
+
+    /* --------------------------------------------------
+       Versão de exibição dos assets (economia de RAM)
+
+       O que pesava: o data URL em resolução cheia ia direto pro DOM
+       (background-image do frame e src das imagens). O Safari então segura três
+       cópias por imagem — a string base64 no assetCache, a mesma string no
+       atributo de estilo, e o bitmap decodificado em resolução original. Uma
+       foto de celular de 4032×3024 decodifica em ~48MB sozinha, e o canvas
+       mostra ela num quadro de 1080px de largura.
+
+       O original continua intocado no IndexedDB: o export lê ele por getAsset()
+       e a qualidade da exportação não muda. Só o DOM passa a receber a versão
+       reduzida (~7,7MB decodificados no mesmo exemplo).
+
+       Imagem que já é pequena passa direto — o Unsplash entra em 1080px e não
+       é reduzida.
+       -------------------------------------------------- */
+    const MAX_DISPLAY_DIM = 1600;      // acima da largura do frame (1080) para o zoom/blur não borrar
+    /* Folgado de propósito: a versão reduzida é pequena (~300KB), e um teto
+       apertado faria projeto com muitas imagens regerar a mesma miniatura a
+       cada render — trocaria RAM por CPU e por um pico de decode a cada vez. */
+    const MAX_DISPLAY_CACHE = 64;
+    const displayCache = new Map();
+    const displayPending = new Map();
+
+    /* Versão reduzida já pronta, se houver. Serve para pintar sem esperar. */
+    function displayAssetIfReady(id) {
+      if (!displayCache.has(id)) return null;
+      const v = displayCache.get(id);
+      displayCache.delete(id);
+      displayCache.set(id, v);   // marca como recém-usado
+      return v;
+    }
+
+    function makeDisplaySrc(fullSrc) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const maior = Math.max(img.naturalWidth, img.naturalHeight);
+          if (!maior || maior <= MAX_DISPLAY_DIM) return resolve(fullSrc);
+          const escala = MAX_DISPLAY_DIM / maior;
+          try {
+            const cv = document.createElement('canvas');
+            cv.width = Math.max(1, Math.round(img.naturalWidth * escala));
+            cv.height = Math.max(1, Math.round(img.naturalHeight * escala));
+            cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+            // PNG continua PNG: virar JPEG aqui perderia a transparência
+            const ehPng = /^data:image\/png/i.test(fullSrc);
+            const out = cv.toDataURL(ehPng ? 'image/png' : 'image/jpeg', ehPng ? undefined : 0.92);
+            cv.width = cv.height = 0;   // solta o buffer do canvas na hora
+            // PNG já otimizado pode crescer ao ser reencodado; nesse caso fica o original
+            resolve(out && out.length < fullSrc.length ? out : fullSrc);
+          } catch {
+            resolve(fullSrc);           // qualquer erro: usa o original, nunca fica sem imagem
+          }
+        };
+        img.onerror = () => resolve(fullSrc);
+        img.src = fullSrc;
+      });
+    }
+
+    /* Fonte que o DOM deve usar. NÃO use isto para exportar — o export precisa
+       do original e deve continuar chamando getAsset(). */
+    async function getDisplayAsset(id) {
+      const pronto = displayAssetIfReady(id);
+      if (pronto) return pronto;
+      if (displayPending.has(id)) return displayPending.get(id);
+
+      const p = (async () => {
+        const full = await getAsset(id);
+        if (!full) return null;
+        const small = await makeDisplaySrc(full);
+        displayCache.set(id, small);
+        while (displayCache.size > MAX_DISPLAY_CACHE) {
+          displayCache.delete(displayCache.keys().next().value);
+        }
+        return small;
+      })();
+
+      displayPending.set(id, p);
+      try {
+        return await p;
+      } finally {
+        displayPending.delete(id);
+      }
+    }
+
     /* --------------------------------------------------
        Tipografia do nó de texto
 
@@ -3073,14 +3206,14 @@
       if (child.src) {
         setImgSrc(child.src);
       } else if (child.assetId) {
-        if (assetCache.has(child.assetId)) {
-          setImgSrc(assetCache.get(child.assetId));
+        /* Versão de exibição, não o original: o <img> só precisa da resolução
+           que cabe na tela. O export continua puxando o asset cheio. */
+        const pronto = displayAssetIfReady(child.assetId);
+        if (pronto) {
+          setImgSrc(pronto);
         } else {
-          getAsset(child.assetId).then(src => {
-            if (src) {
-              assetCache.set(child.assetId, src);
-              setImgSrc(src);
-            }
+          getDisplayAsset(child.assetId).then(src => {
+            if (src) setImgSrc(src);
           });
         }
       }
@@ -3897,7 +4030,7 @@
            existe quando chegar — recriar o frame aqui duplicaria o elemento. */
         if (!bgSrc && frame.bgAssetId) {
           const layerRef = bgLayer;
-          getAsset(frame.bgAssetId).then(src => {
+          getDisplayAsset(frame.bgAssetId).then(src => {
             if (src) layerRef.style.backgroundImage = `url("${src}")`;
           });
         }
@@ -12312,18 +12445,18 @@
         authMode = mode;
         clearNotice();
         if (mode === 'signin') {
-          if (title) title.textContent = 'Sign in with Twin';
-          if (subtitle) subtitle.textContent = 'Welcome back. Let’s get back to work.';
-          if (btnSubmitLabel) btnSubmitLabel.textContent = 'Sign In';
-          if (switchPrompt) switchPrompt.textContent = "Don’t have an account yet?";
-          if (btnSwitchMode) btnSwitchMode.textContent = 'Sign Up';
+          if (title) title.textContent = 'Entrar na sua conta';
+          if (subtitle) subtitle.textContent = 'Bem-vindo de volta! Acesse seus carrosséis e projetos na nuvem.';
+          if (btnSubmitLabel) btnSubmitLabel.textContent = 'Entrar';
+          if (switchPrompt) switchPrompt.textContent = 'Ainda não tem uma conta?';
+          if (btnSwitchMode) btnSwitchMode.textContent = 'Cadastre-se';
           if (wrapName) wrapName.style.display = 'none';
         } else {
-          if (title) title.textContent = 'Create your account';
-          if (subtitle) subtitle.textContent = 'Start creating high-converting carousels in seconds.';
-          if (btnSubmitLabel) btnSubmitLabel.textContent = 'Create Account';
-          if (switchPrompt) switchPrompt.textContent = 'Already have an account?';
-          if (btnSwitchMode) btnSwitchMode.textContent = 'Sign In';
+          if (title) title.textContent = 'Criar sua conta';
+          if (subtitle) subtitle.textContent = 'Comece a criar carrosséis de alto impacto em segundos.';
+          if (btnSubmitLabel) btnSubmitLabel.textContent = 'Criar Conta';
+          if (switchPrompt) switchPrompt.textContent = 'Já possui uma conta?';
+          if (btnSwitchMode) btnSwitchMode.textContent = 'Fazer Login';
           if (wrapName) wrapName.style.display = 'block';
         }
       }
@@ -12635,16 +12768,6 @@
             if (window.SupabaseAuth) await window.SupabaseAuth.signInWithOAuth('google');
           } catch (e) {
             showNotice('error', 'Não foi possível conectar com o Google.');
-          }
-        });
-      }
-
-      if (btnMicrosoft) {
-        btnMicrosoft.addEventListener('click', async () => {
-          try {
-            if (window.SupabaseAuth) await window.SupabaseAuth.signInWithOAuth('azure');
-          } catch (e) {
-            showNotice('error', 'Não foi possível conectar com a Microsoft.');
           }
         });
       }
