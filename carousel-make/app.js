@@ -329,6 +329,9 @@
       color: '#000000',
       bg: '',
       shadow: false,
+      strokeWidth: 0,
+      strokeColor: '#000000',
+      strokeAlign: 'outside',
       align: 'left',
       lineHeight: 1.15,
       letterSpacing: -0.02,
@@ -377,6 +380,10 @@
     const inputBg = document.getElementById('canvas-text-bg');
     const btnBgClear = document.getElementById('canvas-text-bg-clear');
     const btnShadow = document.getElementById('canvas-text-shadow');
+    const inputStrokeW = document.getElementById('canvas-text-stroke-w');
+    const inputStrokeColor = document.getElementById('canvas-text-stroke-color');
+    const btnStrokeCenter = document.getElementById('canvas-text-stroke-center');
+    const btnStrokeOutside = document.getElementById('canvas-text-stroke-outside');
     const btnCaseNone = document.getElementById('canvas-text-case-none');
     const btnCaseUpper = document.getElementById('canvas-text-case-upper');
     const btnCaseLower = document.getElementById('canvas-text-case-lower');
@@ -405,6 +412,11 @@
       s.padding = child.bg && child.bg !== 'transparent' ? '4px 12px' : '';
       s.borderRadius = child.bg && child.bg !== 'transparent' ? '8px' : '';
       s.textShadow = child.shadow ? '0 2px 10px rgba(0,0,0,0.55)' : 'none';
+      // Traçado: "fora" pinta o contorno atrás do preenchimento (paint-order),
+      // "centro" deixa o contorno comer metade da letra, como no Figma
+      const sw = Number(child.strokeWidth) || 0;
+      s.webkitTextStroke = sw > 0 ? `${sw}px ${child.strokeColor || TEXT_DEFAULTS.strokeColor}` : '';
+      s.paintOrder = sw > 0 && (child.strokeAlign || TEXT_DEFAULTS.strokeAlign) === 'outside' ? 'stroke fill' : '';
     }
 
     function selectedChild() {
@@ -437,7 +449,7 @@
     };
 
     // Alinhar ou espaçar linha meio parágrafo não existe: essas seguem do bloco
-    const BLOCK_KEYS = ['align', 'lineHeight', 'rotation'];
+    const BLOCK_KEYS = ['align', 'lineHeight', 'rotation', 'strokeWidth', 'strokeColor', 'strokeAlign'];
 
     let savedRange = null;
 
@@ -585,6 +597,67 @@
       child.text = content.textContent;
     }
 
+    /* Estilo aplicado com o texto selecionado vive em span[data-run] dentro do
+       html, não no nó. Quando o trecho cobre o texto inteiro, esse É o estilo
+       do nó: o export só lê o modelo (e o lote troca o html todo), então sem
+       isso a cor e o fundo somem na hora de exportar. */
+    function effectiveTextChild(child) {
+      if (!child || child.type !== 'text') return child;
+      const content = contentOf(child);
+      const walker = document.createTreeWalker(content || document.createElement('div'), NodeFilter.SHOW_TEXT);
+      const els = [];
+      while (walker.nextNode()) {
+        const n = walker.currentNode;
+        if (!n.nodeValue.trim()) continue;
+        els.push(n.parentElement);
+      }
+      if (!content || !els.length) return child;
+
+      const styles = els.map(el => getComputedStyle(el));
+      const first = styles[0];
+      const uniform = (prop) => styles.every(cs => cs[prop] === first[prop]);
+      const transparent = (c) => !c || c === 'transparent' || /rgba\([^)]*,\s*0\)$/.test(c);
+      // Fundo não é herdado: sobe até o content procurando o primeiro que pinta
+      const bgOf = (el) => {
+        let node = el;
+        while (node && node !== content.parentElement) {
+          const c = getComputedStyle(node).backgroundColor;
+          if (!transparent(c)) return c;
+          node = node.parentElement;
+        }
+        return '';
+      };
+      const bgs = els.map(bgOf);
+
+      const eff = { ...child };
+      if (uniform('color')) eff.color = rgbToHex(first.color);
+      if (bgs.every(c => c === bgs[0])) eff.bg = bgs[0] ? rgbToHex(bgs[0]) : '';
+      if (uniform('fontSize')) eff.fontSize = Math.round(parseFloat(first.fontSize)) || eff.fontSize;
+      if (uniform('fontWeight')) eff.fontWeight = Number(first.fontWeight) || eff.fontWeight;
+      if (uniform('fontFamily')) eff.fontFamily = first.fontFamily;
+      if (uniform('fontStyle')) eff.italic = first.fontStyle === 'italic';
+      if (uniform('textDecorationLine')) eff.underline = (first.textDecorationLine || '').includes('underline');
+      if (uniform('textShadow')) eff.shadow = first.textShadow !== 'none';
+      if (uniform('textTransform')) eff.transform = first.textTransform;
+      if (uniform('letterSpacing')) {
+        const ls = parseFloat(first.letterSpacing);
+        const fs = parseFloat(first.fontSize) || eff.fontSize;
+        eff.letterSpacing = Number.isNaN(ls) ? 0 : Math.round((ls / fs) * 1000) / 1000;
+      }
+      return eff;
+    }
+
+    // Trecho que virou o texto inteiro sobe pro nó e some dos spans
+    function promoteUniformRuns(child, content) {
+      const eff = effectiveTextChild({ ...child, html: content.innerHTML });
+      const changed = Object.keys(INLINE_CSS).filter(k => (eff[k] || '') !== (child[k] || ''));
+      if (!changed.length) return false;
+      changed.forEach(k => { child[k] = eff[k]; });
+      clearRunStyles(content, changed);
+      paintTextStyle(child, content);
+      return true;
+    }
+
     function applyTextToolbarAction(action) {
       if (selectedChildNodes.length === 0) return;
       if (selectedChildNodes.length === 1) {
@@ -609,7 +682,10 @@
               patch[k] = probe[k];
             }
           });
-          if (Object.keys(patch).length) styleRange(content, range, patch);
+          if (Object.keys(patch).length) {
+            styleRange(content, range, patch);
+            promoteUniformRuns(child, content);
+          }
           if (touchedBlock) paintTextStyle(child, content);
           const el = nodeElement(child.id);
           if (el) {
@@ -786,6 +862,18 @@
     if (inputBg) inputBg.addEventListener('input', (e) => applyTextToolbarAction(c => c.bg = e.target.value));
     if (btnBgClear) btnBgClear.addEventListener('click', () => applyTextToolbarAction(c => c.bg = ''));
     if (btnShadow) btnShadow.addEventListener('click', () => applyTextToolbarAction(c => c.shadow = !c.shadow));
+
+    if (inputStrokeW) inputStrokeW.addEventListener('input', (e) => {
+      const v = Number(e.target.value);
+      if (Number.isNaN(v)) return;
+      applyTextToolbarAction(c => c.strokeWidth = Math.min(40, Math.max(0, v)));
+    });
+    if (inputStrokeColor) inputStrokeColor.addEventListener('input', (e) => applyTextToolbarAction(c => {
+      c.strokeColor = e.target.value;
+      if (!c.strokeWidth) c.strokeWidth = 2; // escolher cor já liga o traçado
+    }));
+    if (btnStrokeCenter) btnStrokeCenter.addEventListener('click', () => applyTextToolbarAction(c => c.strokeAlign = 'center'));
+    if (btnStrokeOutside) btnStrokeOutside.addEventListener('click', () => applyTextToolbarAction(c => c.strokeAlign = 'outside'));
 
     if (btnCaseNone) btnCaseNone.addEventListener('click', () => applyTextToolbarAction(c => c.transform = 'none'));
     if (btnCaseUpper) btnCaseUpper.addEventListener('click', () => applyTextToolbarAction(c => c.transform = 'uppercase'));
@@ -1650,6 +1738,11 @@
       if (idle(inputTextRotation)) inputTextRotation.value = shown.rotation != null ? shown.rotation : TEXT_DEFAULTS.rotation;
       if (idle(inputBg)) inputBg.value = shown.bg || '#000000';
       if (btnShadow) btnShadow.classList.toggle('is-active', !!shown.shadow);
+      if (idle(inputStrokeW)) inputStrokeW.value = child.strokeWidth || 0;
+      if (idle(inputStrokeColor)) inputStrokeColor.value = child.strokeColor || TEXT_DEFAULTS.strokeColor;
+      const strokeAlign = child.strokeAlign || TEXT_DEFAULTS.strokeAlign;
+      if (btnStrokeCenter) btnStrokeCenter.classList.toggle('is-active', strokeAlign === 'center');
+      if (btnStrokeOutside) btnStrokeOutside.classList.toggle('is-active', strokeAlign === 'outside');
 
       const weight = shown.fontWeight || TEXT_DEFAULTS.fontWeight;
       if (btnBold) {
@@ -7813,14 +7906,38 @@
           gridWrap.classList.add('is-dragover');
         });
         gridWrap.addEventListener('dragleave', () => gridWrap.classList.remove('is-dragover'));
-        gridWrap.addEventListener('drop', (e) => {
-          const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-          if (!file) return;
+        gridWrap.addEventListener('drop', async (e) => {
+          const files = Array.from(e.dataTransfer && e.dataTransfer.files || []);
+          if (!files.length) return;
+          // Sempre bloqueia o padrão: sem isso o navegador abre a imagem no lugar do app
+          e.preventDefault();
           gridWrap.classList.remove('is-dragover');
+
+          const file = files[0];
           if (file.name.toLowerCase().endsWith('.csv') || file.type.includes('csv')) {
-            e.preventDefault();
             handleCSVFile(file);
+            return;
           }
+
+          // Imagens soltas na tabela: uma por post, na primeira variável de foto
+          const images = files.filter(f => f.type.startsWith('image/'));
+          if (!images.length) return;
+          const binds = getCanvasBinds();
+          const imgBind = binds.find(b => b.type === 'image');
+          if (!imgBind) {
+            toast.info('Marque uma foto do canvas como variável do Batch antes de soltar imagens aqui.');
+            return;
+          }
+          const urls = await Promise.all(images.map(readFileAsDataURL));
+          urls.forEach((url, i) => {
+            if (!url) return;
+            while (batchData.records.length <= i) batchData.records.push(blankRecord(binds));
+            batchData.records[i][imgBind.name] = url;
+            delete batchData.records[i]['__hint_' + imgBind.name];
+          });
+          toast.success(`✓ ${urls.length} ${urls.length === 1 ? 'foto aplicada' : 'fotos aplicadas'} em {{${imgBind.name}}}`);
+          renderBatchGrid();
+          updateBatchFooter();
         });
       }
 
@@ -8179,7 +8296,8 @@
 
       // Upload do Computador
       if (photoUploadTrigger) {
-        photoUploadTrigger.addEventListener('click', () => {
+        photoUploadTrigger.addEventListener('click', (e) => {
+          e.stopPropagation(); // botão fica dentro da dropzone: evita abrir o seletor 2x
           imagesInput.click();
           closeBatchPhotoPickerModal();
         });
@@ -8717,7 +8835,7 @@
         let accumulatedDelta = 0;
 
         for (let i = 0; i < sorted.length; i++) {
-          const c = sorted[i];
+          const c = effectiveTextChild(sorted[i]);
           const origH = getExactTextHeight(c);
           
           let overrideText = '';
@@ -8926,69 +9044,70 @@
               ctx.restore();
             }
           } else if (child.type === 'text') {
+            const tc = effectiveTextChild(child); // estilo de trecho que cobre tudo vale como do nó
             let text = '';
-            if (child.bind && overrides[child.bind] !== undefined) {
-              text = String(overrides[child.bind]);
-            } else if (child.text !== undefined && child.text !== '') {
-              text = child.text;
-            } else if (child.html) {
+            if (tc.bind && overrides[tc.bind] !== undefined) {
+              text = String(overrides[tc.bind]);
+            } else if (tc.text !== undefined && tc.text !== '') {
+              text = tc.text;
+            } else if (tc.html) {
               const temp = document.createElement('div');
-              temp.innerHTML = child.html.replace(/<br\s*[\/]?>/gi, '\n');
+              temp.innerHTML = tc.html.replace(/<br\s*[\/]?>/gi, '\n');
               text = temp.textContent || temp.innerText || '';
             }
 
             if (!text) continue;
 
             ctx.save();
-            ctx.globalAlpha = (child.opacity != null ? child.opacity : 100) / 100;
+            ctx.globalAlpha = (tc.opacity != null ? tc.opacity : 100) / 100;
 
-            const fontSize = child.fontSize || 48;
-            const fontWeight = child.fontWeight || 500;
-            const fontStyle = child.italic ? 'italic ' : '';
-            const fontFamily = child.fontFamily || '"Inter Tight", sans-serif';
+            const fontSize = tc.fontSize || 48;
+            const fontWeight = tc.fontWeight || 500;
+            const fontStyle = tc.italic ? 'italic ' : '';
+            const fontFamily = tc.fontFamily || '"Inter Tight", sans-serif';
             ctx.font = `${fontStyle}${fontWeight} ${fontSize}px ${fontFamily}`;
-            ctx.fillStyle = child.color || '#000000';
+            ctx.fillStyle = tc.color || '#000000';
             ctx.textBaseline = 'top';
 
-            const align = child.align || 'left';
+            const align = tc.align || 'left';
             ctx.textAlign = align;
 
-            if ('letterSpacing' in ctx && child.letterSpacing != null) {
-              ctx.letterSpacing = `${child.letterSpacing}em`;
+            if ('letterSpacing' in ctx && tc.letterSpacing != null) {
+              ctx.letterSpacing = `${tc.letterSpacing}em`;
             }
 
-            const lines = wrapTextForCanvas(ctx, text, child.w);
-            const lh = fontSize * (child.lineHeight || 1.15);
-            const effectiveChildY = adjustedTextYMap.has(child.id) ? adjustedTextYMap.get(child.id) : child.y;
+            const lines = wrapTextForCanvas(ctx, text, tc.w);
+            const lh = fontSize * (tc.lineHeight || 1.15);
+            const effectiveChildY = adjustedTextYMap.has(tc.id) ? adjustedTextYMap.get(tc.id) : tc.y;
             const totalTextH = lines.length > 0 ? (lines.length - 1) * lh + fontSize : fontSize;
 
-            if (child.rotation) {
-              const centerX = child.x + child.w / 2;
+            if (tc.rotation) {
+              const centerX = tc.x + tc.w / 2;
               const centerY = effectiveChildY + totalTextH / 2;
               ctx.translate(centerX, centerY);
-              ctx.rotate((child.rotation * Math.PI) / 180);
+              ctx.rotate((tc.rotation * Math.PI) / 180);
               ctx.translate(-centerX, -centerY);
             }
 
-            if (child.shadow) {
+            if (tc.shadow) {
               ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
               ctx.shadowBlur = 10;
               ctx.shadowOffsetY = 2;
             }
 
             lines.forEach((line, lineIdx) => {
-              let lineX = child.x;
-              if (align === 'center') lineX = child.x + child.w / 2;
-              else if (align === 'right') lineX = child.x + child.w;
+              let lineX = tc.x;
+              if (align === 'center') lineX = tc.x + tc.w / 2;
+              else if (align === 'right') lineX = tc.x + tc.w;
 
               const lineY = effectiveChildY + lineIdx * lh;
 
-              if (child.bg && child.bg !== 'transparent') {
+              if (tc.bg && tc.bg !== 'transparent') {
                 const metrics = ctx.measureText(line);
                 const bgPadX = 10;
                 const bgPadY = 4;
                 ctx.save();
-                ctx.fillStyle = child.bg;
+                ctx.fillStyle = tc.bg;
                 if (ctx.roundRect) {
                   ctx.beginPath();
                   ctx.roundRect(lineX - (align === 'center' ? metrics.width / 2 : 0) - bgPadX, lineY - bgPadY, metrics.width + bgPadX * 2, fontSize + bgPadY * 2, 6);
@@ -8999,15 +9118,36 @@
                 ctx.restore();
               }
 
-              ctx.fillText(line, lineX, lineY);
+              const strokeW = Number(tc.strokeWidth) || 0;
+              if (strokeW > 0) {
+                ctx.save();
+                ctx.strokeStyle = tc.strokeColor || '#000000';
+                ctx.lineJoin = 'round';
+                // "fora": contorno atrás do fill, com o dobro da largura (metade fica escondida)
+                const outside = (tc.strokeAlign || 'outside') === 'outside';
+                ctx.lineWidth = outside ? strokeW * 2 : strokeW;
+                ctx.strokeText(line, lineX, lineY);
+                ctx.restore();
+                ctx.fillText(line, lineX, lineY);
+                if (!outside) {
+                  ctx.save();
+                  ctx.strokeStyle = tc.strokeColor || '#000000';
+                  ctx.lineJoin = 'round';
+                  ctx.lineWidth = strokeW;
+                  ctx.strokeText(line, lineX, lineY);
+                  ctx.restore();
+                }
+              } else {
+                ctx.fillText(line, lineX, lineY);
+              }
 
-              if (child.underline) {
+              if (tc.underline) {
                 const metrics = ctx.measureText(line);
                 let startX = lineX;
                 if (align === 'center') startX = lineX - metrics.width / 2;
                 else if (align === 'right') startX = lineX - metrics.width;
                 ctx.beginPath();
-                ctx.strokeStyle = child.color || '#000000';
+                ctx.strokeStyle = tc.color || '#000000';
                 ctx.lineWidth = Math.max(1, fontSize / 16);
                 ctx.moveTo(startX, lineY + fontSize * 1.05);
                 ctx.lineTo(startX + metrics.width, lineY + fontSize * 1.05);

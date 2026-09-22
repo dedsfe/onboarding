@@ -7,7 +7,7 @@
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
   <link rel="icon" type="image/png" sizes="128x128" href="icons/logo.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=1790029577">
   <!-- Fontes do editor de carrossel: cada família aqui aparece no seletor do texto -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1544,6 +1544,21 @@
 
           <span class="canvas-text-toolbar__sep"></span>
 
+          <!-- Traçado (contorno do texto) -->
+          <div class="canvas-text-toolbar__field canvas-text-toolbar__field--highlight" title="Traçado: cor e peso do contorno (0 = sem traçado)">
+            <i data-lucide="pen-line" style="width: 14px; height: 14px;"></i>
+            <label class="canvas-text-toolbar__color canvas-text-toolbar__color--bg" title="Cor do traçado">
+              <input type="color" id="canvas-text-stroke-color" value="#000000">
+            </label>
+            <input type="number" class="canvas-text-toolbar__input" id="canvas-text-stroke-w" value="0" step="1" min="0" max="40" title="Peso do traçado (px)">
+          </div>
+          <div class="canvas-text-toolbar__segmented" title="Alinhamento do traçado">
+            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-stroke-center" title="Traçado no centro da borda">C</button>
+            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-stroke-outside" title="Traçado por fora (não come a letra)">F</button>
+          </div>
+
+          <span class="canvas-text-toolbar__sep"></span>
+
           <!-- Ordem das Camadas / z-index Segmented Control -->
           <div class="canvas-text-toolbar__segmented" title="Ordem das Camadas (z-index)">
             <button class="canvas-text-toolbar__btn" id="canvas-text-send-back" title="Mandar para trás de tudo (⌘[)"><i data-lucide="arrow-down-to-line" style="width: 14px; height: 14px;"></i></button>
@@ -1567,6 +1582,6 @@
 
   <script src="unsplash-service.js"></script>
   <script src="templates-data.js"></script>
-  <script src="app.js"></script>
+  <script src="app.js?v=1790029577"></script>
 </body>
 </html>

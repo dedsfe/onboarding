@@ -3157,6 +3157,62 @@ body.is-rotating-element * {
   transform: translateY(0);
 }
 
+
+/* ------------------------------------------------------------
+   MODAL DE FOTO DO BATCH — tema escuro (mesmo padrão do library)
+   As abas/chips/busca usam texto branco; sem isto ficam invisíveis.
+   ------------------------------------------------------------ */
+#canvas-batch-photo-modal .openpanel-modal {
+  background: rgba(18, 18, 22, 0.92);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.45),
+              0 2px 8px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  color: #F3F4F6;
+}
+
+#canvas-batch-photo-modal .openpanel-modal__title {
+  color: #FFFFFF;
+}
+
+#canvas-batch-photo-modal .openpanel-modal__sub {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+#canvas-batch-photo-modal .openpanel-close-btn {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+#canvas-batch-photo-modal .openpanel-close-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #FFFFFF;
+}
+
+#canvas-batch-photo-modal .openpanel-modal__footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#canvas-batch-photo-modal .canvas-batch-foot-info-oa {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+#canvas-batch-photo-modal .openpanel-btn-secondary {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #F3F4F6;
+}
+
+#canvas-batch-photo-modal .openpanel-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+#canvas-batch-photo-modal .canvas-batch-photo-search-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
 /* Categorias em Chips */
 .canvas-batch-photo-categories {
   display: flex;
