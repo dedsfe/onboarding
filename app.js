@@ -7615,30 +7615,19 @@
       const modal = document.getElementById('canvas-batch-modal');
       const openBtn = document.getElementById('canvas-batch-btn');
       const closeBtn = document.getElementById('canvas-batch-close');
-      const csvInput = document.getElementById('canvas-batch-csv-input');
+      const linesInput = document.getElementById('canvas-batch-lines');
+      const subEl = document.getElementById('canvas-batch-sub');
       const imagesInput = document.getElementById('canvas-batch-images-input');
-      const importBtn = document.getElementById('canvas-batch-import-btn');
-      const pasteBtn = document.getElementById('canvas-batch-paste-btn');
-      const addRowBtn = document.getElementById('canvas-batch-add-row');
-      const gridWrap = document.getElementById('canvas-batch-gridwrap');
-      const grid = document.getElementById('canvas-batch-grid');
-      const hint = document.getElementById('canvas-batch-hint');
-      const footInfo = document.getElementById('canvas-batch-foot-info');
-      const startBtn = document.getElementById('canvas-batch-start-btn');
-      const startLabel = document.getElementById('canvas-batch-start-label');
-      const summaryBox = document.getElementById('canvas-batch-summary');
-
-      // Elementos do Funil em 3 Passos
+      const photosBtn = document.getElementById('canvas-batch-photos-btn');
+      const photosList = document.getElementById('canvas-batch-photos-list');
+      const countEl = document.getElementById('canvas-batch-count');
       const btnGenCanvas = document.getElementById('canvas-batch-generate-canvas-btn');
       const labelGenCanvas = document.getElementById('canvas-batch-generate-canvas-label');
-      // Formato e resolução do .zip seguem o que está no modal Exportar
+      // O .zip do lote (usado pela ponte MCP) segue formato e resolução do modal Exportar
       const scaleSelect = document.getElementById('canvas-export-scale-slider');
       const formatSelect = document.getElementById('canvas-export-format');
-      const progressBox = document.getElementById('canvas-batch-progress');
-      const progressText = document.getElementById('canvas-batch-progress-text');
-      const progressPct = document.getElementById('canvas-batch-progress-pct');
-      const progressFill = document.getElementById('canvas-batch-progress-fill');
-
+      const startBtn = null;
+      const progressBox = null, progressText = null, progressPct = null, progressFill = null;
       if (!modal || !openBtn) return;
 
       openBtn.addEventListener('click', () => {
@@ -7655,22 +7644,13 @@
       });
 
       /* ----------------------------------------------------
-         Colar direto do Google Sheets ou Excel no Modal (⌘V)
+         UM POST POR LINHA
+         Cada linha troca o texto principal do post modelo. Colado do
+         Sheets, as colunas (tab) preenchem os textos seguintes, do maior
+         para o menor. Fotos soltas vão uma por post. As variáveis ({{}})
+         são criadas só durante a geração e somem em seguida.
          ---------------------------------------------------- */
-      modal.addEventListener('paste', (e) => {
-        if (!modal.classList.contains('open')) return;
-        const text = (e.clipboardData || window.clipboardData)?.getData('text/plain')?.trim();
-        if (text && (text.includes('\t') || (text.includes('\n') && (text.includes(',') || text.includes(';'))))) {
-          e.preventDefault();
-          e.stopPropagation();
-          handleTableText(text, 'Google Sheets / Excel');
-        }
-      });
-
-      // ----------------------------------------------------
-      // TABELA EDITÁVEL (fonte da verdade do lote)
-      // ----------------------------------------------------
-      let pendingImageTarget = null; // { rowIndex, bindName } | { column: bindName }
+      let batchPhotos = [];
 
       function readFileAsDataURL(file) {
         return new Promise(resolve => {
@@ -7681,641 +7661,33 @@
         });
       }
 
-      function blankRecord(binds) {
-        const rec = {};
-        binds.forEach(b => { rec[b.name] = ''; });
-        return rec;
-      }
-
-      /* CSV/TSV: casa header com bind por nome (exato antes de parcial). */
-      function matchHeaderForBind(bindName, headers) {
-        const normBind = bindName.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const norm = h => h.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const exact = headers.find(h => norm(h) === normBind);
-        if (exact) return exact;
-        return headers.find(h => norm(h).includes(normBind) || normBind.includes(norm(h))) || '';
-      }
-
-      function handleTableText(text, sourceName = 'Tabela', assumeHeader = 'auto') {
-        if (!text || typeof text !== 'string') return false;
-        const parsed = parseTSVOrCSV(text, assumeHeader);
-        if (!parsed.headers.length || !parsed.rows.length) {
-          if (hint) hint.innerHTML = `<span style="color: #EF4444;">Formato de tabela vazio ou não reconhecido.</span>`;
-          return false;
-        }
-
-        const binds = getCanvasBinds();
-        if (!binds.length) {
-          if (hint) hint.innerHTML = `<span style="color: #F59E0B;">Li ${parsed.rows.length} linha(s), mas nenhuma coluna está ligada. Ligue pelo menos uma.</span>`;
-          toast.info('Ligue pelo menos uma coluna para o CSV preencher a tabela.');
-          return false;
-        }
-        batchData.csv = parsed;
-        batchData.csvPick = {};
-
-        if (parsed.hasRealHeaders) {
-          binds.forEach(b => {
-            batchData.csvPick[b.name] = matchHeaderForBind(b.name, parsed.headers);
-          });
-          /* Cabecalho com outros nomes (ex.: "Frase" para {{titulo_1}}) deixaria
-             a tabela vazia: preenche o que sobrou na ordem das colunas. */
-          const usados = new Set(Object.values(batchData.csvPick).filter(Boolean));
-          const livres = parsed.headers.filter(h => !usados.has(h));
-          binds.forEach(b => {
-            if (!batchData.csvPick[b.name] && livres.length) {
-              batchData.csvPick[b.name] = livres.shift();
-            }
-          });
-        } else {
-          // Se não vieram cabeçalhos, mapeia na ordem sequencial das variáveis
-          binds.forEach((b, idx) => {
-            if (idx < parsed.headers.length) {
-              batchData.csvPick[b.name] = parsed.headers[idx];
-            }
-          });
-        }
-
-        batchData.records = parsed.rows.map(() => blankRecord(binds));
-        binds.forEach(b => fillColumnFromCSV(b));
-
-        renderBatchGrid();
-        updateBatchFooter();
-
-        toast.success(`✓ ${parsed.rows.length} ${parsed.rows.length === 1 ? 'post carregado' : 'posts carregados'} com sucesso!`);
-        return true;
-      }
-
-      if (pasteBtn) {
-        pasteBtn.addEventListener('click', async () => {
-          try {
-            if (navigator.clipboard && navigator.clipboard.readText) {
-              const text = await navigator.clipboard.readText();
-              if (text && (text.includes('\t') || text.includes('\n') || text.includes(','))) {
-                const ok = handleTableText(text, 'Google Sheets / Excel');
-                if (ok) return;
-              }
-            }
-          } catch (err) {}
-          toast.info('Pressione ⌘V para colar sua tabela do Sheets / Excel.');
-        });
-      }
-
-      if (importBtn && csvInput) {
-        importBtn.addEventListener('click', () => csvInput.click());
-        csvInput.addEventListener('change', (e) => {
-          const file = e.target.files && e.target.files[0];
-          if (file) handleCSVFile(file);
-          csvInput.value = '';
-        });
-      }
-
-      if (addRowBtn) {
-        addRowBtn.addEventListener('click', () => {
-          batchData.records.push(blankRecord(getCanvasBinds()));
-          renderBatchGrid();
-          updateBatchFooter();
-          if (gridWrap) gridWrap.scrollTop = gridWrap.scrollHeight;
-        });
-      }
-
-      // Soltar um .csv em cima da tabela preenche tudo
-      if (gridWrap) {
-        gridWrap.addEventListener('dragover', (e) => {
-          if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
-          e.preventDefault();
-          gridWrap.classList.add('is-dragover');
-        });
-        gridWrap.addEventListener('dragleave', () => gridWrap.classList.remove('is-dragover'));
-        gridWrap.addEventListener('drop', async (e) => {
-          const files = Array.from(e.dataTransfer && e.dataTransfer.files || []);
-          if (!files.length) return;
-          // Sempre bloqueia o padrão: sem isso o navegador abre a imagem no lugar do app
-          e.preventDefault();
-          gridWrap.classList.remove('is-dragover');
-
-          const file = files[0];
-          if (file.name.toLowerCase().endsWith('.csv') || file.type.includes('csv')) {
-            handleCSVFile(file);
-            return;
-          }
-
-          // Imagens soltas na tabela: uma por post, na primeira variável de foto
-          const images = files.filter(f => f.type.startsWith('image/'));
-          if (!images.length) return;
-          const binds = getCanvasBinds();
-          const imgBind = binds.find(b => b.type === 'image');
-          if (!imgBind) {
-            toast.info('Marque uma foto do canvas como variável do Batch antes de soltar imagens aqui.');
-            return;
-          }
-          const urls = await Promise.all(images.map(readFileAsDataURL));
-          urls.forEach((url, i) => {
-            if (!url) return;
-            while (batchData.records.length <= i) batchData.records.push(blankRecord(binds));
-            batchData.records[i][imgBind.name] = url;
-            delete batchData.records[i]['__hint_' + imgBind.name];
-          });
-          toast.success(`✓ ${urls.length} ${urls.length === 1 ? 'foto aplicada' : 'fotos aplicadas'} em {{${imgBind.name}}}`);
-          renderBatchGrid();
-          updateBatchFooter();
-        });
-      }
-
-
-      /* O .csv pode ser solto em qualquer ponto do modal (inclusive no Passo 1).
-         Sem isto, o handler global de 'drop' engole o arquivo em silencio. */
-      if (modal) {
-        modal.addEventListener('dragover', (e) => {
-          if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
-          e.preventDefault();
-          modal.classList.add('is-csv-dragover');
-        });
-        modal.addEventListener('dragleave', (e) => {
-          if (e.target === modal || !modal.contains(e.relatedTarget)) modal.classList.remove('is-csv-dragover');
-        });
-        modal.addEventListener('drop', (e) => {
-          modal.classList.remove('is-csv-dragover');
-          const files = Array.from(e.dataTransfer && e.dataTransfer.files || []);
-          if (!files.length) return;
-          const csv = files.find(f => f.name.toLowerCase().endsWith('.csv') || f.type.includes('csv'));
-          if (!csv) return;
-          // O grid do Passo 2 ja trata o proprio drop; nao processar duas vezes
-          if (gridWrap && gridWrap.contains(e.target)) return;
-          e.preventDefault();
-          handleCSVFile(csv);
-        });
-      }
-
-      // Seletor de fotos: serve tanto para uma célula quanto para a coluna toda
-      if (imagesInput) {
-        imagesInput.addEventListener('change', async (e) => {
-          const files = Array.from(e.target.files || []).filter(f => f.type.startsWith('image/'));
-          imagesInput.value = '';
-          if (!files.length || !pendingImageTarget) return;
-          const target = pendingImageTarget;
-          pendingImageTarget = null;
-
-          if (target.column) {
-            const urls = await Promise.all(files.map(readFileAsDataURL));
-            const binds = getCanvasBinds();
-            urls.forEach((url, i) => {
-              if (!url) return;
-              while (batchData.records.length <= i) batchData.records.push(blankRecord(binds));
-              batchData.records[i][target.column] = url;
-              delete batchData.records[i]['__hint_' + target.column];
-            });
-            toast.success(`✓ ${urls.length} fotos do computador aplicadas!`);
-          } else {
-            const url = await readFileAsDataURL(files[0]);
-            const rec = batchData.records[target.rowIndex];
-            if (url && rec) {
-              rec[target.bindName] = url;
-              delete rec['__hint_' + target.bindName];
-            }
-            toast.success('Foto aplicada com sucesso!');
-          }
-          renderBatchGrid();
-          updateBatchFooter();
-        });
-      }
-
-      // ----------------------------------------------------
-      // SELETOR DE IMAGENS DE VARIÁVEL (UNSPLASH + COMPUTADOR + URL)
-      // ----------------------------------------------------
-      const photoModal = document.getElementById('canvas-batch-photo-modal');
-      const photoCloseBtn = document.getElementById('canvas-batch-photo-close');
-      const photoCancelBtn = document.getElementById('canvas-batch-photo-cancel');
-      const photoTitle = document.getElementById('canvas-batch-photo-title');
-      const photoSub = document.getElementById('canvas-batch-photo-sub');
-      const photoTabs = document.querySelectorAll('.canvas-batch-photo-tab');
-      const photoViewUnsplash = document.getElementById('canvas-batch-photo-view-unsplash');
-      const photoViewUpload = document.getElementById('canvas-batch-photo-view-upload');
-      const photoViewUrl = document.getElementById('canvas-batch-photo-view-url');
-      const photoSearchInput = document.getElementById('canvas-batch-photo-search');
-      const photoSearchClear = document.getElementById('canvas-batch-photo-search-clear');
-      const photoBulkFillBtn = document.getElementById('canvas-batch-photo-bulk-fill');
-      const photoBulkFillLabel = document.getElementById('canvas-batch-photo-bulk-label');
-      const photoCatsWrap = document.getElementById('canvas-batch-photo-cats');
-      const photoGrid = document.getElementById('canvas-batch-photo-grid');
-      const photoDropzone = document.getElementById('canvas-batch-upload-dropzone');
-      const photoUploadTrigger = document.getElementById('canvas-batch-upload-trigger-btn');
-      const photoUrlInput = document.getElementById('canvas-batch-photo-url-input');
-      const photoUrlApply = document.getElementById('canvas-batch-photo-url-apply');
-      const photoUrlPreview = document.getElementById('canvas-batch-photo-url-preview');
-      const photoUrlImg = document.getElementById('canvas-batch-photo-url-img');
-
-      let currentPhotoTarget = null; // { rowIndex, bindName } | { column }
-      let photoTab = 'unsplash';
-      let photoQuery = '';
-      let photoCategory = 'all';
-      let photoLoading = false;
-      let photoSeq = 0;
-      let photoDebounce = null;
-
-      function openBatchPhotoPickerModal(target) {
-        currentPhotoTarget = target;
-        pendingImageTarget = target;
-        if (!photoModal) return;
-
-        // Atualiza títulos
-        if (target.column) {
-          if (photoTitle) photoTitle.textContent = `Preencher Coluna {{${target.column}}}`;
-          if (photoSub) photoSub.textContent = `Selecione fotos do Unsplash para todos os posts ou envie do computador`;
-          if (photoBulkFillBtn) {
-            photoBulkFillBtn.style.display = 'inline-flex';
-            const count = batchData.records.length;
-            if (photoBulkFillLabel) {
-              photoBulkFillLabel.textContent = `Preencher os ${count} ${count === 1 ? 'post' : 'posts'} com este tema`;
-            }
-          }
-        } else {
-          if (photoTitle) photoTitle.textContent = `Escolher Foto para {{${target.bindName}}}`;
-          if (photoSub) photoSub.textContent = `Post #${target.rowIndex + 1} · Escolha do Unsplash ou faça upload do computador`;
-          if (photoBulkFillBtn) photoBulkFillBtn.style.display = 'none';
-        }
-
-        switchPhotoTab('unsplash');
-        if (photoSearchInput) {
-          photoSearchInput.value = '';
-          if (photoSearchClear) photoSearchClear.style.display = 'none';
-        }
-        photoQuery = '';
-        photoCategory = 'all';
-        if (photoCatsWrap) {
-          photoCatsWrap.querySelectorAll('.canvas-batch-photo-chip').forEach(c => {
-            c.classList.toggle('is-active', c.dataset.cat === 'all');
-          });
-        }
-
-        photoModal.classList.add('open');
-        carregarFotosUnsplash();
-        if (window.lucide) lucide.createIcons();
-      }
-
-      function closeBatchPhotoPickerModal() {
-        if (!photoModal) return;
-        photoModal.classList.remove('open');
-        currentPhotoTarget = null;
-      }
-
-      function switchPhotoTab(t) {
-        photoTab = t;
-        photoTabs.forEach(tabBtn => {
-          tabBtn.classList.toggle('is-active', tabBtn.dataset.tab === t);
-        });
-        if (photoViewUnsplash) photoViewUnsplash.style.display = t === 'unsplash' ? 'flex' : 'none';
-        if (photoViewUpload) photoViewUpload.style.display = t === 'upload' ? 'flex' : 'none';
-        if (photoViewUrl) photoViewUrl.style.display = t === 'url' ? 'flex' : 'none';
-        if (window.lucide) lucide.createIcons();
-      }
-
-      photoTabs.forEach(tabBtn => {
-        tabBtn.addEventListener('click', () => switchPhotoTab(tabBtn.dataset.tab));
-      });
-
-      if (photoCloseBtn) photoCloseBtn.addEventListener('click', closeBatchPhotoPickerModal);
-      if (photoCancelBtn) photoCancelBtn.addEventListener('click', closeBatchPhotoPickerModal);
-      if (photoModal) {
-        photoModal.addEventListener('click', (e) => {
-          if (e.target === photoModal) closeBatchPhotoPickerModal();
-        });
-      }
-
-      // Categorias Unsplash
-      const CATEGORY_QUERIES = {
-        'all': '',
-        'minimalist': 'minimalist clean white architecture aesthetic',
-        'business': 'modern business technology startup workspace',
-        'editorial': 'editorial fashion modern architecture portrait',
-        'coffee': 'coffee shop cafe workspace latte aesthetic',
-        'dark_moody': 'dark moody cinematic black aesthetic contrast',
-        'textures': 'texture paper concrete noise abstract surface',
-        'nature': 'nature landscape peaceful serene aesthetic'
-      };
-
-      if (photoCatsWrap) {
-        photoCatsWrap.querySelectorAll('.canvas-batch-photo-chip').forEach(chip => {
-          chip.addEventListener('click', () => {
-            photoCatsWrap.querySelectorAll('.canvas-batch-photo-chip').forEach(c => c.classList.remove('is-active'));
-            chip.classList.add('is-active');
-            photoCategory = chip.dataset.cat;
-            photoQuery = CATEGORY_QUERIES[photoCategory] || '';
-            if (photoSearchInput) photoSearchInput.value = '';
-            if (photoSearchClear) photoSearchClear.style.display = 'none';
-            carregarFotosUnsplash();
-          });
-        });
-      }
-
-      if (photoSearchInput) {
-        photoSearchInput.addEventListener('input', () => {
-          clearTimeout(photoDebounce);
-          const val = photoSearchInput.value.trim();
-          if (photoSearchClear) photoSearchClear.style.display = val.length > 0 ? 'flex' : 'none';
-          photoDebounce = setTimeout(() => {
-            photoQuery = val;
-            if (photoCatsWrap) {
-              photoCatsWrap.querySelectorAll('.canvas-batch-photo-chip').forEach(c => c.classList.remove('is-active'));
-            }
-            carregarFotosUnsplash();
-          }, 240);
-        });
-      }
-
-      if (photoSearchClear && photoSearchInput) {
-        photoSearchClear.addEventListener('click', () => {
-          photoSearchInput.value = '';
-          photoQuery = '';
-          photoSearchClear.style.display = 'none';
-          if (photoCatsWrap) {
-            const first = photoCatsWrap.querySelector('[data-cat="all"]');
-            if (first) first.classList.add('is-active');
-          }
-          photoSearchInput.focus();
-          carregarFotosUnsplash();
-        });
-      }
-
-      async function carregarFotosUnsplash() {
-        if (!photoGrid) return;
-        const seq = ++photoSeq;
-        photoLoading = true;
-        photoGrid.innerHTML = `
-          <div style="grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 48px 0; color: rgba(255,255,255,0.6); font-size: 13px;">
-            <i data-lucide="loader-2" class="canvas-topbar__save-spin" style="width: 18px; height: 18px;"></i>
-            <span>Carregando fotos do Unsplash…</span>
-          </div>
-        `;
-        if (window.lucide) lucide.createIcons();
-
-        try {
-          if (!window.UnsplashService) throw new Error('UnsplashService ausente');
-
-          let res;
-          if (photoQuery) {
-            res = await window.UnsplashService.searchPhotos(photoQuery, { page: 1, perPage: 28 });
-          } else {
-            res = await window.UnsplashService.getEditorialPhotos({ page: 1, perPage: 28 });
-          }
-
-          if (seq !== photoSeq) return;
-
-          const photos = res.results || [];
-          renderUnsplashPhotoGrid(photos);
-        } catch (err) {
-          if (seq !== photoSeq) return;
-          console.error('[Unsplash batch]', err);
-          photoGrid.innerHTML = `
-            <div style="grid-column: 1 / -1; padding: 40px 20px; text-align: center; color: rgba(255,255,255,0.55); font-size: 13px;">
-              Não foi possível carregar as fotos do Unsplash. Verifique sua conexão ou tente outro termo.
-            </div>
-          `;
-        } finally {
-          photoLoading = false;
-        }
-      }
-
-      function renderUnsplashPhotoGrid(photos) {
-        if (!photoGrid) return;
-        photoGrid.innerHTML = '';
-
-        if (!photos || photos.length === 0) {
-          photoGrid.innerHTML = `
-            <div style="grid-column: 1 / -1; padding: 48px 20px; text-align: center; color: rgba(255,255,255,0.55); font-size: 13px;">
-              Nenhuma foto encontrada para esta busca. Tente palavras em português ou inglês (ex: <em>café, minimalista, escritório, tecnologia</em>).
-            </div>
-          `;
-          return;
-        }
-
-        photos.forEach(photo => {
-          if (!photo || !photo.urls) return;
-          const card = document.createElement('button');
-          card.type = 'button';
-          card.className = 'canvas-batch-photo-card';
-          card.title = `${photo.description || 'Foto Unsplash'} por ${(photo.author && photo.author.name) || 'Unsplash'}`;
-
-          const img = document.createElement('img');
-          img.src = photo.urls.small || photo.urls.regular;
-          img.alt = photo.description || 'Unsplash';
-          img.loading = 'lazy';
-          card.appendChild(img);
-
-          const author = document.createElement('div');
-          author.className = 'canvas-batch-photo-author';
-          author.textContent = `📷 ${(photo.author && photo.author.name) || 'Unsplash'}`;
-          card.appendChild(author);
-
-          card.addEventListener('click', async () => {
-            card.classList.add('is-busy');
-            try {
-              const photoData = await window.UnsplashService.downloadPhotoAsDataUrl(photo, 'regular', 1080);
-              aplicarFotoNoTarget(photoData.dataUrl);
-            } catch (e) {
-              console.error('Falha ao baixar foto:', e);
-              toast.error('Erro ao carregar foto do Unsplash.');
-            } finally {
-              card.classList.remove('is-busy');
-            }
-          });
-
-          photoGrid.appendChild(card);
-        });
-      }
-
-      // Preenchimento em Lote Inteligente para a Coluna Inteira
-      if (photoBulkFillBtn) {
-        photoBulkFillBtn.addEventListener('click', async () => {
-          if (!currentPhotoTarget || !currentPhotoTarget.column) return;
-          const colName = currentPhotoTarget.column;
-          const count = batchData.records.length;
-          photoBulkFillBtn.disabled = true;
-          const originalText = photoBulkFillLabel ? photoBulkFillLabel.textContent : '';
-          if (photoBulkFillLabel) photoBulkFillLabel.textContent = 'Baixando fotos…';
-
-          try {
-            if (!window.UnsplashService) throw new Error('UnsplashService ausente');
-            let res;
-            if (photoQuery) {
-              res = await window.UnsplashService.searchPhotos(photoQuery, { page: 1, perPage: Math.max(count, 12) });
-            } else {
-              res = await window.UnsplashService.getEditorialPhotos({ page: 1, perPage: Math.max(count, 12) });
-            }
-
-            const photos = (res.results || []).slice(0, count);
-            if (photos.length === 0) {
-              toast.info('Nenhuma foto encontrada para preencher.');
-              return;
-            }
-
-            // Baixa todas em paralelo
-            const downloadedUrls = await Promise.all(
-              photos.map(p => window.UnsplashService.downloadPhotoAsDataUrl(p, 'regular', 1080).then(d => d.dataUrl).catch(() => null))
-            );
-
-            downloadedUrls.forEach((url, idx) => {
-              if (url && batchData.records[idx]) {
-                batchData.records[idx][colName] = url;
-                delete batchData.records[idx]['__hint_' + colName];
-              }
-            });
-
-            renderBatchGrid();
-            updateBatchFooter();
-            closeBatchPhotoPickerModal();
-            toast.success(`✓ ${downloadedUrls.filter(Boolean).length} fotos do Unsplash aplicadas na coluna {{${colName}}}!`);
-          } catch (e) {
-            console.error('Falha no preenchimento em lote do Unsplash:', e);
-            toast.error('Não foi possível preencher as fotos em lote.');
-          } finally {
-            photoBulkFillBtn.disabled = false;
-            if (photoBulkFillLabel) photoBulkFillLabel.textContent = originalText;
-          }
-        });
-      }
-
-      // Aplicar foto para a célula ou coluna
-      function aplicarFotoNoTarget(dataUrl) {
-        if (!currentPhotoTarget || !dataUrl) return;
-        const target = currentPhotoTarget;
-
-        if (target.column) {
-          if (batchData.records.length > 0) {
-            batchData.records[0][target.column] = dataUrl;
-            delete batchData.records[0]['__hint_' + target.column];
-          }
-          toast.success(`Foto do Unsplash aplicada para a coluna {{${target.column}}}!`);
-        } else {
-          const rec = batchData.records[target.rowIndex];
-          if (rec) {
-            rec[target.bindName] = dataUrl;
-            delete rec['__hint_' + target.bindName];
-          }
-          toast.success(`Foto do Unsplash aplicada para o Post #${target.rowIndex + 1}!`);
-        }
-
-        renderBatchGrid();
-        updateBatchFooter();
-        closeBatchPhotoPickerModal();
-      }
-
-      // Upload do Computador
-      if (photoUploadTrigger) {
-        photoUploadTrigger.addEventListener('click', (e) => {
-          e.stopPropagation(); // botão fica dentro da dropzone: evita abrir o seletor 2x
-          imagesInput.click();
-          closeBatchPhotoPickerModal();
-        });
-      }
-
-      if (photoDropzone) {
-        photoDropzone.addEventListener('click', () => {
-          imagesInput.click();
-          closeBatchPhotoPickerModal();
-        });
-        photoDropzone.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          photoDropzone.classList.add('is-dragover');
-        });
-        photoDropzone.addEventListener('dragleave', () => photoDropzone.classList.remove('is-dragover'));
-        photoDropzone.addEventListener('drop', async (e) => {
-          e.preventDefault();
-          photoDropzone.classList.remove('is-dragover');
-          const files = Array.from(e.dataTransfer && e.dataTransfer.files || []).filter(f => f.type.startsWith('image/'));
-          if (!files.length || !currentPhotoTarget) return;
-
-          const target = currentPhotoTarget;
-          if (target.column) {
-            const urls = await Promise.all(files.map(readFileAsDataURL));
-            const binds = getCanvasBinds();
-            urls.forEach((url, i) => {
-              if (!url) return;
-              while (batchData.records.length <= i) batchData.records.push(blankRecord(binds));
-              batchData.records[i][target.column] = url;
-              delete batchData.records[i]['__hint_' + target.column];
-            });
-            toast.success(`✓ ${urls.length} fotos do computador carregadas!`);
-          } else {
-            const url = await readFileAsDataURL(files[0]);
-            const rec = batchData.records[target.rowIndex];
-            if (url && rec) {
-              rec[target.bindName] = url;
-              delete rec['__hint_' + target.bindName];
-            }
-            toast.success('Foto carregada do computador!');
-          }
-
-          renderBatchGrid();
-          updateBatchFooter();
-          closeBatchPhotoPickerModal();
-        });
-      }
-
-      // Inserção por URL Direta
-      if (photoUrlApply && photoUrlInput) {
-        photoUrlApply.addEventListener('click', () => {
-          const url = photoUrlInput.value.trim();
-          if (!url) {
-            toast.info('Cole uma URL de imagem válida.');
-            return;
-          }
-          aplicarFotoNoTarget(url);
-          photoUrlInput.value = '';
-        });
-        photoUrlInput.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            photoUrlApply.click();
-          }
-        });
-      }
-
-      function handleCSVFile(file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          handleTableText(e.target.result, file.name, true);
-        };
-        reader.readAsText(file, 'UTF-8');
-      }
-
-      /* Repontar uma coluna reescreve só ela: o que foi digitado nas outras fica. */
-      function fillColumnFromCSV(bind) {
-        if (!batchData.csv) return;
-        const col = batchData.csvPick[bind.name];
-        batchData.csv.rows.forEach((row, i) => {
-          const rec = batchData.records[i];
-          if (!rec) return;
-          const raw = col ? String(row[col] !== undefined ? row[col] : '') : '';
-          if (bind.type === 'image') {
-            rec[bind.name] = isImageSrcValue(raw) ? raw : (rec[bind.name] || '');
-            if (raw && !isImageSrcValue(raw)) rec['__hint_' + bind.name] = raw;
-            else delete rec['__hint_' + bind.name];
-          } else {
-            rec[bind.name] = raw;
-          }
-        });
-      }
-
-      /* Colunas da tabela: tudo que pode variar no post modelo. Ligada = já é
-         variável (tem bind); desligada = fica igual em todos os posts. */
-      function batchColumns() {
-        const cols = getCanvasBinds().map(b => ({ ...b, on: true }));
+      function templateChain() {
         const anchor = selectedFrame() || frames[0];
-        if (!anchor) return cols;
+        if (!anchor) return [];
         const byId = new Map(frames.map(f => [f.id, f]));
-        const chain = computePosts().find(c => c.includes(anchor.id)) || [anchor.id];
-        chain.map(id => byId.get(id)).filter(Boolean).forEach(f => {
-          (f.children || []).forEach(c => {
-            if (c.bind || (c.type !== 'text' && c.type !== 'image')) return;
-            cols.push({ name: null, type: c.type, frameId: f.id, childId: c.id, on: false });
-          });
-        });
-        return cols;
+        return (computePosts().find(c => c.includes(anchor.id)) || [anchor.id]).map(id => byId.get(id)).filter(Boolean);
       }
 
-      function columnChild(col) {
-        const f = frames.find(x => x.id === col.frameId);
-        return f && col.childId != null ? (f.children || []).find(c => c.id === col.childId) : null;
+      // Textos do post, do maior (título) para o menor
+      function textTargets() {
+        return templateChain()
+          .flatMap(f => (f.children || []).filter(c => c.type === 'text').map(c => ({ f, c })))
+          .sort((a, b) => (b.c.fontSize || 0) - (a.c.fontSize || 0) || a.c.y - b.c.y);
+      }
+
+      // Foto que troca: a maior imagem do post, senão o fundo do primeiro slide
+      function photoTarget() {
+        const chain = templateChain();
+        const imgs = chain.flatMap(f => (f.children || []).filter(c => c.type === 'image').map(c => ({ f, c })));
+        imgs.sort((a, b) => (b.c.w * b.c.h) - (a.c.w * a.c.h));
+        return imgs[0] || (chain[0] ? { f: chain[0], c: null } : null);
+      }
+
+      function readLines() {
+        return (linesInput ? linesInput.value : '')
+          .split('\n')
+          .map(l => l.split('\t').map(x => x.trim()))
+          .filter(cells => cells.some(Boolean));
       }
 
       function uniqueBindName(base) {
@@ -8325,263 +7697,109 @@
         return name;
       }
 
-      function setColumnOn(col, on) {
-        const f = frames.find(x => x.id === col.frameId);
-        if (!f) return;
-        if (col.isBackground) {
-          if (!on) delete f.bgBind;
-          applyFrameBackground(f);
-          updateFrameMeta();
-        } else {
-          const c = columnChild(col);
-          if (!c) return;
-          if (on) c.bind = uniqueBindName(c.type === 'image' ? 'foto' : (slugifyBind(c.text) || 'texto'));
-          else delete c.bind;
-          const el = nodeElement(c.id);
-          if (el) paintBind(c, el);
-        }
+      function postCount() {
+        return Math.max(readLines().length, batchPhotos.length);
       }
 
-      function toggleColumn(col) {
-        setColumnOn(col, !col.on);
-        updateTextToolbar();
-        save();
-        renderBatchGrid();
+      function updateBatchFooter() {
+        const n = postCount();
+        if (countEl) countEl.textContent = n ? `${n} ${n === 1 ? 'post' : 'posts'}` : '';
+        if (btnGenCanvas) btnGenCanvas.disabled = n === 0;
+        if (labelGenCanvas) labelGenCanvas.textContent = n ? `Criar ${n} ${n === 1 ? 'post' : 'posts'}` : 'Criar posts';
+      }
+
+      function renderPhotos() {
+        if (!photosList) return;
+        photosList.innerHTML = '';
+        batchPhotos.forEach((url, i) => {
+          const item = document.createElement('button');
+          item.type = 'button';
+          item.className = 'canvas-batch-photos__item';
+          item.title = 'Remover foto';
+          item.innerHTML = `<img alt=""><span>${i + 1}</span>`;
+          item.querySelector('img').src = url;
+          item.addEventListener('click', () => {
+            batchPhotos.splice(i, 1);
+            renderPhotos();
+            updateBatchFooter();
+          });
+          photosList.appendChild(item);
+        });
+      }
+
+      async function addPhotos(files) {
+        const images = Array.from(files || []).filter(f => f.type.startsWith('image/'));
+        if (!images.length) return;
+        const urls = await Promise.all(images.map(readFileAsDataURL));
+        batchPhotos.push(...urls.filter(Boolean));
+        renderPhotos();
         updateBatchFooter();
       }
 
-      // Primeira vez: todo texto do post já entra ligado, sem passo de "conectar"
-      function autoConnectTexts() {
-        if (getCanvasBinds().length) return;
-        const texts = batchColumns().filter(c => c.type === 'text');
-        if (!texts.length) return;
-        texts.forEach(col => setColumnOn(col, true));
-        updateTextToolbar();
-        save();
-      }
-
-      function renderBatchGrid() {
-        if (!grid) return;
-        const binds = getCanvasBinds();
-        const cols = batchColumns();
-        batchData.binds = binds;
-        grid.innerHTML = '';
-
-        if (cols.length === 0) {
-          grid.style.gridTemplateColumns = '1fr';
-          const empty = document.createElement('div');
-          empty.className = 'canvas-batch-empty-guide';
-          empty.innerHTML = `
-            <div class="canvas-batch-guide-icon">
-              <i data-lucide="sparkles" style="width: 24px; height: 24px;"></i>
-            </div>
-            <h3 class="canvas-batch-guide-title">O post ainda está vazio</h3>
-            <p class="canvas-batch-guide-sub">Adicione um texto ou uma foto no post para virar coluna aqui.</p>
-          `;
-          grid.appendChild(empty);
-          if (window.lucide) lucide.createIcons();
-          return;
-        }
-
-        // Mantém o que já foi digitado quando os binds do canvas mudam
-        // A primeira linha nasce com o texto que já está no post
-        const current = b => {
-          const c = b.type === 'text' ? columnChild(b) : null;
-          return c ? (c.text || '') : '';
+      /* Monta os registros da geração e liga variáveis temporárias nos
+         alvos; devolve a função que desfaz essas ligações. */
+      function prepareBatch() {
+        const lines = readLines();
+        const cols = Math.max(0, ...lines.map(l => l.length));
+        const undo = [];
+        const bindOn = (holder, key, base) => {
+          if (!holder[key]) {
+            holder[key] = uniqueBindName(base);
+            undo.push(() => delete holder[key]);
+          }
+          return holder[key];
         };
-        if (batchData.records.length === 0) batchData.records.push({});
-        batchData.records = batchData.records.map((rec, i) => {
-          const next = {};
-          binds.forEach(b => {
-            next[b.name] = rec[b.name] !== undefined ? rec[b.name] : (i === 0 ? current(b) : '');
-            if (rec['__hint_' + b.name]) next['__hint_' + b.name] = rec['__hint_' + b.name];
-          });
-          return next;
+
+        const textBinds = textTargets().slice(0, cols)
+          .map(({ c }) => bindOn(c, 'bind', slugifyBind(c.text) || 'texto'));
+        let photoBind = null;
+        const pt = batchPhotos.length ? photoTarget() : null;
+        if (pt) photoBind = pt.c ? bindOn(pt.c, 'bind', 'foto') : bindOn(pt.f, 'bgBind', 'fundo');
+
+        batchData.records = Array.from({ length: postCount() }, (_, i) => {
+          const rec = {};
+          textBinds.forEach((name, j) => { rec[name] = (lines[i] || [])[j] || ''; });
+          if (photoBind) rec[photoBind] = batchPhotos[i] || '';
+          return rec;
         });
-        grid.style.gridTemplateColumns = `36px repeat(${cols.length}, minmax(170px, 1fr)) 34px`;
-
-        // Cabeçalho
-        const idxHead = document.createElement('div');
-        idxHead.className = 'canvas-batch-cell-oa is-head is-idx';
-        idxHead.textContent = '#';
-        grid.appendChild(idxHead);
-
-        cols.forEach(b => {
-          const cell = document.createElement('div');
-          cell.className = `canvas-batch-cell-oa is-head${b.on ? '' : ' is-off'}`;
-
-          const top = document.createElement('div');
-          top.className = 'canvas-batch-headtop-oa';
-          const toggle = document.createElement('button');
-          toggle.type = 'button';
-          toggle.className = `canvas-batch-coltoggle-oa${b.on ? ' is-on' : ''}`;
-          toggle.title = b.on ? 'Muda em cada post (clique para deixar igual)' : 'Fica igual (clique para mudar em cada post)';
-          toggle.innerHTML = '<i data-lucide="check" style="width:11px;height:11px;"></i>';
-          toggle.addEventListener('click', () => toggleColumn(b));
-          top.appendChild(toggle);
-          const label = document.createElement('div');
-          label.className = `canvas-batch-var-tag ${b.type === 'image' ? 'is-img' : 'is-txt'}`;
-          const off = columnChild(b);
-          const name = b.on ? b.name : (b.type === 'image' ? 'Foto' : ((off && off.text) || 'Texto').slice(0, 24));
-          label.innerHTML = `<span class="canvas-batch-var-icon">${b.type === 'image' ? '🖼' : 'T'}</span><span class="canvas-batch-var-name"></span>`;
-          label.querySelector('.canvas-batch-var-name').textContent = name;
-          top.appendChild(label);
-          if (b.on && b.type === 'image') {
-            const fill = document.createElement('button');
-            fill.type = 'button';
-            fill.className = 'canvas-batch-colfill-oa';
-            fill.title = 'Preencher coluna com fotos do Unsplash ou do Computador';
-            fill.innerHTML = '<i data-lucide="images" style="width:13px;height:13px;"></i>';
-            fill.addEventListener('click', () => {
-              openBatchPhotoPickerModal({ column: b.name });
-            });
-            top.appendChild(fill);
-          }
-          cell.appendChild(top);
-
-          /* Só aparece depois de um import: é o que substitui o antigo passo de
-             "mapear colunas", agora no lugar onde a coluna já está. */
-          if (b.on && batchData.csv) {
-            const sel = document.createElement('select');
-            sel.className = 'canvas-batch-headsel-oa';
-            const none = document.createElement('option');
-            none.value = '';
-            none.textContent = '— sem coluna —';
-            sel.appendChild(none);
-            batchData.csv.headers.forEach(h => {
-              const o = document.createElement('option');
-              o.value = h;
-              o.textContent = h;
-              sel.appendChild(o);
-            });
-            sel.value = batchData.csvPick[b.name] || '';
-            sel.addEventListener('change', () => {
-              batchData.csvPick[b.name] = sel.value;
-              fillColumnFromCSV(b);
-              renderBatchGrid();
-              updateBatchFooter();
-            });
-            cell.appendChild(sel);
-          }
-
-          grid.appendChild(cell);
-        });
-
-        const actHead = document.createElement('div');
-        actHead.className = 'canvas-batch-cell-oa is-head is-act';
-        grid.appendChild(actHead);
-
-        // Linhas
-        batchData.records.forEach((rec, rowIndex) => {
-          const idx = document.createElement('div');
-          idx.className = 'canvas-batch-cell-oa is-idx';
-          idx.textContent = rowIndex + 1;
-          grid.appendChild(idx);
-
-          cols.forEach(b => {
-            const cell = document.createElement('div');
-            cell.className = 'canvas-batch-cell-oa';
-            if (!b.on) {
-              cell.classList.add('is-off');
-              cell.textContent = 'Fica igual';
-            } else if (b.type === 'image') {
-              cell.appendChild(buildImageCell(rec, rowIndex, b.name));
-            } else {
-              const ta = document.createElement('textarea');
-              ta.className = 'canvas-batch-input-oa';
-              ta.rows = 1;
-              ta.placeholder = b.name;
-              ta.value = rec[b.name] || '';
-              const autoGrow = () => {
-                ta.style.height = 'auto';
-                ta.style.height = Math.min(ta.scrollHeight, 66) + 'px';
-              };
-              ta.addEventListener('input', () => {
-                rec[b.name] = ta.value;
-                autoGrow();
-              });
-              cell.appendChild(ta);
-              requestAnimationFrame(autoGrow);
-            }
-            grid.appendChild(cell);
-          });
-
-          const delCell = document.createElement('div');
-          delCell.className = 'canvas-batch-cell-oa is-act';
-          const delBtn = document.createElement('button');
-          delBtn.type = 'button';
-          delBtn.className = 'canvas-batch-rowdel-oa';
-          delBtn.title = 'Remover linha';
-          delBtn.innerHTML = '<i data-lucide="x" style="width:12px;height:12px;"></i>';
-          delBtn.addEventListener('click', () => {
-            batchData.records.splice(rowIndex, 1);
-            if (batchData.records.length === 0) batchData.records.push(blankRecord(binds));
-            renderBatchGrid();
-            updateBatchFooter();
-          });
-          delCell.appendChild(delBtn);
-          grid.appendChild(delCell);
-        });
-
-        if (window.lucide) lucide.createIcons();
+        return () => undo.forEach(fn => fn());
       }
 
-      function buildImageCell(rec, rowIndex, bindName) {
-        const wrap = document.createElement('div');
-        wrap.className = 'canvas-batch-imgcell-oa';
+      if (linesInput) linesInput.addEventListener('input', updateBatchFooter);
+      if (photosBtn && imagesInput) {
+        photosBtn.addEventListener('click', () => imagesInput.click());
+        imagesInput.addEventListener('change', () => {
+          addPhotos(imagesInput.files);
+          imagesInput.value = '';
+        });
+      }
 
-        const val = rec[bindName] || '';
-        const hint = rec['__hint_' + bindName] || '';
-
-        if (val) {
-          const thumb = document.createElement('img');
-          thumb.className = 'canvas-batch-thumb-oa';
-          thumb.src = val;
-          thumb.title = 'Clique para trocar esta foto (Unsplash / PC)';
-          thumb.style.cursor = 'pointer';
-          thumb.addEventListener('click', () => {
-            openBatchPhotoPickerModal({ rowIndex, bindName, currentVal: val });
-          });
-          wrap.appendChild(thumb);
-
-          const changeBtn = document.createElement('button');
-          changeBtn.type = 'button';
-          changeBtn.className = 'canvas-batch-imgbtn-oa has-img';
-          changeBtn.title = 'Trocar foto';
-          changeBtn.innerHTML = '<i data-lucide="sparkles" style="width:11px;height:11px;"></i><span>Trocar</span>';
-          changeBtn.addEventListener('click', () => {
-            openBatchPhotoPickerModal({ rowIndex, bindName, currentVal: val });
-          });
-          wrap.appendChild(changeBtn);
-
-          const del = document.createElement('button');
-          del.type = 'button';
-          del.className = 'canvas-batch-imgbtn-oa';
-          del.style.flex = '0 0 24px';
-          del.title = 'Remover foto';
-          del.innerHTML = '<i data-lucide="x" style="width:11px;height:11px;"></i>';
-          del.addEventListener('click', (e) => {
-            e.stopPropagation();
-            rec[bindName] = '';
-            renderBatchGrid();
+      // Soltar fotos ou um .csv em qualquer ponto do modal
+      modal.addEventListener('dragover', (e) => {
+        if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        modal.classList.add('is-csv-dragover');
+      });
+      modal.addEventListener('dragleave', (e) => {
+        if (e.target === modal || !modal.contains(e.relatedTarget)) modal.classList.remove('is-csv-dragover');
+      });
+      modal.addEventListener('drop', (e) => {
+        modal.classList.remove('is-csv-dragover');
+        const files = Array.from(e.dataTransfer && e.dataTransfer.files || []);
+        if (!files.length) return;
+        e.preventDefault();
+        const csv = files.find(f => f.name.toLowerCase().endsWith('.csv') || f.type.includes('csv'));
+        if (csv) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            const parsed = parseTSVOrCSV(ev.target.result, true);
+            linesInput.value = parsed.rows.map(r => parsed.headers.map(h => r[h] || '').join('\t')).join('\n');
             updateBatchFooter();
-          });
-          wrap.appendChild(del);
-        } else {
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = 'canvas-batch-imgbtn-oa';
-          btn.title = hint ? `Arquivo sugerido no CSV: ${hint}` : 'Escolher foto do Unsplash ou computador';
-          btn.innerHTML = hint
-            ? `<i data-lucide="image" style="width:12px;height:12px;"></i><span>${hint}</span>`
-            : '<i data-lucide="image-plus" style="width:12px;height:12px;"></i><span>Escolher Foto</span>';
-          btn.addEventListener('click', () => {
-            openBatchPhotoPickerModal({ rowIndex, bindName, currentVal: val });
-          });
-          wrap.appendChild(btn);
+          };
+          reader.readAsText(csv, 'UTF-8');
         }
-        return wrap;
-      }
+        addPhotos(files);
+      });
 
       function isImageSrcValue(val) {
         if (!val || typeof val !== 'string') return false;
@@ -9048,10 +8266,6 @@
       }
 
       // Execução da Exportação em Lote
-      if (startBtn) {
-        startBtn.addEventListener('click', runBatchExport);
-      }
-
       async function runBatchExport() {
         if (!window.JSZip) {
           toast.info('Biblioteca de exportação carregando, tente novamente em um instante.');
@@ -9078,7 +8292,7 @@
           .filter(Boolean);
         const isCarousel = chain.length > 1;
 
-        startBtn.disabled = true;
+        if (startBtn) startBtn.disabled = true;
         if (progressBox) progressBox.style.display = 'flex';
 
         const zip = new JSZip();
@@ -9152,7 +8366,7 @@
             ? `✓ ${totalRows} posts exportados — ${falhas} imagem${falhas === 1 ? '' : 'ns'} não carregou (veja o console)`
             : `✓ ${totalRows} posts exportados com sucesso!`;
         }
-        startBtn.disabled = false;
+        if (startBtn) startBtn.disabled = false;
         setTimeout(() => {
           closeBatchModal();
           if (progressBox) progressBox.style.display = 'none';
@@ -9371,53 +8585,33 @@
       }
 
       if (btnGenCanvas) {
-        btnGenCanvas.addEventListener('click', generateBatchOnCanvas);
-      }
-
-      function updateBatchFooter() {
-        const total = batchData.records.length;
-        const binds = getCanvasBinds();
-        const ok = total > 0 && binds.length > 0;
-
-        const anchor = selectedFrame() || frames[0];
-        let slides = 1;
-        if (anchor) {
-          const chain = computePosts().find(c => c.includes(anchor.id)) || [anchor.id];
-          slides = chain.length;
-        }
-
-        if (startBtn) {
-          startBtn.disabled = !ok;
-          if (startLabel) startLabel.textContent = 'Baixar .zip';
-        }
-        if (btnGenCanvas) {
-          btnGenCanvas.disabled = !ok;
-          if (labelGenCanvas) {
-            labelGenCanvas.textContent = ok
-              ? `Criar ${total} ${total === 1 ? 'post' : 'posts'} no canvas`
-              : 'Criar no canvas';
+        btnGenCanvas.addEventListener('click', async () => {
+          const release = prepareBatch();
+          try {
+            await generateBatchOnCanvas();
+          } finally {
+            release();
+            renderAll();
+            save();
           }
-        }
-        if (summaryBox) {
-          if (total > 0 && binds.length > 0) {
-            summaryBox.innerHTML = `<span>📦 <strong>${total}</strong> ${total === 1 ? 'post' : 'posts'} × <strong>${slides}</strong> ${slides === 1 ? 'slide' : 'slides'} = <strong>${total * slides}</strong> ${total * slides === 1 ? 'PNG' : 'PNGs'}</span>`;
-          } else {
-            summaryBox.innerHTML = '';
-          }
-        }
-        if (footInfo) {
-          footInfo.textContent = total > 0
-            ? `${total} ${total === 1 ? 'post na tabela' : 'posts na tabela'}`
-            : '';
-        }
+          if (linesInput) linesInput.value = '';
+          batchPhotos = [];
+          renderPhotos();
+          updateBatchFooter();
+        });
       }
 
       function openBatchModal() {
         document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
         modal.classList.add('open');
-        autoConnectTexts();
-        renderBatchGrid();
+        const main = textTargets()[0];
+        if (subEl) {
+          subEl.textContent = main
+            ? `Escreva um post por linha. Cada linha troca “${(main.c.text || 'o título').slice(0, 40)}”.`
+            : 'Adicione um texto no post para criar vários de uma vez.';
+        }
         updateBatchFooter();
+        if (linesInput) setTimeout(() => linesInput.focus(), 50);
         if (progressBox) progressBox.style.display = 'none';
         if (window.lucide) lucide.createIcons();
       }
@@ -9435,12 +8629,6 @@
 
       window.closeBatchModal = closeBatchModal;
       window.openBatchModal = openBatchModal;
-      // O modal de variável ({}) mexe nas colunas: a tabela aberta acompanha
-      window.refreshBatchGrid = () => {
-        if (!modal.classList.contains('open')) return;
-        renderBatchGrid();
-        updateBatchFooter();
-      };
       window.exportFrameToBlob = exportFrameToBlob;
       window.exportFrameToBlobs = exportFrameToBlobs;
       window.renderFrameToCanvas = renderFrameToCanvas;
@@ -9460,10 +8648,6 @@
         definirLote: (registros) => {
           batchData.records = (registros || []).map(r => ({ ...r }));
           batchData.binds = getCanvasBinds();
-          batchData.csv = null;
-          batchData.csvPick = {};
-          renderBatchGrid();
-          updateBatchFooter();
           return batchData.records.length;
         },
         exportar: () => runBatchExport(),
@@ -11917,7 +11101,6 @@
           }
 
           closeBindModal();
-          if (window.refreshBatchGrid) window.refreshBatchGrid();
         });
       }
 
@@ -11944,7 +11127,6 @@
             toast.info(`Variável {{${old}}} desvinculada.`);
           }
           closeBindModal();
-          if (window.refreshBatchGrid) window.refreshBatchGrid();
         });
       }
 
