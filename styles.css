@@ -1237,7 +1237,6 @@ body {
   will-change: transform;
 }
 
-
 .canvas-frame.is-dragging {
   /* O arraste acontece por transform: promove a camada e o conteúdo do frame
      (divisórias, hachuras, rótulo) viaja junto sem ser repintado. */
@@ -2625,26 +2624,6 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   }
 }
 
-.canvas-batch-section-oa {
-  display: flex;
-  flex-direction: column;
-}
-
-.canvas-batch-title-oa {
-  font-size: 11.5px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: #9CA3AF;
-  margin-bottom: 6px;
-}
-
-.canvas-batch-opt-oa {
-  text-transform: none;
-  font-weight: 400;
-  color: #9CA3AF;
-}
-
 /* Dropzones Padronizados (Mesma Forma, Borda, Padding e Geometria) */
 .canvas-batch-dropzone-oa {
   background: #F9FAFB;
@@ -2671,98 +2650,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   border-color: #86EFAC;
 }
 
-.canvas-batch-dropzone-label-oa {
-  font-size: 12.5px;
-  font-weight: 400;
-  color: #6B7280;
-  line-height: 1.35;
-  font-family: inherit;
-  flex: 1;
-  min-width: 0;
-}
-
-.canvas-batch-dropzone-label-oa strong {
-  color: #111827;
-  font-weight: 500;
-}
-
-.canvas-batch-images-tag-oa {
-  margin-left: auto;
-  font-size: 11px;
-  color: #7C3AED;
-  font-weight: 500;
-  background: #EDE9FE;
-  padding: 1px 7px;
-  border-radius: 9999px;
-  flex-shrink: 0;
-}
-
 /* Lista de Mapeamentos */
-.canvas-batch-list-oa {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.canvas-batch-empty-oa {
-  font-size: 12.5px;
-  font-weight: 400;
-  color: #9CA3AF;
-  padding: 12px;
-  background: #F9FAFB;
-  border-radius: 12px;
-  text-align: center;
-  font-family: inherit;
-}
-
-.canvas-batch-empty-oa code {
-  background: #E5E7EB;
-  color: #374151;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.canvas-batch-mapping-row-oa {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
-  background: #F9FAFB;
-  border: 1px solid #F3F4F6;
-  border-radius: 12px;
-}
-
-.canvas-batch-mapping-target-oa {
-  font-family: inherit;
-  font-size: 13px;
-  color: #111827;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.canvas-batch-mapping-select-oa {
-  background: #FFFFFF;
-  border: 1px solid #E5E7EB;
-  color: #374151;
-  font-size: 12.5px;
-  font-family: inherit;
-  font-weight: 400;
-  padding: 5px 10px;
-  border-radius: 8px;
-  outline: none;
-  transition: all var(--transition);
-  max-width: 180px;
-}
-
-.canvas-batch-mapping-select-oa:focus {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
-}
 
 /* ------------------------------------------------------------
    TABELA EDITÁVEL DO LOTE (uma linha = um post)
@@ -3204,7 +3092,6 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 .canvas-batch-photo-bulk-btn:active {
   transform: translateY(0);
 }
-
 
 /* ------------------------------------------------------------
    MODAL DE FOTO DO BATCH — tema escuro (mesmo padrão do library)
@@ -5599,374 +5486,14 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 /* Step indicator pill no topo do modal */
-.canvas-batch-steps-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 6px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-pill);
-  margin-bottom: 8px;
-}
-
-.canvas-batch-step-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 10px;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  border: none;
-  color: rgba(255, 255, 255, 0.45);
-  font-size: 11.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 140ms ease;
-  user-select: none;
-}
-
-.canvas-batch-step-btn:hover {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.canvas-batch-step-btn.is-active {
-  background: rgba(255, 255, 255, 0.14);
-  color: #FFFFFF;
-  font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
-}
-
-.canvas-batch-step-btn.is-done {
-  color: #34D399;
-}
-
-.canvas-batch-step-num {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  font-weight: 700;
-}
-
-.canvas-batch-step-btn.is-active .canvas-batch-step-num {
-  background: #2563EB;
-  color: #FFFFFF;
-}
-
-.canvas-batch-step-sep {
-  width: 12px;
-  height: 1px;
-  background: rgba(255, 255, 255, 0.12);
-}
 
 /* Step Views */
-.canvas-batch-step-view {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
 
 /* Passo 1: Cards de Variáveis */
-.canvas-batch-binds-status-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 4px 0;
-}
-
-.canvas-batch-var-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 10px;
-}
-
-.canvas-batch-var-card {
-  padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  transition: all 140ms ease;
-}
-
-.canvas-batch-var-card:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.16);
-}
-
-.canvas-batch-var-card-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: rgba(124, 58, 237, 0.15);
-  border: 1px solid rgba(124, 58, 237, 0.3);
-  color: #DDD6FE;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  flex-shrink: 0;
-}
-
-.canvas-batch-var-card-icon.is-img {
-  background: rgba(16, 185, 129, 0.15);
-  border-color: rgba(16, 185, 129, 0.3);
-  color: #A7F3D0;
-}
-
-.canvas-batch-var-card-info {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.canvas-batch-var-card-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: #FFFFFF;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-}
-
-.canvas-batch-var-card-sub {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.45);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 /* Passo 1: Assistente amigável quando ainda não há variáveis */
-.canvas-batch-no-binds-card {
-  padding: 20px 22px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px dashed rgba(255, 255, 255, 0.14);
-  border-radius: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.canvas-batch-no-binds-head {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.canvas-batch-no-binds-head-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  background: linear-gradient(135deg, rgba(37, 99, 235, 0.2), rgba(124, 58, 237, 0.2));
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #60A5FA;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.canvas-batch-no-binds-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: #FFFFFF;
-}
-
-.canvas-batch-no-binds-sub {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.canvas-batch-elements-detect-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.canvas-batch-elem-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 10px;
-}
-
-.canvas-batch-elem-row-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.85);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 440px;
-}
-
-.canvas-batch-elem-connect-btn {
-  height: 26px;
-  padding: 0 10px;
-  border-radius: var(--radius-pill);
-  background: rgba(124, 58, 237, 0.2);
-  border: 1px solid rgba(124, 58, 237, 0.4);
-  color: #DDD6FE;
-  font-size: 11.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 130ms ease;
-  white-space: nowrap;
-}
-
-.canvas-batch-elem-connect-btn:hover {
-  background: rgba(124, 58, 237, 0.35);
-  color: #FFFFFF;
-  transform: scale(1.03);
-}
-
-.canvas-batch-auto-connect-all-btn {
-  height: 34px;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, #2563EB, #7C3AED);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #FFFFFF;
-  font-size: 12.5px;
-  font-weight: 600;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  cursor: pointer;
-  box-shadow: 0 3px 12px rgba(124, 58, 237, 0.3);
-  transition: all 140ms ease;
-}
-
-.canvas-batch-auto-connect-all-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 5px 16px rgba(124, 58, 237, 0.45);
-}
 
 /* Passo 3: Cards de Escolha de Saída */
-.canvas-batch-summary-hero {
-  padding: 12px 16px;
-  background: rgba(37, 99, 235, 0.09);
-  border: 1px solid rgba(37, 99, 235, 0.2);
-  border-radius: 12px;
-  font-size: 13px;
-  color: #BFDBFE;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.canvas-batch-output-cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.canvas-batch-output-card {
-  padding: 20px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  transition: all 160ms cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.canvas-batch-output-card:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.2);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px -8px rgba(0, 0, 0, 0.5);
-}
-
-.canvas-batch-output-card.is-highlight {
-  background: rgba(37, 99, 235, 0.07);
-  border-color: rgba(37, 99, 235, 0.3);
-  box-shadow: 0 8px 24px -6px rgba(37, 99, 235, 0.2);
-}
-
-.canvas-batch-output-card.is-highlight:hover {
-  background: rgba(37, 99, 235, 0.12);
-  border-color: rgba(37, 99, 235, 0.45);
-}
-
-.canvas-batch-output-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.canvas-batch-output-icon.is-canvas {
-  background: rgba(124, 58, 237, 0.15);
-  border: 1px solid rgba(124, 58, 237, 0.3);
-  color: #C4B5FD;
-}
-
-.canvas-batch-output-icon.is-zip {
-  background: rgba(37, 99, 235, 0.2);
-  border: 1px solid rgba(37, 99, 235, 0.4);
-  color: #93C5FD;
-}
-
-.canvas-batch-output-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #FFFFFF;
-  letter-spacing: -0.015em;
-  margin-bottom: 4px;
-}
-
-.canvas-batch-output-desc {
-  font-size: 12px;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.canvas-batch-quick-options {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 10px;
-  flex-wrap: wrap;
-}
-
-.canvas-batch-opt-mini {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.canvas-batch-select-mini {
-  height: 24px;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 6px;
-  color: #FFFFFF;
-  font-size: 11px;
-  padding: 0 6px;
-  outline: none;
-}
-
-.canvas-batch-output-action {
-  width: 100%;
-  margin-top: auto;
-}
 
 #canvas-batch-modal .openpanel-modal__header,
 #canvas-export-modal .openpanel-modal__header {
@@ -6023,14 +5550,6 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 /* Títulos de seção */
-#canvas-batch-modal .canvas-batch-title-oa,
-#canvas-export-modal .canvas-batch-title-oa {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(255, 255, 255, 0.45);
-}
 
 /* Cabeçalho da grade de posts */
 .canvas-batch-grid-head-oa {
@@ -6158,6 +5677,49 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 /* Variable Tag Chips no cabeçalho */
+/* Liga/desliga a coluna: ligada muda em cada post, desligada fica igual */
+.canvas-batch-coltoggle-oa {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.canvas-batch-coltoggle-oa:hover {
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.canvas-batch-coltoggle-oa.is-on {
+  background: #2563EB;
+  border-color: #2563EB;
+  color: #FFFFFF;
+}
+
+.canvas-batch-coltoggle-oa + .canvas-batch-var-tag {
+  margin-right: auto;
+}
+
+.canvas-batch-cell-oa.is-off {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.canvas-batch-cell-oa.is-head.is-off .canvas-batch-var-tag {
+  opacity: 0.45;
+}
+
 .canvas-batch-var-tag {
   display: inline-flex;
   align-items: center;
@@ -6288,71 +5850,6 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   line-height: 1.45;
 }
 
-.canvas-batch-steps-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  width: 100%;
-  margin-top: 10px;
-  text-align: left;
-}
-
-.canvas-batch-step-card {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  transition: all 140ms ease;
-}
-
-.canvas-batch-step-card:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.15);
-  transform: translateY(-1px);
-}
-
-.canvas-batch-step-num {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: rgba(56, 189, 248, 0.15);
-  color: #38BDF8;
-  font-size: 11px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.canvas-batch-step-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 11.5px;
-  line-height: 1.35;
-  color: rgba(255, 255, 255, 0.52);
-}
-
-.canvas-batch-step-info strong {
-  color: #FFFFFF;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.canvas-batch-step-info code,
-.canvas-batch-step-info kbd {
-  background: rgba(255, 255, 255, 0.1);
-  color: #FFFFFF;
-  padding: 1px 4px;
-  border-radius: 4px;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 500;
-}
-
 /* Imagens na célula de lote */
 .canvas-batch-imgcell-oa {
   display: flex;
@@ -6446,41 +5943,6 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 /* Barra de Opções Rápidas (Formato + Resolução + Dica) */
-.canvas-batch-options-bar-oa {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 0 2px;
-}
-
-.canvas-batch-quick-selects {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.canvas-batch-opt-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.45);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.canvas-batch-select-oa.is-compact {
-  height: 28px;
-  font-size: 11.5px;
-  padding: 0 26px 0 10px;
-  background-position: right 8px center;
-  border-radius: 8px;
-  width: auto;
-  min-width: 120px;
-}
 
 /* Dica de atalho no rodapé do formulário */
 .canvas-batch-hint-oa {
@@ -6509,39 +5971,6 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 /* Custom Select Dark Glass */
-.canvas-batch-select-oa {
-  width: 100%;
-  height: 38px;
-  background: rgba(255, 255, 255, 0.06) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.45)' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 12px center;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  color: #FFFFFF;
-  font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  padding: 0 32px 0 12px;
-  outline: none;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  transition: all 130ms ease;
-}
-
-.canvas-batch-select-oa:hover {
-  background-color: rgba(255, 255, 255, 0.10);
-  border-color: rgba(255, 255, 255, 0.18);
-}
-
-.canvas-batch-select-oa:focus {
-  border-color: #38BDF8;
-  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2);
-}
-
-.canvas-batch-select-oa option {
-  background: #18181B;
-  color: #FFFFFF;
-  padding: 6px;
-}
 
 /* Custom Input Dark Glass para Exportar */
 .canvas-export-input-oa {
@@ -6745,8 +6174,6 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   border-color: rgba(255, 255, 255, 0.08) !important;
   color: rgba(255, 255, 255, 0.35) !important;
 }
-
-
 
 /* ------------------------------------------------------------
    TOASTS — avisos curtos no canto inferior direito

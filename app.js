@@ -7629,134 +7629,17 @@
       const summaryBox = document.getElementById('canvas-batch-summary');
 
       // Elementos do Funil em 3 Passos
-      const stepNav1 = document.getElementById('canvas-batch-step-nav-1');
-      const stepNav2 = document.getElementById('canvas-batch-step-nav-2');
-      const stepNav3 = document.getElementById('canvas-batch-step-nav-3');
-      const viewStep1 = document.getElementById('canvas-batch-view-1');
-      const viewStep2 = document.getElementById('canvas-batch-view-2');
-      const viewStep3 = document.getElementById('canvas-batch-view-3');
-      const titleEl = document.getElementById('canvas-batch-title');
-      const subEl = document.getElementById('canvas-batch-sub');
-      const prevStepBtn = document.getElementById('canvas-batch-prev-step-btn');
-      const nextStepBtn = document.getElementById('canvas-batch-next-step-btn');
-      const bindsStatusWrap = document.getElementById('canvas-batch-binds-status');
-      const summaryHero = document.getElementById('canvas-batch-summary-hero');
       const btnGenCanvas = document.getElementById('canvas-batch-generate-canvas-btn');
       const labelGenCanvas = document.getElementById('canvas-batch-generate-canvas-label');
-      const scaleSelect = document.getElementById('canvas-batch-scale');
-      const formatSelect = document.getElementById('canvas-batch-format');
+      // Formato e resolução do .zip seguem o que está no modal Exportar
+      const scaleSelect = document.getElementById('canvas-export-scale-slider');
+      const formatSelect = document.getElementById('canvas-export-format');
       const progressBox = document.getElementById('canvas-batch-progress');
       const progressText = document.getElementById('canvas-batch-progress-text');
       const progressPct = document.getElementById('canvas-batch-progress-pct');
       const progressFill = document.getElementById('canvas-batch-progress-fill');
 
       if (!modal || !openBtn) return;
-
-      let currentBatchStep = 1;
-
-      function setBatchStep(step) {
-        currentBatchStep = step;
-
-        if (viewStep1) viewStep1.style.display = step === 1 ? 'flex' : 'none';
-        if (viewStep2) viewStep2.style.display = step === 2 ? 'flex' : 'none';
-        if (viewStep3) viewStep3.style.display = step === 3 ? 'flex' : 'none';
-
-        [stepNav1, stepNav2, stepNav3].forEach((btn, idx) => {
-          if (!btn) return;
-          const s = idx + 1;
-          btn.classList.toggle('is-active', s === step);
-          btn.classList.toggle('is-done', s < step);
-        });
-
-        if (step === 1) {
-          if (titleEl) titleEl.textContent = 'Elementos Dinâmicos';
-          if (subEl) subEl.textContent = 'Defina quais textos e fotos mudam em cada post';
-          if (prevStepBtn) prevStepBtn.style.display = 'none';
-          if (nextStepBtn) {
-            nextStepBtn.style.display = 'inline-flex';
-            const span = nextStepBtn.querySelector('span');
-            if (span) span.textContent = 'Continuar para o Conteúdo';
-          }
-          renderStep1BindsStatus();
-        } else if (step === 2) {
-          if (titleEl) titleEl.textContent = 'Preencher Conteúdo';
-          if (subEl) subEl.textContent = 'Digite ou cole os dados para gerar seus novos posts';
-          if (prevStepBtn) {
-            prevStepBtn.style.display = 'inline-flex';
-            const span = prevStepBtn.querySelector('span');
-            if (span) span.textContent = 'Voltar para Elementos';
-          }
-          if (nextStepBtn) {
-            nextStepBtn.style.display = 'inline-flex';
-            const span = nextStepBtn.querySelector('span');
-            if (span) span.textContent = 'Avançar para Gerar';
-          }
-          renderBatchGrid();
-          updateBatchFooter();
-        } else if (step === 3) {
-          if (titleEl) titleEl.textContent = 'Gerar Posts';
-          if (subEl) subEl.textContent = 'Escolha onde você deseja gerar o resultado';
-          if (prevStepBtn) {
-            prevStepBtn.style.display = 'inline-flex';
-            const span = prevStepBtn.querySelector('span');
-            if (span) span.textContent = 'Voltar para a Tabela';
-          }
-          if (nextStepBtn) {
-            nextStepBtn.style.display = 'none';
-          }
-          renderStep3Summary();
-          updateBatchFooter();
-        }
-
-        if (window.lucide) lucide.createIcons();
-      }
-
-      if (stepNav1) stepNav1.addEventListener('click', () => setBatchStep(1));
-      if (stepNav2) stepNav2.addEventListener('click', () => setBatchStep(2));
-      if (stepNav3) stepNav3.addEventListener('click', () => {
-        if (batchData.records.length === 0) {
-          batchData.records.push(blankRecord(getCanvasBinds()));
-        }
-        setBatchStep(3);
-      });
-
-      if (prevStepBtn) {
-        prevStepBtn.addEventListener('click', () => {
-          if (currentBatchStep === 2) setBatchStep(1);
-          else if (currentBatchStep === 3) setBatchStep(2);
-        });
-      }
-
-      if (nextStepBtn) {
-        nextStepBtn.addEventListener('click', () => {
-          if (currentBatchStep === 1) {
-            const binds = getCanvasBinds();
-            if (binds.length === 0) {
-              // Auto-conecta textos existentes no frame para não travar o usuário
-              const anchor = selectedFrame() || frames[0];
-              const textChildren = (anchor && anchor.children) ? anchor.children.filter(c => c.type === 'text') : [];
-              if (textChildren.length > 0) {
-                textChildren.forEach((c, idx) => {
-                  if (!c.bind) {
-                    const defaultName = idx === 0 ? 'titulo' : idx === 1 ? 'subtitulo' : `texto_${idx + 1}`;
-                    c.bind = slugifyBind(c.text) || defaultName;
-                    const el = nodeElement(c.id);
-                    if (el) paintBind(c, el);
-                  }
-                });
-                updateTextToolbar();
-                save();
-              }
-            }
-            setBatchStep(2);
-          } else if (currentBatchStep === 2) {
-            if (batchData.records.length === 0) {
-              batchData.records.push(blankRecord(getCanvasBinds()));
-            }
-            setBatchStep(3);
-          }
-        });
-      }
 
       openBtn.addEventListener('click', () => {
         if (modal.classList.contains('open')) {
@@ -7823,10 +7706,8 @@
 
         const binds = getCanvasBinds();
         if (!binds.length) {
-          if (hint) hint.innerHTML = `<span style="color: #F59E0B;">Li ${parsed.rows.length} linha(s), mas nenhuma variável está conectada. Volte ao Passo 1 e marque os textos/fotos que mudam.</span>`;
-          toast.info('Nenhuma variável conectada: marque os campos no Passo 1 para o CSV preencher a tabela.');
-          setBatchStep(1);
-          renderStep1BindsStatus();
+          if (hint) hint.innerHTML = `<span style="color: #F59E0B;">Li ${parsed.rows.length} linha(s), mas nenhuma coluna está ligada. Ligue pelo menos uma.</span>`;
+          toast.info('Ligue pelo menos uma coluna para o CSV preencher a tabela.');
           return false;
         }
         batchData.csv = parsed;
@@ -7857,7 +7738,6 @@
         batchData.records = parsed.rows.map(() => blankRecord(binds));
         binds.forEach(b => fillColumnFromCSV(b));
 
-        setBatchStep(2);
         renderBatchGrid();
         updateBatchFooter();
 
@@ -8416,154 +8296,78 @@
         });
       }
 
-      function renderStep1BindsStatus() {
-        if (!bindsStatusWrap) return;
-        const binds = getCanvasBinds();
+      /* Colunas da tabela: tudo que pode variar no post modelo. Ligada = já é
+         variável (tem bind); desligada = fica igual em todos os posts. */
+      function batchColumns() {
+        const cols = getCanvasBinds().map(b => ({ ...b, on: true }));
         const anchor = selectedFrame() || frames[0];
-        bindsStatusWrap.innerHTML = '';
-
-        if (binds.length > 0) {
-          const count = binds.length;
-          const card = document.createElement('div');
-          card.innerHTML = `
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; padding: 0 4px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span style="display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #10B981; color: #FFF; font-size: 11px; font-weight: bold;">✓</span>
-                <strong style="font-size: 13.5px; color: #FFF;">${count} ${count === 1 ? 'variável identificada' : 'variáveis identificadas'} no template</strong>
-              </div>
-              <span style="font-size: 11.5px; color: rgba(255,255,255,0.5);">Pronto para preencher posts</span>
-            </div>
-            <div class="canvas-batch-var-list">
-              ${binds.map(b => `
-                <div class="canvas-batch-var-card">
-                  <div class="canvas-batch-var-card-icon ${b.type === 'image' ? 'is-img' : ''}">
-                    ${b.type === 'image' ? '🖼️' : 'T'}
-                  </div>
-                  <div class="canvas-batch-var-card-info">
-                    <div class="canvas-batch-var-card-name">{{${b.name}}}</div>
-                    <div class="canvas-batch-var-card-sub">${b.type === 'image' ? (b.isBackground ? 'Fundo do post' : 'Imagem / Foto') : 'Texto dinâmico'}</div>
-                  </div>
-                </div>
-              `).join('')}
-            </div>
-            <div style="margin-top: 14px; padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 12px; font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.45;">
-              💡 <strong>Como funciona:</strong> No próximo passo, cada linha da tabela preencherá essas variáveis automaticamente para criar um novo post.
-            </div>
-          `;
-          bindsStatusWrap.appendChild(card);
-        } else {
-          // Assistente quando ainda não há variáveis
-          const noBinds = document.createElement('div');
-          noBinds.className = 'canvas-batch-no-binds-card';
-
-          const currentChildren = (anchor && anchor.children) ? anchor.children : [];
-          const textChildren = currentChildren.filter(c => c.type === 'text');
-
-          let elementsListHtml = '';
-          if (textChildren.length > 0) {
-            elementsListHtml = `
-              <div style="font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.7); margin-top: 4px;">
-                Textos encontrados no seu design atual:
-              </div>
-              <div class="canvas-batch-elements-detect-list">
-                ${textChildren.map((c, i) => `
-                  <div class="canvas-batch-elem-row">
-                    <div class="canvas-batch-elem-row-info">
-                      <span style="color: rgba(255,255,255,0.4); font-weight: 600;">T</span>
-                      <span>"${(c.text || 'Texto vazio').slice(0, 45)}${(c.text || '').length > 45 ? '…' : ''}"</span>
-                    </div>
-                    <button type="button" class="canvas-batch-elem-connect-btn" data-child-id="${c.id}">
-                      ✨ Conectar
-                    </button>
-                  </div>
-                `).join('')}
-              </div>
-              <button type="button" class="canvas-batch-auto-connect-all-btn" id="canvas-batch-auto-connect-all">
-                <i data-lucide="sparkles" style="width: 15px; height: 15px;"></i>
-                <span>Conectar todos os textos automaticamente</span>
-              </button>
-            `;
-          } else {
-            elementsListHtml = `
-              <div style="font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.5;">
-                Adicione textos ou fotos ao seu post no canvas e clique no botão <code>{}</code> na barra de ferramentas para torná-los variáveis dinâmicas.
-              </div>
-            `;
-          }
-
-          noBinds.innerHTML = `
-            <div class="canvas-batch-no-binds-head">
-              <div class="canvas-batch-no-binds-head-icon">
-                <i data-lucide="sparkles" style="width: 20px; height: 20px;"></i>
-              </div>
-              <div>
-                <div class="canvas-batch-no-binds-title">O que deve mudar em cada post?</div>
-                <div class="canvas-batch-no-binds-sub">Escolha quais frases ou imagens do seu post devem mudar para cada post gerado.</div>
-              </div>
-            </div>
-            ${elementsListHtml}
-          `;
-          bindsStatusWrap.appendChild(noBinds);
-
-          noBinds.querySelectorAll('.canvas-batch-elem-connect-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-              const childId = Number(btn.dataset.childId);
-              const child = (anchor.children || []).find(c => c.id === childId);
-              if (child) {
-                if (window.openBindModal) {
-                  window.openBindModal({ type: 'child', child });
-                } else {
-                  child.bind = slugifyBind(child.text) || 'titulo';
-                  renderStep1BindsStatus();
-                }
-              }
-            });
+        if (!anchor) return cols;
+        const byId = new Map(frames.map(f => [f.id, f]));
+        const chain = computePosts().find(c => c.includes(anchor.id)) || [anchor.id];
+        chain.map(id => byId.get(id)).filter(Boolean).forEach(f => {
+          (f.children || []).forEach(c => {
+            if (c.bind || (c.type !== 'text' && c.type !== 'image')) return;
+            cols.push({ name: null, type: c.type, frameId: f.id, childId: c.id, on: false });
           });
-
-          const autoBtn = noBinds.querySelector('#canvas-batch-auto-connect-all');
-          if (autoBtn) {
-            autoBtn.addEventListener('click', () => {
-              textChildren.forEach((c, idx) => {
-                if (!c.bind) {
-                  const defaultName = idx === 0 ? 'titulo' : idx === 1 ? 'subtitulo' : `texto_${idx + 1}`;
-                  c.bind = slugifyBind(c.text) || defaultName;
-                  const el = nodeElement(c.id);
-                  if (el) paintBind(c, el);
-                }
-              });
-              updateTextToolbar();
-              save();
-              toast.success('Textos conectados como variáveis!');
-              renderStep1BindsStatus();
-            });
-          }
-        }
-        if (window.lucide) lucide.createIcons();
+        });
+        return cols;
       }
 
-      function renderStep3Summary() {
-        if (!summaryHero) return;
-        const total = batchData.records.length;
-        const anchor = selectedFrame() || frames[0];
-        let slides = 1;
-        if (anchor) {
-          const chain = computePosts().find(c => c.includes(anchor.id)) || [anchor.id];
-          slides = chain.length;
+      function columnChild(col) {
+        const f = frames.find(x => x.id === col.frameId);
+        return f && col.childId != null ? (f.children || []).find(c => c.id === col.childId) : null;
+      }
+
+      function uniqueBindName(base) {
+        const taken = new Set(getCanvasBinds().map(b => b.name));
+        let name = base;
+        for (let n = 2; taken.has(name); n++) name = `${base}_${n}`;
+        return name;
+      }
+
+      function setColumnOn(col, on) {
+        const f = frames.find(x => x.id === col.frameId);
+        if (!f) return;
+        if (col.isBackground) {
+          if (!on) delete f.bgBind;
+          applyFrameBackground(f);
+          updateFrameMeta();
+        } else {
+          const c = columnChild(col);
+          if (!c) return;
+          if (on) c.bind = uniqueBindName(c.type === 'image' ? 'foto' : (slugifyBind(c.text) || 'texto'));
+          else delete c.bind;
+          const el = nodeElement(c.id);
+          if (el) paintBind(c, el);
         }
-        summaryHero.innerHTML = `
-          <i data-lucide="package-check" style="width: 18px; height: 18px; color: #60A5FA; flex-shrink: 0;"></i>
-          <span>Você vai gerar <strong>${total} ${total === 1 ? 'post' : 'posts'}</strong> (${slides > 1 ? `${total * slides} slides no total` : `${total} imagens PNG`}) a partir deste modelo.</span>
-        `;
-        if (window.lucide) lucide.createIcons();
+      }
+
+      function toggleColumn(col) {
+        setColumnOn(col, !col.on);
+        updateTextToolbar();
+        save();
+        renderBatchGrid();
+        updateBatchFooter();
+      }
+
+      // Primeira vez: todo texto do post já entra ligado, sem passo de "conectar"
+      function autoConnectTexts() {
+        if (getCanvasBinds().length) return;
+        const texts = batchColumns().filter(c => c.type === 'text');
+        if (!texts.length) return;
+        texts.forEach(col => setColumnOn(col, true));
+        updateTextToolbar();
+        save();
       }
 
       function renderBatchGrid() {
         if (!grid) return;
         const binds = getCanvasBinds();
+        const cols = batchColumns();
         batchData.binds = binds;
         grid.innerHTML = '';
 
-        if (binds.length === 0) {
+        if (cols.length === 0) {
           grid.style.gridTemplateColumns = '1fr';
           const empty = document.createElement('div');
           empty.className = 'canvas-batch-empty-guide';
@@ -8571,8 +8375,8 @@
             <div class="canvas-batch-guide-icon">
               <i data-lucide="sparkles" style="width: 24px; height: 24px;"></i>
             </div>
-            <h3 class="canvas-batch-guide-title">Nenhuma variável conectada ainda</h3>
-            <p class="canvas-batch-guide-sub">Volte ao Passo 1 ou clique num texto e aperte <code>{}</code> para marcar o que muda.</p>
+            <h3 class="canvas-batch-guide-title">O post ainda está vazio</h3>
+            <p class="canvas-batch-guide-sub">Adicione um texto ou uma foto no post para virar coluna aqui.</p>
           `;
           grid.appendChild(empty);
           if (window.lucide) lucide.createIcons();
@@ -8580,17 +8384,21 @@
         }
 
         // Mantém o que já foi digitado quando os binds do canvas mudam
-        batchData.records = batchData.records.map(rec => {
+        // A primeira linha nasce com o texto que já está no post
+        const current = b => {
+          const c = b.type === 'text' ? columnChild(b) : null;
+          return c ? (c.text || '') : '';
+        };
+        if (batchData.records.length === 0) batchData.records.push({});
+        batchData.records = batchData.records.map((rec, i) => {
           const next = {};
           binds.forEach(b => {
-            next[b.name] = rec[b.name] !== undefined ? rec[b.name] : '';
+            next[b.name] = rec[b.name] !== undefined ? rec[b.name] : (i === 0 ? current(b) : '');
             if (rec['__hint_' + b.name]) next['__hint_' + b.name] = rec['__hint_' + b.name];
           });
           return next;
         });
-        if (batchData.records.length === 0) batchData.records.push(blankRecord(binds));
-
-        grid.style.gridTemplateColumns = `36px repeat(${binds.length}, minmax(170px, 1fr)) 34px`;
+        grid.style.gridTemplateColumns = `36px repeat(${cols.length}, minmax(170px, 1fr)) 34px`;
 
         // Cabeçalho
         const idxHead = document.createElement('div');
@@ -8598,17 +8406,27 @@
         idxHead.textContent = '#';
         grid.appendChild(idxHead);
 
-        binds.forEach(b => {
+        cols.forEach(b => {
           const cell = document.createElement('div');
-          cell.className = 'canvas-batch-cell-oa is-head';
+          cell.className = `canvas-batch-cell-oa is-head${b.on ? '' : ' is-off'}`;
 
           const top = document.createElement('div');
           top.className = 'canvas-batch-headtop-oa';
+          const toggle = document.createElement('button');
+          toggle.type = 'button';
+          toggle.className = `canvas-batch-coltoggle-oa${b.on ? ' is-on' : ''}`;
+          toggle.title = b.on ? 'Muda em cada post (clique para deixar igual)' : 'Fica igual (clique para mudar em cada post)';
+          toggle.innerHTML = '<i data-lucide="check" style="width:11px;height:11px;"></i>';
+          toggle.addEventListener('click', () => toggleColumn(b));
+          top.appendChild(toggle);
           const label = document.createElement('div');
           label.className = `canvas-batch-var-tag ${b.type === 'image' ? 'is-img' : 'is-txt'}`;
-          label.innerHTML = `<span class="canvas-batch-var-icon">${b.type === 'image' ? '🖼' : 'T'}</span><span class="canvas-batch-var-name">{{${b.name}}}</span>`;
+          const off = columnChild(b);
+          const name = b.on ? b.name : (b.type === 'image' ? 'Foto' : ((off && off.text) || 'Texto').slice(0, 24));
+          label.innerHTML = `<span class="canvas-batch-var-icon">${b.type === 'image' ? '🖼' : 'T'}</span><span class="canvas-batch-var-name"></span>`;
+          label.querySelector('.canvas-batch-var-name').textContent = name;
           top.appendChild(label);
-          if (b.type === 'image') {
+          if (b.on && b.type === 'image') {
             const fill = document.createElement('button');
             fill.type = 'button';
             fill.className = 'canvas-batch-colfill-oa';
@@ -8623,7 +8441,7 @@
 
           /* Só aparece depois de um import: é o que substitui o antigo passo de
              "mapear colunas", agora no lugar onde a coluna já está. */
-          if (batchData.csv) {
+          if (b.on && batchData.csv) {
             const sel = document.createElement('select');
             sel.className = 'canvas-batch-headsel-oa';
             const none = document.createElement('option');
@@ -8660,10 +8478,13 @@
           idx.textContent = rowIndex + 1;
           grid.appendChild(idx);
 
-          binds.forEach(b => {
+          cols.forEach(b => {
             const cell = document.createElement('div');
             cell.className = 'canvas-batch-cell-oa';
-            if (b.type === 'image') {
+            if (!b.on) {
+              cell.classList.add('is-off');
+              cell.textContent = 'Fica igual';
+            } else if (b.type === 'image') {
               cell.appendChild(buildImageCell(rec, rowIndex, b.name));
             } else {
               const ta = document.createElement('textarea');
@@ -9567,14 +9388,14 @@
 
         if (startBtn) {
           startBtn.disabled = !ok;
-          if (startLabel) startLabel.textContent = ok ? `Baixar .ZIP (${total * slides})` : 'Baixar .ZIP';
+          if (startLabel) startLabel.textContent = 'Baixar .zip';
         }
         if (btnGenCanvas) {
           btnGenCanvas.disabled = !ok;
           if (labelGenCanvas) {
             labelGenCanvas.textContent = ok
-              ? `Criar ${total} ${total === 1 ? 'Post' : 'Posts'} no Canvas`
-              : 'Criar no Canvas';
+              ? `Criar ${total} ${total === 1 ? 'post' : 'posts'} no canvas`
+              : 'Criar no canvas';
           }
         }
         if (summaryBox) {
@@ -9594,12 +9415,9 @@
       function openBatchModal() {
         document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
         modal.classList.add('open');
-        const binds = getCanvasBinds();
-        if (binds.length > 0 && batchData.records.length > 0) {
-          setBatchStep(2);
-        } else {
-          setBatchStep(1);
-        }
+        autoConnectTexts();
+        renderBatchGrid();
+        updateBatchFooter();
         if (progressBox) progressBox.style.display = 'none';
         if (window.lucide) lucide.createIcons();
       }
@@ -9617,7 +9435,12 @@
 
       window.closeBatchModal = closeBatchModal;
       window.openBatchModal = openBatchModal;
-      window.renderStep1BindsStatus = renderStep1BindsStatus;
+      // O modal de variável ({}) mexe nas colunas: a tabela aberta acompanha
+      window.refreshBatchGrid = () => {
+        if (!modal.classList.contains('open')) return;
+        renderBatchGrid();
+        updateBatchFooter();
+      };
       window.exportFrameToBlob = exportFrameToBlob;
       window.exportFrameToBlobs = exportFrameToBlobs;
       window.renderFrameToCanvas = renderFrameToCanvas;
@@ -12094,7 +11917,7 @@
           }
 
           closeBindModal();
-          if (window.renderStep1BindsStatus) window.renderStep1BindsStatus();
+          if (window.refreshBatchGrid) window.refreshBatchGrid();
         });
       }
 
@@ -12121,7 +11944,7 @@
             toast.info(`Variável {{${old}}} desvinculada.`);
           }
           closeBindModal();
-          if (window.renderStep1BindsStatus) window.renderStep1BindsStatus();
+          if (window.refreshBatchGrid) window.refreshBatchGrid();
         });
       }
 

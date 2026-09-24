@@ -71,28 +71,11 @@
   <!-- Modal 1: Criar em Lote (Funil em 3 Passos: 1. Elementos -> 2. Conteúdo -> 3. Gerar) -->
   <div class="modal-overlay" id="canvas-batch-modal">
     <div class="openpanel-modal canvas-batch-modal-oa">
-      <!-- Cabeçalho do Funil -->
+      <!-- Tela única: cada coluna é um texto/foto do post, cada linha é um post novo -->
       <div class="openpanel-modal__header canvas-batch-header-oa">
         <div>
-          <!-- Step indicator pills -->
-          <div class="canvas-batch-steps-pill">
-            <button type="button" class="canvas-batch-step-btn is-active" id="canvas-batch-step-nav-1" data-step="1">
-              <span class="canvas-batch-step-num">1</span>
-              <span>Elementos</span>
-            </button>
-            <span class="canvas-batch-step-sep"></span>
-            <button type="button" class="canvas-batch-step-btn" id="canvas-batch-step-nav-2" data-step="2">
-              <span class="canvas-batch-step-num">2</span>
-              <span>Conteúdo</span>
-            </button>
-            <span class="canvas-batch-step-sep"></span>
-            <button type="button" class="canvas-batch-step-btn" id="canvas-batch-step-nav-3" data-step="3">
-              <span class="canvas-batch-step-num">3</span>
-              <span>Gerar Posts</span>
-            </button>
-          </div>
-          <h2 class="openpanel-modal__title" id="canvas-batch-title">Elementos Dinâmicos</h2>
-          <div class="openpanel-modal__sub" id="canvas-batch-sub">Defina quais textos e fotos mudam em cada post</div>
+          <h2 class="openpanel-modal__title">Criar em lote</h2>
+          <div class="openpanel-modal__sub">Cada linha vira um post. Desligue as colunas que ficam iguais.</div>
         </div>
         <button class="openpanel-close-btn" id="canvas-batch-close" title="Fechar (Esc)">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -102,142 +85,58 @@
         </button>
       </div>
 
-      <!-- Corpo Principal (Abas dos Passos) -->
       <div class="canvas-batch-body-oa">
-
-        <!-- ============================================== -->
-        <!-- PASSO 1: REVISÃO DE ELEMENTOS / VARIÁVEIS     -->
-        <!-- ============================================== -->
-        <div class="canvas-batch-step-view is-active" id="canvas-batch-view-1">
-          <div class="canvas-batch-binds-status-wrap" id="canvas-batch-binds-status">
-            <!-- Renderizado dinamicamente: lista de variáveis detectadas ou assistente para conectar com 1 clique -->
+        <div class="canvas-batch-grid-head-oa">
+          <div class="canvas-batch-counter-oa" id="canvas-batch-foot-info"></div>
+          <div class="canvas-batch-grid-actions-oa">
+            <button type="button" class="canvas-batch-mini-btn-oa" id="canvas-batch-paste-btn" title="Colar dados copiados do Google Sheets, Excel ou ChatGPT (⌘V)">
+              <i data-lucide="clipboard-paste" style="width: 13px; height: 13px;"></i>
+              <span>Colar (⌘V)</span>
+            </button>
+            <button type="button" class="canvas-batch-mini-btn-oa" id="canvas-batch-import-btn" title="Importar arquivo .CSV">
+              <i data-lucide="file-spreadsheet" style="width: 13px; height: 13px;"></i>
+              <span>Importar .csv</span>
+            </button>
+            <button type="button" class="canvas-batch-mini-btn-oa is-primary" id="canvas-batch-add-row" title="Adicionar novo post">
+              <i data-lucide="plus" style="width: 13px; height: 13px;"></i>
+              <span>Post</span>
+            </button>
           </div>
         </div>
 
-        <!-- ============================================== -->
-        <!-- PASSO 2: PREENCHIMENTO DO CONTEÚDO             -->
-        <!-- ============================================== -->
-        <div class="canvas-batch-step-view" id="canvas-batch-view-2" style="display: none;">
-          <!-- Barra de Ações Superior da Tabela -->
-          <div class="canvas-batch-grid-head-oa">
-            <div class="canvas-batch-counter-oa" id="canvas-batch-foot-info"></div>
-            <div class="canvas-batch-grid-actions-oa">
-              <button type="button" class="canvas-batch-mini-btn-oa" id="canvas-batch-paste-btn" title="Colar dados copiados do Google Sheets, Excel ou ChatGPT (⌘V)">
-                <i data-lucide="clipboard-paste" style="width: 13px; height: 13px;"></i>
-                <span>Colar (⌘V)</span>
-              </button>
-              <button type="button" class="canvas-batch-mini-btn-oa" id="canvas-batch-import-btn" title="Importar arquivo .CSV">
-                <i data-lucide="file-spreadsheet" style="width: 13px; height: 13px;"></i>
-                <span>Importar .csv</span>
-              </button>
-              <button type="button" class="canvas-batch-mini-btn-oa is-primary" id="canvas-batch-add-row" title="Adicionar novo post">
-                <i data-lucide="plus" style="width: 13px; height: 13px;"></i>
-                <span>+ Post</span>
-              </button>
-            </div>
-          </div>
+        <input type="file" id="canvas-batch-csv-input" accept=".csv,text/csv" style="display: none;">
+        <input type="file" id="canvas-batch-images-input" accept="image/*" multiple style="display: none;">
 
-          <input type="file" id="canvas-batch-csv-input" accept=".csv,text/csv" style="display: none;">
-          <input type="file" id="canvas-batch-images-input" accept="image/*" multiple style="display: none;">
-
-          <!-- Tabela Unificada (Textos + Fotos) -->
-          <div class="canvas-batch-gridwrap-oa" id="canvas-batch-gridwrap">
-            <div class="canvas-batch-grid-oa" id="canvas-batch-grid"></div>
-          </div>
-
-          <!-- Dica do Passo 2 -->
-          <div class="canvas-batch-hint-oa" id="canvas-batch-hint">
-            Cole do Google Sheets com <kbd>⌘V</kbd> ou digite os textos dos posts diretamente nas células acima.
-          </div>
+        <div class="canvas-batch-gridwrap-oa" id="canvas-batch-gridwrap">
+          <div class="canvas-batch-grid-oa" id="canvas-batch-grid"></div>
         </div>
 
-        <!-- ============================================== -->
-        <!-- PASSO 3: ESCOLHA DE GERAÇÃO (CANVAS OU .ZIP)  -->
-        <!-- ============================================== -->
-        <div class="canvas-batch-step-view" id="canvas-batch-view-3" style="display: none;">
-          <div class="canvas-batch-summary-hero" id="canvas-batch-summary-hero">
-            <!-- Ex: "📦 5 posts prontos para serem gerados" -->
-          </div>
-
-          <div class="canvas-batch-output-cards">
-            <!-- Card 1: Canvas Infinito -->
-            <div class="canvas-batch-output-card" id="canvas-batch-card-canvas">
-              <div class="canvas-batch-output-icon is-canvas">
-                <i data-lucide="layout-grid" style="width: 28px; height: 28px;"></i>
-              </div>
-              <div class="canvas-batch-output-content">
-                <div class="canvas-batch-output-title">Gerar no Canvas Infinito</div>
-                <div class="canvas-batch-output-desc">
-                  Duplica seu template gerando todos os posts lado a lado no seu editor. Ideal para você revisar o visual, trocar fotos e fazer ajustes antes de exportar.
-                </div>
-              </div>
-              <button type="button" class="openpanel-btn-secondary canvas-batch-output-action" id="canvas-batch-generate-canvas-btn">
-                <i data-lucide="layout-grid" style="width: 14px; height: 14px;"></i>
-                <span id="canvas-batch-generate-canvas-label">Criar no Canvas</span>
-              </button>
-            </div>
-
-            <!-- Card 2: Download Direto em ZIP -->
-            <div class="canvas-batch-output-card is-highlight" id="canvas-batch-card-zip">
-              <div class="canvas-batch-output-icon is-zip">
-                <i data-lucide="download" style="width: 28px; height: 28px;"></i>
-              </div>
-              <div class="canvas-batch-output-content">
-                <div class="canvas-batch-output-title">Baixar Direto em .ZIP</div>
-                <div class="canvas-batch-output-desc">
-                  Renderiza todas as imagens em alta resolução e faz o download direto de um arquivo .zip pronto para postar.
-                </div>
-                <!-- Quick options inline -->
-                <div class="canvas-batch-quick-options">
-                  <label class="canvas-batch-opt-mini">
-                    <span>Formato:</span>
-                    <select class="canvas-batch-select-mini" id="canvas-batch-format">
-                      <option value="png" selected>PNG (Alta qualidade)</option>
-                      <option value="jpeg">JPG (Compacto)</option>
-                    </select>
-                  </label>
-                  <label class="canvas-batch-opt-mini">
-                    <span>Resolução:</span>
-                    <select class="canvas-batch-select-mini" id="canvas-batch-scale">
-                      <option value="1">1x · 1080p</option>
-                      <option value="2" selected>2x · 2K Retina</option>
-                      <option value="4">4x · 4K Ultra HD</option>
-                    </select>
-                  </label>
-                </div>
-              </div>
-              <button type="button" class="openpanel-btn-primary canvas-batch-output-action" id="canvas-batch-start-btn">
-                <i data-lucide="download" style="width: 14px; height: 14px;"></i>
-                <span id="canvas-batch-start-label">Baixar .ZIP</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Barra de Progresso de Exportação -->
-          <div class="canvas-batch-progress-box" id="canvas-batch-progress" style="display: none;">
-            <div class="canvas-batch-progress-header">
-              <span id="canvas-batch-progress-text">Gerando posts...</span>
-              <span class="canvas-batch-progress-pct" id="canvas-batch-progress-pct">0%</span>
-            </div>
-            <div class="canvas-batch-progress-track">
-              <div class="canvas-batch-progress-fill" id="canvas-batch-progress-fill" style="width: 0%;"></div>
-            </div>
-          </div>
+        <div class="canvas-batch-hint-oa" id="canvas-batch-hint">
+          Cole do Google Sheets com <kbd>⌘V</kbd> ou digite direto nas células.
         </div>
 
+        <div class="canvas-batch-progress-box" id="canvas-batch-progress" style="display: none;">
+          <div class="canvas-batch-progress-header">
+            <span id="canvas-batch-progress-text">Gerando posts...</span>
+            <span class="canvas-batch-progress-pct" id="canvas-batch-progress-pct">0%</span>
+          </div>
+          <div class="canvas-batch-progress-track">
+            <div class="canvas-batch-progress-fill" id="canvas-batch-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
       </div>
 
-      <!-- Rodapé de Navegação do Funil -->
+      <!-- Formato e resolução do .zip vêm do modal Exportar -->
       <div class="openpanel-modal__footer canvas-batch-footer-oa">
-        <button type="button" class="openpanel-btn-secondary" id="canvas-batch-prev-step-btn" style="display: none;">
-          <i data-lucide="arrow-left" style="width: 13px; height: 13px;"></i>
-          <span>Voltar</span>
-        </button>
         <div class="canvas-batch-summary-pill-oa" id="canvas-batch-summary"></div>
         <div style="flex: 1;"></div>
-        <button type="button" class="openpanel-btn-primary" id="canvas-batch-next-step-btn">
-          <span>Continuar</span>
-          <i data-lucide="arrow-right" style="width: 13px; height: 13px;"></i>
+        <button type="button" class="openpanel-btn-secondary" id="canvas-batch-start-btn">
+          <i data-lucide="download" style="width: 14px; height: 14px;"></i>
+          <span id="canvas-batch-start-label">Baixar .zip</span>
+        </button>
+        <button type="button" class="openpanel-btn-primary" id="canvas-batch-generate-canvas-btn">
+          <i data-lucide="layout-grid" style="width: 14px; height: 14px;"></i>
+          <span id="canvas-batch-generate-canvas-label">Criar no canvas</span>
         </button>
       </div>
     </div>
