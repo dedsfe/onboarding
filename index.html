@@ -902,53 +902,32 @@
           </div>
         </div>
 
-        <div class="canvas-topbar__item-wrap">
-          <button class="canvas-topbar__btn" id="canvas-insert-menu-btn" title="Inserir Texto, Imagem, Gradientes, Ícones ou Fontes">
-            <i data-lucide="sparkles" style="width: 15px; height: 15px;"></i>
-            <span class="canvas-topbar__btn-label">Inserir</span>
-          </button>
+        <!-- Ferramentas de inserção: Texto age direto; Imagem e Elementos abrem um mini menu -->
+        <button class="canvas-topbar__btn canvas-topbar__tool" data-action="add-text" title="Texto (T)" aria-label="Texto">
+          <i data-lucide="type"></i>
+        </button>
 
-          <!-- Menu Vertical 2: Inserir Elementos (Monocromático e Consistente) -->
-          <div class="canvas-dropdown-card" id="canvas-insert-menu">
-            <div class="canvas-dropdown-head">Inserir no Post</div>
-            <button class="canvas-dropdown-item" data-action="open-templates">
-              <i data-lucide="layout-template"></i>
-              <span>Templates Prontos</span>
-              <span class="canvas-dropdown-meta">Galeria</span>
-            </button>
-            <div class="canvas-dropdown-divider"></div>
-            <button class="canvas-dropdown-item" data-action="add-text">
-              <i data-lucide="type"></i>
-              <span>Texto</span>
-              <span class="canvas-dropdown-meta">T</span>
-            </button>
-            <button class="canvas-dropdown-item" data-action="open-photos">
-              <i data-lucide="image-down"></i>
-              <span>Fotos</span>
-              <span class="canvas-dropdown-meta">Unsplash</span>
-            </button>
-            <button class="canvas-dropdown-item" data-action="add-image">
-              <i data-lucide="upload"></i>
-              <span>Upload Imagem</span>
-              <span class="canvas-dropdown-meta">Local</span>
-            </button>
-            <div class="canvas-dropdown-divider"></div>
-            <button class="canvas-dropdown-item" data-action="open-mesh">
-              <i data-lucide="blend"></i>
-              <span>Gradientes Mesh</span>
-            </button>
-            <button class="canvas-dropdown-item" data-action="open-icons">
-              <i data-lucide="shapes"></i>
-              <span>Ícones & Stickers</span>
-              <span class="canvas-dropdown-meta">⇧I</span>
-            </button>
-            <button class="canvas-dropdown-item" data-action="open-fonts">
-              <i data-lucide="case-sensitive"></i>
-              <span>Fontes & Tipografia</span>
-              <span class="canvas-dropdown-meta">F</span>
-            </button>
+        <div class="canvas-topbar__item-wrap">
+          <button class="canvas-topbar__btn canvas-topbar__tool" data-menu="canvas-image-menu" title="Imagem" aria-label="Imagem">
+            <i data-lucide="image"></i>
+          </button>
+          <div class="canvas-dropdown-card canvas-tool-menu" id="canvas-image-menu">
+            <button class="canvas-tool-tile" data-action="add-image"><i data-lucide="upload"></i><span>Computador</span></button>
+            <button class="canvas-tool-tile" data-action="open-photos"><i data-lucide="images"></i><span>Unsplash</span></button>
           </div>
         </div>
+
+        <div class="canvas-topbar__item-wrap">
+          <button class="canvas-topbar__btn canvas-topbar__tool" id="canvas-elements-btn" data-menu="canvas-elements-menu" title="Elementos" aria-label="Elementos">
+            <i data-lucide="shapes"></i>
+          </button>
+          <div class="canvas-dropdown-card canvas-tool-menu" id="canvas-elements-menu">
+            <button class="canvas-tool-tile" data-action="open-icons"><i data-lucide="smile-plus"></i><span>Ícones</span></button>
+            <button class="canvas-tool-tile" data-action="open-mesh"><i data-lucide="blend"></i><span>Gradientes</span></button>
+          </div>
+        </div>
+
+        <span class="canvas-topbar__sep"></span>
 
         <!-- Grupo 2: Automação & Carrossel -->
         <button class="canvas-topbar__btn" id="canvas-batch-btn" title="Criar posts em lote">

@@ -121,8 +121,6 @@
     const btnImageBind = document.getElementById('canvas-image-bind');
     const topLabel = document.getElementById('canvas-topbar-label');
     const formatsMenu = document.getElementById('canvas-formats');
-    const btnInsertMenu = document.getElementById('canvas-insert-menu-btn');
-    const insertMenu = document.getElementById('canvas-insert-menu');
     const btnBatchMenu = document.getElementById('canvas-batch-menu-btn');
     const batchMenu = document.getElementById('canvas-batch-menu');
     const btnBatch = document.getElementById('canvas-batch-btn');
@@ -4704,7 +4702,6 @@
 
       // Habilita/desabilita menus e ações
       if (btnBatch) btnBatch.disabled = frames.length === 0;
-      if (btnInsertMenu) btnInsertMenu.disabled = false;
       const exportBtn = document.getElementById('canvas-export-btn');
       if (exportBtn) exportBtn.disabled = frames.length === 0;
       const libBtn = document.getElementById('canvas-library-btn');
@@ -6666,7 +6663,7 @@
           } else if (action === 'add-new-frame') {
             addFrame();
           } else if (action === 'open-library') {
-            const libBtn = document.getElementById('canvas-insert-menu-btn');
+            const libBtn = document.getElementById('canvas-elements-btn');
             if (libBtn) libBtn.click();
           } else if (action === 'reset-zoom') {
             cam.scale = 1;
@@ -6820,11 +6817,9 @@
     }
     /* Barra do topo: Menus Verticais Suspensos & Ações */
     function closeAllDropdowns() {
-      if (formatsMenu) formatsMenu.classList.remove('is-open');
-      if (insertMenu) insertMenu.classList.remove('is-open');
+      document.querySelectorAll('.canvas-dropdown-card.is-open').forEach(m => m.classList.remove('is-open'));
+      document.querySelectorAll('.canvas-topbar .active').forEach(b => b.classList.remove('active'));
       if (batchMenu) batchMenu.classList.remove('is-open');
-      if (btnAddFrame) btnAddFrame.classList.remove('active');
-      if (btnInsertMenu) btnInsertMenu.classList.remove('active');
       if (btnBatchMenu) btnBatchMenu.classList.remove('active');
     }
 
@@ -6887,50 +6882,40 @@
       }
     }
 
-    // 2. Menu de Inserção de Elementos (Texto, Imagem, Mesh, Ícones, Fontes)
-    if (btnInsertMenu && insertMenu) {
-      btnInsertMenu.addEventListener('click', (e) => {
+    // 2. Ferramentas de inserção: data-menu abre um mini menu, data-action insere
+    function runInsertAction(action) {
+      // Sem post no canvas, cria um primeiro para receber o elemento
+      if (frames.length === 0) addFrame('ig-feed');
+      const targetFrame = frames.find(f => f.id === selectedId) || frames[0];
+      if (targetFrame && selectedId !== targetFrame.id) selectFrame(targetFrame.id);
+
+      const library = { 'open-photos': 'photos', 'open-mesh': 'gradients', 'open-icons': 'icons' };
+      if (action === 'add-text') addTextToSelectedFrame();
+      else if (action === 'add-image') { if (imageUpload) imageUpload.click(); }
+      else if (library[action] && window.openIconLibrary) window.openIconLibrary(library[action]);
+    }
+
+    document.querySelectorAll('.canvas-topbar [data-menu]').forEach(btn => {
+      const menu = document.getElementById(btn.dataset.menu);
+      if (!menu) return;
+      btn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const willOpen = !insertMenu.classList.contains('is-open');
+        const willOpen = !menu.classList.contains('is-open');
         closeAllDropdowns();
         if (willOpen) {
-          insertMenu.classList.add('is-open');
-          btnInsertMenu.classList.add('active');
+          menu.classList.add('is-open');
+          btn.classList.add('active');
         }
       });
+    });
 
-      insertMenu.addEventListener('click', (e) => {
-        const item = e.target.closest('.canvas-dropdown-item');
-        if (!item) return;
-        const action = item.dataset.action;
+    document.querySelectorAll('.canvas-topbar [data-action]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
         closeAllDropdowns();
-
-        // Se não houver frame no canvas, cria um primeiro automaticamente
-        if (frames.length === 0) {
-          addFrame('ig-feed');
-        }
-        const targetFrame = frames.find(f => f.id === selectedId) || frames[0];
-        if (targetFrame && selectedId !== targetFrame.id) {
-          selectFrame(targetFrame.id);
-        }
-
-        if (action === 'add-text') {
-          addTextToSelectedFrame();
-        } else if (action === 'open-templates') {
-          if (window.openTemplatesModal) window.openTemplatesModal();
-        } else if (action === 'open-photos') {
-          if (window.openIconLibrary) window.openIconLibrary('photos');
-        } else if (action === 'add-image') {
-          if (imageUpload) imageUpload.click();
-        } else if (action === 'open-mesh') {
-          if (window.openIconLibrary) window.openIconLibrary('gradients');
-        } else if (action === 'open-icons') {
-          if (window.openIconLibrary) window.openIconLibrary('icons');
-        } else if (action === 'open-fonts') {
-          if (window.openIconLibrary) window.openIconLibrary('fonts');
-        }
+        runInsertAction(el.dataset.action);
       });
-    }
+    });
 
     // 3. Menu de Automação em Lote (CSV, Fotos, Exportar, Snapping, Guias, Binds)
     if (btnBatchMenu && batchMenu) {

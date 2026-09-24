@@ -1034,6 +1034,57 @@ body {
   transform: scale(0.94);
 }
 
+/* Ferramentas de inserção: só ícone, e o mini menu em blocos lado a lado */
+.canvas-topbar__tool {
+  width: 34px;
+  padding: 0;
+}
+
+.canvas-topbar__tool svg {
+  width: 17px;
+  height: 17px;
+}
+
+.canvas-tool-menu {
+  min-width: 0;
+  flex-direction: row;
+  gap: 4px;
+  padding: 6px;
+}
+
+.canvas-tool-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 92px;
+  height: 76px;
+  border: none;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, transform 100ms ease;
+}
+
+.canvas-tool-tile svg {
+  width: 20px;
+  height: 20px;
+}
+
+.canvas-tool-tile:hover {
+  background: rgba(255, 255, 255, 0.10);
+  color: #FFFFFF;
+}
+
+.canvas-tool-tile:active {
+  transform: scale(0.96);
+}
+
 /* ------------------------------------------------------------
    FRAME (prancheta do post)
    Vive em coordenadas reais: 1 unidade do mundo = 1px do PNG final.
@@ -8255,8 +8306,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
    modal inteiro. O JS continua válido — só não há como abrir.
    ------------------------------------------------------------ */
 #canvas-templates-btn,
-#canvas-templates-modal,
-#canvas-insert-menu [data-action="open-templates"] {
+#canvas-templates-modal {
   display: none !important;
 }
 
