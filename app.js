@@ -1502,9 +1502,93 @@
       if (label) syncPropsColors(label.parentElement);
     });
 
+    /* X Y W H do painel: o mesmo código serve post, texto e imagem.
+       Imagem mantém a proporção (como puxar o canto); texto tem altura
+       automática; post fora do tamanho do formato vira "Personalizado". */
+    function geoTarget() {
+      if (selectedChildNodes.length === 1 && selectedTextNode.frameId) {
+        const child = selectedChild();
+        if (child) return { kind: child.type, obj: child };
+      }
+      if (selectedChildNodes.length === 0 && selectedFrameIds.size <= 1) {
+        const f = selectedFrame();
+        if (f) return { kind: 'frame', obj: f };
+      }
+      return null;
+    }
+
+    function syncGeoFields() {
+      if (!propsPanel) return;
+      const t = geoTarget();
+      propsPanel.querySelectorAll('.pp-panel.is-visible [data-geo]').forEach(input => {
+        if (document.activeElement === input) return;
+        const k = input.dataset.geo;
+        let v = t ? t.obj[k] : '';
+        if (t && t.kind === 'text' && k === 'h') {
+          const el = nodeElement(t.obj.id);
+          v = el ? el.offsetHeight : '';
+        }
+        input.value = v === '' || v == null ? '' : Math.round(v);
+      });
+    }
+
+    function applyGeo(k, v) {
+      const t = geoTarget();
+      if (!t || !Number.isFinite(v)) return;
+      const o = t.obj;
+      v = Math.round(v);
+
+      if (t.kind === 'frame') {
+        if (k === 'x' || k === 'y') {
+          o[k] = v;
+          const el = frameElOf(o);
+          if (el) { el.style.left = `${o.x}px`; el.style.top = `${o.y}px`; }
+          wakeRopes();
+        } else {
+          o[k] = Math.min(CUSTOM_MAX, Math.max(CUSTOM_MIN, v));
+          const known = Object.entries(FORMATS).find(([key, f]) => key !== 'custom' && f.w === o.w && f.h === o.h);
+          o.format = known ? known[0] : 'custom';
+          const old = frameElOf(o);
+          const fresh = renderFrame(o);
+          if (old) old.replaceWith(fresh);
+          fresh.classList.add('is-selected');
+          renderLinks();
+          updateFrameLabels();
+          updateFrameMeta();
+        }
+      } else if (t.kind === 'image') {
+        if (k === 'x' || k === 'y') {
+          o[k] = v;
+        } else {
+          const ratio = o.w / o.h;
+          const w = Math.max(20, k === 'w' ? v : v * ratio);
+          const scale = w / o.w;
+          o.w = Math.round(w);
+          o.h = Math.round(w / ratio);
+          ['imgW', 'imgH', 'imgX', 'imgY'].forEach(p => { if (o[p] != null) o[p] = Math.round(o[p] * scale); });
+        }
+        const el = nodeElement(o.id);
+        if (el) updateImageNodeDOM(o, el);
+        syncImageChrome();
+      } else if (t.kind === 'text') {
+        if (k === 'h') return;
+        o[k] = k === 'w' ? Math.max(20, v) : v;
+        const el = nodeElement(o.id);
+        if (el) { el.style.left = `${o.x}px`; el.style.top = `${o.y}px`; el.style.width = `${o.w}px`; }
+      }
+      save();
+      syncGeoFields();
+    }
+
+    if (propsPanel) propsPanel.addEventListener('input', (e) => {
+      const input = e.target.closest('[data-geo]');
+      if (input) applyGeo(input.dataset.geo, Number(input.value));
+    });
+
     function updateTextToolbar() {
       fillPropsPanel();
       syncPropsColors();
+      syncGeoFields();
     }
 
     function fillPropsPanel() {
