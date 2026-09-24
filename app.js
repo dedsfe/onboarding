@@ -361,13 +361,10 @@
     }
 
     const textToolbar = document.getElementById('canvas-text-toolbar');
-    const advRow = document.getElementById('canvas-text-advanced');
     const selPreset = document.getElementById('canvas-text-preset');
     const selFont = document.getElementById('canvas-text-font');
     const selWeight = document.getElementById('canvas-text-weight');
     const inputSize = document.getElementById('canvas-text-size');
-    const btnSizeUp = document.getElementById('canvas-text-size-up');
-    const btnSizeDown = document.getElementById('canvas-text-size-down');
     const inputColor = document.getElementById('canvas-text-color');
     const btnBold = document.getElementById('canvas-text-bold');
     const btnItalic = document.getElementById('canvas-text-italic');
@@ -376,7 +373,6 @@
     const btnAlignLeft = document.getElementById('canvas-text-align-left');
     const btnAlignCenter = document.getElementById('canvas-text-align-center');
     const btnAlignRight = document.getElementById('canvas-text-align-right');
-    const btnMore = document.getElementById('canvas-text-more');
     const inputLh = document.getElementById('canvas-text-lh');
     const inputLs = document.getElementById('canvas-text-ls');
     const inputOpacity = document.getElementById('canvas-text-opacity');
@@ -806,14 +802,6 @@
       applyTextToolbarAction(c => c.fontSize = Math.min(400, size));
     });
 
-    function stepSize(delta) {
-      applyTextToolbarAction(c => {
-        c.fontSize = Math.min(400, Math.max(8, (c.fontSize || TEXT_DEFAULTS.fontSize) + delta));
-      });
-    }
-    if (btnSizeUp) btnSizeUp.addEventListener('click', () => stepSize(4));
-    if (btnSizeDown) btnSizeDown.addEventListener('click', () => stepSize(-4));
-
     if (inputColor) inputColor.addEventListener('input', (e) => applyTextToolbarAction(c => c.color = e.target.value));
 
     /* B alterna entre o peso mais leve e o mais pesado que a família oferece:
@@ -883,12 +871,6 @@
     if (btnCaseUpper) btnCaseUpper.addEventListener('click', () => applyTextToolbarAction(c => c.transform = 'uppercase'));
     if (btnCaseLower) btnCaseLower.addEventListener('click', () => applyTextToolbarAction(c => c.transform = 'lowercase'));
 
-    if (btnMore && advRow) btnMore.addEventListener('click', () => {
-      const open = advRow.classList.toggle('is-open');
-      btnMore.classList.toggle('is-active', open);
-      updateTextToolbar();
-    });
-
     /* Clicar num botão da toolbar tirava o foco do texto (e a seleção junto).
        Inputs e selects seguem recebendo foco: sem isso os campos param. */
     if (textToolbar) textToolbar.addEventListener('mousedown', (e) => {
@@ -919,8 +901,6 @@
     const inputImageRotation = document.getElementById('canvas-image-rotation');
     const inputBlur = document.getElementById('canvas-image-blur');
     const inputShadow = document.getElementById('canvas-image-shadow');
-    const btnImageMore = document.getElementById('canvas-image-more');
-    const imageAdvRow = document.getElementById('canvas-image-advanced');
     const btnImageDup = document.getElementById('canvas-image-dup');
     const btnImageDel = document.getElementById('canvas-image-del');
 
@@ -1099,16 +1079,7 @@
         inputCropZoomVal.value = Math.round((child.zoom || 1.0) * 100);
       }
 
-      const el = world.querySelector(`.canvas-image-node[data-id="${child.id}"]`);
-      if (el) {
-        const rect = el.getBoundingClientRect();
-        const barH = cropToolbar.offsetHeight || 44;
-        const half = (cropToolbar.offsetWidth || 280) / 2;
-        const top = rect.top - barH - 16;
-        cropToolbar.style.top = `${top < 76 ? Math.min(innerHeight - barH - 16, rect.bottom + 16) : top}px`;
-        cropToolbar.style.left = `${Math.min(innerWidth - half - 16, Math.max(half + 16, rect.left + rect.width / 2))}px`;
-        cropToolbar.classList.add('is-visible');
-      }
+      cropToolbar.classList.add('is-visible');
     }
 
     function applyImageToolbarAction(action) {
@@ -1306,18 +1277,6 @@
         return;
       }
 
-      const frameEl = frameElOf(frame);
-      if (!frameEl) return;
-
-      const r = frameEl.getBoundingClientRect();
-      const barH = bgRepositionToolbar.offsetHeight || 48;
-      const half = (bgRepositionToolbar.offsetWidth || 380) / 2;
-      const boxCenterX = (r.left + r.right) / 2;
-      const top = r.top - barH - 12;
-
-      bgRepositionToolbar.style.top = `${top < 76 ? Math.min(innerHeight - barH - 16, r.bottom + 12) : top}px`;
-      bgRepositionToolbar.style.left = `${Math.min(innerWidth - half - 12, Math.max(half + 12, boxCenterX))}px`;
-
       const inputY = document.getElementById('canvas-bg-reposition-pos-y');
       const inputX = document.getElementById('canvas-bg-reposition-pos-x');
       const inputZoom = document.getElementById('canvas-bg-reposition-zoom');
@@ -1414,12 +1373,6 @@
     });
     if (inputBlur) inputBlur.addEventListener('input', (e) => applyImageToolbarAction(c => c.blur = Number(e.target.value) || 0));
     if (inputShadow) inputShadow.addEventListener('input', (e) => applyImageToolbarAction(c => c.shadow = Number(e.target.value) || 0));
-    // Abrir a segunda linha muda a altura da barra: ela tem que se reancorar
-    if (btnImageMore && imageAdvRow) btnImageMore.addEventListener('click', () => {
-      const open = imageAdvRow.classList.toggle('is-open');
-      btnImageMore.classList.toggle('is-active', open);
-      updateTextToolbar();
-    });
 
     if (btnImageDup) btnImageDup.addEventListener('click', () => duplicateTextNode());
     if (btnImageDel) btnImageDel.addEventListener('click', () => { deleteTextNode(); updateTextToolbar(); });
@@ -1452,10 +1405,10 @@
 
     function initUniversalScrubController() {
       // Procura todos os campos com inputs numéricos dentro das barras de ferramentas do editor
-      const fields = document.querySelectorAll('.canvas-text-toolbar__field, .canvas-crop-field');
+      const fields = document.querySelectorAll('.pp-field');
 
       fields.forEach(field => {
-        const input = field.querySelector('.canvas-text-toolbar__input') || (field.matches('.canvas-text-toolbar__input') ? field : null);
+        const input = field.querySelector('.pp-input');
         if (!input || input.type !== 'number') return;
 
         // Evita anexar múltiplos listeners se a função for chamada novamente
@@ -1534,7 +1487,29 @@
 
     initUniversalScrubController();
 
+    /* Painel de propriedades: cada .pp-color mostra o hex da sua cor. Valor
+       posto pelo JS não dispara 'input', então o painel ressincroniza tudo
+       depois de preencher, e o 'input' cobre o que o usuário escolhe. */
+    const propsPanel = document.getElementById('canvas-props');
+    function syncPropsColors(scope = propsPanel) {
+      if (!scope) return;
+      scope.querySelectorAll('.pp-color').forEach(label => {
+        const input = label.querySelector('input[type="color"]');
+        const hex = label.querySelector('.pp-color__hex');
+        if (input && hex) hex.textContent = input.value.replace('#', '').toUpperCase();
+      });
+    }
+    if (propsPanel) propsPanel.addEventListener('input', (e) => {
+      const label = e.target.closest('.pp-color');
+      if (label) syncPropsColors(label.parentElement);
+    });
+
     function updateTextToolbar() {
+      fillPropsPanel();
+      syncPropsColors();
+    }
+
+    function fillPropsPanel() {
       const imageToolbar = document.getElementById('canvas-image-toolbar');
       const cropToolbar = document.getElementById('canvas-crop-toolbar');
       const bgRepositionToolbar = document.getElementById('canvas-bg-reposition-toolbar');
@@ -1576,13 +1551,6 @@
         if (selFrame && frameToolbar) {
           const frameEl = frameElOf(selFrame);
           if (frameEl) {
-            const r = frameEl.getBoundingClientRect();
-            const barH = frameToolbar.offsetHeight || 48;
-            const half = (frameToolbar.offsetWidth || 340) / 2;
-            const boxCenterX = (r.left + r.right) / 2;
-            const top = r.top - barH - 12;
-            frameToolbar.style.top = `${top < 76 ? Math.min(innerHeight - barH - 16, r.bottom + 12) : top}px`;
-            frameToolbar.style.left = `${Math.min(innerWidth - half - 12, Math.max(half + 12, boxCenterX))}px`;
 
             const btnModeSolid = document.getElementById('canvas-frame-mode-solid');
             const btnModeGrad = document.getElementById('canvas-frame-mode-gradient');
@@ -1677,22 +1645,6 @@
           : 'Virar variável do Batch Create';
       });
 
-      // Calcula caixa delimitadora de todos os nós selecionados na tela
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      selectedChildNodes.forEach(sel => {
-        const el = nodeElement(sel.childId);
-        if (el) {
-          const r = el.getBoundingClientRect();
-          minX = Math.min(minX, r.left);
-          minY = Math.min(minY, r.top);
-          maxX = Math.max(maxX, r.right);
-          maxY = Math.max(maxY, r.bottom);
-        }
-      });
-      const boxCenterX = isFinite(minX) ? (minX + maxX) / 2 : innerWidth / 2;
-      const boxTop = isFinite(minY) ? minY : 100;
-      const boxBottom = isFinite(maxY) ? maxY : 200;
-
       if (child.type === 'image') {
         if (!imageToolbar) return;
         const idle = (el) => el && document.activeElement !== el;
@@ -1712,11 +1664,6 @@
         if (idle(inputBlur)) inputBlur.value = child.blur || 0;
         if (idle(inputShadow)) inputShadow.value = child.shadow || 0;
         
-        const barH = imageToolbar.offsetHeight || 48;
-        const half = (imageToolbar.offsetWidth || 300) / 2;
-        const top = boxTop - barH - 12;
-        imageToolbar.style.top = `${top < 76 ? Math.min(innerHeight - barH - 16, boxBottom + 12) : top}px`;
-        imageToolbar.style.left = `${Math.min(innerWidth - half - 12, Math.max(half + 12, boxCenterX))}px`;
         imageToolbar.classList.add('is-visible');
         return;
       }
@@ -1766,12 +1713,6 @@
       if (btnCaseUpper) btnCaseUpper.classList.toggle('is-active', transform === 'uppercase');
       if (btnCaseLower) btnCaseLower.classList.toggle('is-active', transform === 'lowercase');
 
-      // Ancora a barra acima do nó, sem deixá-la sair pela borda da janela
-      const barH = textToolbar.offsetHeight || 48;
-      const half = (textToolbar.offsetWidth || 560) / 2;
-      const top = boxTop - barH - 12;
-      textToolbar.style.top = `${top < 76 ? Math.min(innerHeight - barH - 16, boxBottom + 12) : top}px`;
-      textToolbar.style.left = `${Math.min(innerWidth - half - 12, Math.max(half + 12, boxCenterX))}px`;
       textToolbar.classList.add('is-visible');
     }
 
@@ -5407,7 +5348,7 @@
       const marqueeOverride = e.button === 0 && (e.metaKey || e.ctrlKey || e.shiftKey);
       if (e.target.closest('.canvas-topbar')) return;
       if (e.target.closest('.canvas-frame') && !marqueeOverride) return;
-      if (e.target.closest('.canvas-text-toolbar') || e.target.closest('.canvas-image-toolbar') || e.target.closest('.canvas-crop-toolbar')) return;
+      if (e.target.closest('.canvas-props')) return;
 
       const isPanning = isSpacePressed || e.button === 1 || e.altKey;
 
@@ -6635,11 +6576,6 @@
             <span>${showBinds ? 'Ocultar Visor de Variáveis {{}}' : 'Ligar Visor de Variáveis {{}}'}</span>
             <span class="canvas-context-meta">B</span>
           </button>
-          <button type="button" class="canvas-context-item" data-action="reset-toolbar-pin">
-            <i data-lucide="pin-off"></i>
-            <span>Grudar Barra no Elemento</span>
-            <span class="canvas-context-meta">⌥T</span>
-          </button>
           <button type="button" class="canvas-context-item" data-action="open-library">
             <i data-lucide="sparkles"></i>
             <span>Biblioteca & Recursos</span>
@@ -6675,8 +6611,6 @@
               if (window.__tcmCanvas) window.__tcmCanvas.limpar();
               toast.success('Canvas limpo');
             }
-          } else if (action === 'reset-toolbar-pin') {
-            if (typeof resetToolbarToElement === 'function') resetToolbarToElement(false);
           } else if (action === 'set-child-as-bg') {
             if (targetData && targetData.frameId && targetData.childId) {
               setChildAsFrameBackground(targetData.frameId, targetData.childId);
@@ -7335,14 +7269,6 @@
         e.preventDefault();
         e.stopPropagation();
         toggleBindsVisibility(true);
-        return;
-      }
-
-      // Atalho '⌥T' para resetar e fixar a barra de edição de volta no elemento
-      if (e.altKey && e.key.toLowerCase() === 't') {
-        e.preventDefault();
-        e.stopPropagation();
-        if (typeof resetToolbarToElement === 'function') resetToolbarToElement(false);
         return;
       }
 
@@ -11816,8 +11742,6 @@
       const selectGrad = document.getElementById('canvas-frame-gradient-select');
       const btnBgImg = document.getElementById('canvas-frame-bg-img-btn');
       const fileBgImg = document.getElementById('canvas-frame-bg-file');
-      const btnMore = document.getElementById('canvas-frame-more');
-      const advRow = document.getElementById('canvas-frame-advanced');
       const inputOverlay = document.getElementById('canvas-frame-overlay');
       const inputBlur = document.getElementById('canvas-frame-blur');
       const btnDelImg = document.getElementById('canvas-frame-del-img');
@@ -11958,14 +11882,6 @@
             updateTextToolbar();
           };
           reader.readAsDataURL(file);
-        });
-      }
-
-      if (btnMore && advRow) {
-        btnMore.addEventListener('click', () => {
-          advRow.classList.toggle('is-open');
-          btnMore.classList.toggle('is-active', advRow.classList.contains('is-open'));
-          updateTextToolbar();
         });
       }
 
@@ -12746,164 +12662,6 @@
       window.openTemplatesModal = openTemplatesModal;
     }
 
-    /* --------------------------------------------------
-       BARRAS DE EDIÇÃO SOLTAS (arrastar pela alça)
-       A barra nasce grudada no elemento. Arrastando a alça da ponta esquerda
-       ela fica onde for largada — inclusive encostada num canto — e um clique
-       na mesma alça devolve ela para junto do elemento.
-       -------------------------------------------------- */
-    const TOOLBAR_PIN_KEY = 'tcm_toolbar_pin';
-    const TOOLBAR_IDS = [
-      'canvas-text-toolbar',
-      'canvas-image-toolbar',
-      'canvas-frame-toolbar',
-      'canvas-crop-toolbar',
-      'canvas-bg-reposition-toolbar',
-    ];
-    let toolbarPin = null;
-
-    function applyToolbarPin() {
-      if (!view) return;
-      const hudResetBtn = document.getElementById('canvas-hud-reset-toolbar');
-
-      if (toolbarPin) {
-        view.classList.add('is-toolbar-pinned');
-        view.style.setProperty('--tb-x', `${toolbarPin.x}px`);
-        view.style.setProperty('--tb-y', `${toolbarPin.y}px`);
-        if (hudResetBtn) {
-          hudResetBtn.classList.add('is-active');
-          hudResetBtn.title = 'Barra de edição solta: clique para grudar no elemento de novo (⌥T)';
-          hudResetBtn.innerHTML = '<i data-lucide="pin" style="width: 15px; height: 15px;"></i>';
-        }
-      } else {
-        view.classList.remove('is-toolbar-pinned');
-        if (hudResetBtn) {
-          hudResetBtn.classList.remove('is-active');
-          hudResetBtn.title = 'Barra fixada no elemento (Arraste pela alça para soltar onde quiser)';
-          hudResetBtn.innerHTML = '<i data-lucide="pin-off" style="width: 15px; height: 15px;"></i>';
-        }
-      }
-      document.querySelectorAll('.canvas-toolbar-grip').forEach(g => {
-        g.classList.toggle('is-pinned', !!toolbarPin);
-        g.title = toolbarPin
-          ? 'Clique para grudar a barra no elemento de novo'
-          : 'Arraste para soltar a barra onde quiser';
-      });
-      if (window.lucide) lucide.createIcons();
-    }
-
-    function setToolbarPin(pin) {
-      toolbarPin = pin;
-      try {
-        if (pin) localStorage.setItem(TOOLBAR_PIN_KEY, JSON.stringify(pin));
-        else localStorage.removeItem(TOOLBAR_PIN_KEY);
-      } catch (e) {}
-      applyToolbarPin();
-    }
-
-    function resetToolbarToElement(silent = false) {
-      const hasNodeSelected = selectedChildNodes.length > 0 || (selectedTextNode && selectedTextNode.childId !== null);
-      const hasFrameSelected = selectedFrameIds.size > 0 || selectedId !== null;
-      const hasSelection = hasNodeSelected || hasFrameSelected;
-      const wasPinned = !!toolbarPin;
-
-      setToolbarPin(null);
-      updateTextToolbar();
-      if (window.lucide) lucide.createIcons();
-
-      if (silent) return;
-
-      if (!hasSelection) {
-        if (wasPinned) {
-          toast.info('Posição da barra resetada. Selecione um elemento ou post para editá-lo.');
-        } else {
-          toast.info('Nenhuma barra de edição aberta. Selecione um texto, imagem ou post.');
-        }
-      } else {
-        if (wasPinned) {
-          toast.success('Barra de edição centralizada e fixada no elemento!');
-        } else {
-          toast.info('A barra de edição já está fixada no elemento selecionado.');
-        }
-      }
-    }
-    window.resetToolbarToElement = resetToolbarToElement;
-
-    function initToolbarGrips() {
-      try {
-        const raw = localStorage.getItem(TOOLBAR_PIN_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed && typeof parsed.x === 'number' && typeof parsed.y === 'number') {
-            const hostW = window.innerWidth || 1200;
-            const hostH = window.innerHeight || 800;
-            if (parsed.x < 10 || parsed.x > hostW - 60 || parsed.y < 10 || parsed.y > hostH - 60) {
-              parsed.x = Math.max(10, Math.min(hostW - 320, parsed.x));
-              parsed.y = Math.max(70, Math.min(hostH - 80, parsed.y));
-            }
-            toolbarPin = parsed;
-          }
-        }
-      } catch (e) {
-        toolbarPin = null;
-      }
-
-      const hudResetBtn = document.getElementById('canvas-hud-reset-toolbar');
-      if (hudResetBtn) {
-        hudResetBtn.addEventListener('click', () => resetToolbarToElement(false));
-      }
-
-      TOOLBAR_IDS.forEach(id => {
-        const bar = document.getElementById(id);
-        if (!bar || bar.querySelector('.canvas-toolbar-grip')) return;
-
-        bar.classList.add('has-grip');
-        const grip = document.createElement('button');
-        grip.type = 'button';
-        grip.className = 'canvas-toolbar-grip';
-        grip.setAttribute('aria-label', 'Mover barra de edição');
-        bar.prepend(grip);
-
-        grip.addEventListener('mousedown', (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          const rect = bar.getBoundingClientRect();
-          const hostRect = view.getBoundingClientRect();
-          const startX = e.clientX;
-          const startY = e.clientY;
-          // Sem o pin a barra está centrada por transform: parte da posição real
-          const originX = rect.left - hostRect.left;
-          const originY = rect.top - hostRect.top;
-          let arrastou = false;
-
-          const onMove = (ev) => {
-            if (!arrastou && Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) < 3) return;
-            arrastou = true;
-            grip.classList.add('is-grabbing');
-            const maxX = hostRect.width - rect.width - 8;
-            const maxY = hostRect.height - rect.height - 8;
-            setToolbarPin({
-              x: Math.round(Math.min(Math.max(8, originX + (ev.clientX - startX)), Math.max(8, maxX))),
-              y: Math.round(Math.min(Math.max(8, originY + (ev.clientY - startY)), Math.max(8, maxY))),
-            });
-          };
-
-          const onUp = () => {
-            document.removeEventListener('mousemove', onMove);
-            document.removeEventListener('mouseup', onUp);
-            grip.classList.remove('is-grabbing');
-            // Clique seco na alça devolve a barra para junto do elemento
-            if (!arrastou) resetToolbarToElement(false);
-          };
-
-          document.addEventListener('mousemove', onMove);
-          document.addEventListener('mouseup', onUp);
-        });
-      });
-
-      applyToolbarPin();
-    }
-
     function initAuthAndCloudController() {
       // Widget Flutuante Estilo Google (Canto Superior Direito)
       const userWidget = document.getElementById('canvas-user-account-widget');
@@ -13420,7 +13178,6 @@
       })
     };
 
-    initToolbarGrips();
     initTemplatesModalController();
     initIconLibraryController();
     initFrameToolbarController();

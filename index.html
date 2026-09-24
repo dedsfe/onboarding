@@ -1102,468 +1102,283 @@
         <button class="canvas-hud__btn is-active" id="canvas-hud-binds" title="Visor de Variáveis CSV {{}}: Ligado (Atalho: B ou ⌥V)">
           <i data-lucide="variable" style="width: 15px; height: 15px;"></i>
         </button>
-        <button class="canvas-hud__btn" id="canvas-hud-reset-toolbar" title="Grudar barra no elemento / Centralizar (Atalho: ⌥T)">
-          <i data-lucide="pin-off" style="width: 15px; height: 15px;"></i>
-        </button>
       </div>
     </div>
 
     <!-- --------------------------------------------------
-         BARRA FLUTUANTE DE EDIÇÃO DO FRAME (FUNDO, COR, GRADIENTE, FOTO)
+         PAINEL DE PROPRIEDADES (estilo Figma)
+         Um painel fixo à direita. Cada seleção acende um dos blocos abaixo
+         (.is-visible); o painel só aparece quando algum está aceso.
+         Peças: pp-head, pp-section, pp-row, pp-field, pp-seg, pp-color, pp-btn.
          -------------------------------------------------- -->
-    <div class="canvas-text-toolbar" id="canvas-frame-toolbar">
-      <div class="canvas-text-toolbar__row">
-        <!-- Modo do Fundo: Sólido vs Gradiente -->
-        <div class="canvas-text-toolbar__segmented" title="Modo de Preenchimento">
-          <button class="canvas-text-toolbar__btn is-active" id="canvas-frame-mode-solid" title="Cor sólida">
-            <i data-lucide="circle" style="width: 14px; height: 14px;"></i>
-          </button>
-          <button class="canvas-text-toolbar__btn" id="canvas-frame-mode-gradient" title="Gradiente de cores">
-            <i data-lucide="blend" style="width: 14px; height: 14px;"></i>
-          </button>
-        </div>
+    <aside class="canvas-props" id="canvas-props" aria-label="Propriedades">
 
-        <span class="canvas-text-toolbar__sep"></span>
+      <!-- POST (frame): fundo sólido/gradiente e foto de fundo -->
+      <div class="pp-panel" id="canvas-frame-toolbar">
+        <header class="pp-head">
+          <span class="pp-head__title">Post</span>
+          <button class="pp-btn pp-btn--type" id="canvas-frame-bg-bind" title="Virar variável de Fundo do Batch Create">{}</button>
+          <button class="pp-btn" id="canvas-frame-bg-reset" title="Resetar para branco padrão"><i data-lucide="rotate-ccw"></i></button>
+        </header>
 
-        <!-- Controles de Cor Sólida -->
-        <span class="canvas-text-toolbar__group" id="canvas-frame-solid-group" title="Cor do Fundo">
-          <label class="canvas-text-toolbar__color" title="Escolher cor sólida">
-            <input type="color" id="canvas-frame-bg-color" value="#ffffff">
-          </label>
-        </span>
-
-        <!-- Controles de Gradiente Personalizado (Cor 1, Cor 2 e Direção) -->
-        <span class="canvas-text-toolbar__group" id="canvas-frame-grad-group" style="display: none;">
-          <label class="canvas-text-toolbar__color" title="Cor 1 do Gradiente">
-            <input type="color" id="canvas-frame-grad-c1" value="#18181b">
-          </label>
-          <label class="canvas-text-toolbar__color" title="Cor 2 do Gradiente">
-            <input type="color" id="canvas-frame-grad-c2" value="#09090b">
-          </label>
-          <select class="canvas-text-toolbar__select" id="canvas-frame-grad-dir" title="Direção do Gradiente" style="min-width: 80px;">
-            <option value="180deg">↓ Vertical</option>
-            <option value="135deg">↘ Diagonal</option>
-            <option value="90deg">→ Horizontal</option>
-            <option value="0deg">↑ Invertido</option>
-            <option value="radial">⊙ Radial</option>
+        <section class="pp-section">
+          <div class="pp-section__head">
+            <span class="pp-section__title">Preenchimento</span>
+            <div class="pp-seg" title="Modo de Preenchimento">
+              <button class="pp-btn is-active" id="canvas-frame-mode-solid" title="Cor sólida"><i data-lucide="square"></i></button>
+              <button class="pp-btn" id="canvas-frame-mode-gradient" title="Gradiente de cores"><i data-lucide="blend"></i></button>
+            </div>
+          </div>
+          <div class="pp-stack" id="canvas-frame-solid-group">
+            <label class="pp-color" title="Cor do fundo"><input type="color" id="canvas-frame-bg-color" value="#ffffff"><span class="pp-color__hex"></span></label>
+          </div>
+          <div class="pp-stack" id="canvas-frame-grad-group" style="display: none;">
+            <label class="pp-color" title="Cor 1 do Gradiente"><input type="color" id="canvas-frame-grad-c1" value="#18181b"><span class="pp-color__hex"></span></label>
+            <label class="pp-color" title="Cor 2 do Gradiente"><input type="color" id="canvas-frame-grad-c2" value="#09090b"><span class="pp-color__hex"></span></label>
+            <select class="pp-select" id="canvas-frame-grad-dir" title="Direção do Gradiente">
+              <option value="180deg">↓ Vertical</option>
+              <option value="135deg">↘ Diagonal</option>
+              <option value="90deg">→ Horizontal</option>
+              <option value="0deg">↑ Invertido</option>
+              <option value="radial">⊙ Radial</option>
+            </select>
+          </div>
+          <select class="pp-select" id="canvas-frame-gradient-select" title="Presets de Gradientes">
+            <option value="">Presets…</option>
+            <option value="#18181B|#09090B|180deg">Obsidian Dark</option>
+            <option value="#1C1917|#44403C|135deg">Warm Amber</option>
+            <option value="#0F172A|#020617|180deg">Midnight Navy</option>
+            <option value="#31102F|#1E1B4B|135deg">Sunset Glow</option>
+            <option value="#064E3B|#022C22|180deg">Forest Green</option>
+            <option value="#F3E8FF|#E0E7FF|135deg">Pastel Aura</option>
+            <option value="#FFFBEB|#FEF3C7|180deg">Golden Hour</option>
+            <option value="#111827|#374151|135deg">Zinc Minimal</option>
           </select>
-        </span>
+        </section>
 
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <!-- Presets Rápidos de Gradiente -->
-        <select class="canvas-text-toolbar__select" id="canvas-frame-gradient-select" title="Presets de Gradientes" style="min-width: 110px;">
-          <option value="">Presets...</option>
-          <option value="#18181B|#09090B|180deg">Obsidian Dark</option>
-          <option value="#1C1917|#44403C|135deg">Warm Amber</option>
-          <option value="#0F172A|#020617|180deg">Midnight Navy</option>
-          <option value="#31102F|#1E1B4B|135deg">Sunset Glow</option>
-          <option value="#064E3B|#022C22|180deg">Forest Green</option>
-          <option value="#F3E8FF|#E0E7FF|135deg">Pastel Aura</option>
-          <option value="#FFFBEB|#FEF3C7|180deg">Golden Hour</option>
-          <option value="#111827|#374151|135deg">Zinc Minimal</option>
-        </select>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <!-- Foto de Fundo -->
-        <button class="canvas-text-toolbar__btn" id="canvas-frame-bg-img-btn" title="Adicionar imagem de fundo do computador">
-          <input type="file" id="canvas-frame-bg-file" accept="image/*" style="display: none;">
-          <i data-lucide="image" style="width: 15px; height: 15px;"></i>
-        </button>
-
-        <!-- Reposicionar / Ajustar Foto de Fundo -->
-        <button class="canvas-text-toolbar__btn" id="canvas-frame-reposition-btn" title="Ajustar posição da foto de fundo (Duplo-clique no post)" style="display: none;">
-          <i data-lucide="move" style="width: 15px; height: 15px;"></i>
-        </button>
-
-        <button class="canvas-text-toolbar__btn" id="canvas-frame-more" title="Mais opções (Overlay, Blur e Posição)">
-          <i data-lucide="sliders-horizontal" style="width: 15px; height: 15px;"></i>
-        </button>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <!-- Variável de Fundo para Batch / CSV -->
-        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-frame-bg-bind" title="Virar variável de Fundo do Batch Create">{}</button>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <!-- Resetar Fundo para Branco -->
-        <button class="canvas-text-toolbar__btn" id="canvas-frame-bg-reset" title="Resetar para branco padrão">
-          <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
-        </button>
+        <section class="pp-section">
+          <div class="pp-section__head">
+            <span class="pp-section__title">Foto de fundo</span>
+            <button class="pp-btn" id="canvas-frame-reposition-btn" title="Ajustar posição da foto (Duplo-clique no post)" style="display: none;"><i data-lucide="move"></i></button>
+            <button class="pp-btn pp-btn--danger" id="canvas-frame-del-img" title="Remover imagem de fundo" style="display: none;"><i data-lucide="minus"></i></button>
+            <button class="pp-btn" id="canvas-frame-bg-img-btn" title="Adicionar imagem de fundo do computador">
+              <input type="file" id="canvas-frame-bg-file" accept="image/*" hidden>
+              <i data-lucide="plus"></i>
+            </button>
+          </div>
+          <div class="pp-row">
+            <label class="pp-field" title="Escurecimento / Overlay (%)"><i data-lucide="sun-medium"></i><input type="number" class="pp-input" id="canvas-frame-overlay" value="0" min="0" max="100" step="5"></label>
+            <label class="pp-field" title="Desfoque do fundo (px)"><i data-lucide="aperture"></i><input type="number" class="pp-input" id="canvas-frame-blur" value="0" min="0" max="50" step="1"></label>
+            <label class="pp-field" id="canvas-frame-pos-x-wrap" title="Posição horizontal da foto (%)" style="display: none;"><span class="pp-field__label">X</span><input type="number" class="pp-input" id="canvas-frame-pos-x" value="50" min="0" max="100" step="5"></label>
+            <label class="pp-field" id="canvas-frame-pos-y-wrap" title="Posição vertical da foto (%)" style="display: none;"><span class="pp-field__label">Y</span><input type="number" class="pp-input" id="canvas-frame-pos-y" value="50" min="0" max="100" step="5"></label>
+            <label class="pp-field" id="canvas-frame-zoom-wrap" title="Zoom da foto de fundo (%)" style="display: none;"><i data-lucide="zoom-in"></i><input type="number" class="pp-input" id="canvas-frame-zoom" value="100" min="100" max="300" step="10"></label>
+          </div>
+        </section>
       </div>
 
-      <!-- Segunda linha expansível: Overlay, Blur e Posição -->
-      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv" id="canvas-frame-advanced">
-        <div class="canvas-text-toolbar__subrow">
-          <div class="canvas-text-toolbar__field" title="Escurecimento / Overlay (%) [Para destacar textos]">
-            <i data-lucide="sun-medium" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-frame-overlay" value="0" min="0" max="100" step="5">
+      <!-- AJUSTAR FOTO DE FUNDO (modo reposicionar) -->
+      <div class="pp-panel" id="canvas-bg-reposition-toolbar">
+        <header class="pp-head">
+          <span class="pp-head__title">Ajustar foto</span>
+          <button class="pp-btn" id="canvas-bg-reposition-reset" title="Centralizar posição (50% 50%)"><i data-lucide="rotate-ccw"></i></button>
+        </header>
+        <section class="pp-section">
+          <div class="pp-row">
+            <label class="pp-field" title="Posição horizontal (%)"><span class="pp-field__label">X</span><input type="number" class="pp-input" id="canvas-bg-reposition-pos-x" value="50" min="0" max="100" step="5"></label>
+            <label class="pp-field" title="Posição vertical (%)"><span class="pp-field__label">Y</span><input type="number" class="pp-input" id="canvas-bg-reposition-pos-y" value="50" min="0" max="100" step="5"></label>
           </div>
-
-          <div class="canvas-text-toolbar__field" title="Desfoque / Blur de fundo (px)">
-            <i data-lucide="aperture" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-frame-blur" value="0" min="0" max="50" step="1">
+          <div class="pp-row pp-row--stepper">
+            <button class="pp-btn" id="canvas-bg-zoom-out" title="Diminuir zoom"><i data-lucide="minus"></i></button>
+            <label class="pp-field" title="Zoom da imagem de fundo (%)"><i data-lucide="zoom-in"></i><input type="number" class="pp-input" id="canvas-bg-reposition-zoom" value="100" min="100" max="300" step="5"></label>
+            <button class="pp-btn" id="canvas-bg-zoom-in" title="Aumentar zoom"><i data-lucide="plus"></i></button>
           </div>
-
-          <div class="canvas-text-toolbar__field" id="canvas-frame-pos-y-wrap" title="Posição Vertical da Foto (0% topo a 100% base)" style="display: none;">
-            <i data-lucide="move-vertical" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-frame-pos-y" value="50" min="0" max="100" step="5">
-          </div>
-
-          <div class="canvas-text-toolbar__field" id="canvas-frame-pos-x-wrap" title="Posição Horizontal da Foto (0% esq a 100% dir)" style="display: none;">
-            <i data-lucide="move-horizontal" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-frame-pos-x" value="50" min="0" max="100" step="5">
-          </div>
-
-          <div class="canvas-text-toolbar__field" id="canvas-frame-zoom-wrap" title="Zoom da foto de fundo (%)" style="display: none;">
-            <i data-lucide="zoom-in" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-frame-zoom" value="100" min="100" max="300" step="10">
-          </div>
-
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--danger canvas-text-toolbar__btn--pill" id="canvas-frame-del-img" title="Remover imagem de fundo" style="display: none;">
-            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
-            <span>Remover Foto</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- --------------------------------------------------
-         BARRA FLUTUANTE DE REPOSICIONAMENTO DA FOTO DE FUNDO (CANVA/FIGMA STYLE)
-         -------------------------------------------------- -->
-    <div class="canvas-text-toolbar" id="canvas-bg-reposition-toolbar">
-      <div class="canvas-text-toolbar__row">
-        <span class="canvas-reposition-badge" style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #93C5FD; padding: 0 4px;">
-          <i data-lucide="move" style="width: 13px; height: 13px;"></i>
-          <span>Ajustar Foto</span>
-        </span>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <!-- Posição Vertical -->
-        <div class="canvas-text-toolbar__field" title="Posição Vertical da Imagem (0% topo a 100% base)">
-          <i data-lucide="move-vertical" style="width: 14px; height: 14px;"></i>
-          <input type="number" class="canvas-text-toolbar__input" id="canvas-bg-reposition-pos-y" value="50" min="0" max="100" step="5">
-        </div>
-
-        <!-- Posição Horizontal -->
-        <div class="canvas-text-toolbar__field" title="Posição Horizontal da Imagem (0% esq a 100% dir)">
-          <i data-lucide="move-horizontal" style="width: 14px; height: 14px;"></i>
-          <input type="number" class="canvas-text-toolbar__input" id="canvas-bg-reposition-pos-x" value="50" min="0" max="100" step="5">
-        </div>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <!-- Zoom Stepper -->
-        <div class="canvas-text-toolbar__stepper">
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-bg-zoom-out" title="Diminuir zoom">
-            <i data-lucide="minus" style="width: 14px; height: 14px;"></i>
-          </button>
-          <div class="canvas-text-toolbar__field canvas-text-toolbar__field--stepper" title="Zoom da imagem de fundo (%)">
-            <i data-lucide="zoom-in" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-bg-reposition-zoom" value="100" min="100" max="300" step="5">
-          </div>
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-bg-zoom-in" title="Aumentar zoom">
-            <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
-          </button>
-        </div>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <button class="canvas-text-toolbar__btn" id="canvas-bg-reposition-reset" title="Centralizar posição (50% 50%)">
-          <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
-        </button>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--primary canvas-text-toolbar__btn--pill" id="canvas-bg-reposition-done" title="Concluir ajuste (Enter / Esc)">
-          <i data-lucide="check" style="width: 14px; height: 14px;"></i>
-          <span>Pronto</span>
-        </button>
-      </div>
-    </div>
-
-    <div class="canvas-text-toolbar" id="canvas-image-toolbar">
-      <!-- Linha 1: o que se usa sempre -->
-      <div class="canvas-text-toolbar__row">
-        <button class="canvas-text-toolbar__btn" id="canvas-image-crop" title="Recortar / Zoom da imagem (Duplo clique ou Enter)">
-          <i data-lucide="crop" style="width: 15px; height: 15px;"></i>
-        </button>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <!-- Arredondamento e opacidade em campos de métricas -->
-        <div class="canvas-text-toolbar__field" title="Arredondamento das bordas (px) [Arraste para ajustar]">
-          <i data-lucide="square" style="width: 14px; height: 14px;"></i>
-          <input type="number" class="canvas-text-toolbar__input" id="canvas-image-radius" value="0" min="0" step="1">
-        </div>
-
-        <div class="canvas-text-toolbar__field" title="Opacidade (%) [Arraste para ajustar]">
-          <i data-lucide="droplet" style="width: 14px; height: 14px;"></i>
-          <input type="number" class="canvas-text-toolbar__input" id="canvas-image-opacity" value="100" min="0" max="100" step="5">
-        </div>
-
-        <div class="canvas-text-toolbar__field" title="Rotação da imagem (°) [0° a 360° - Arraste para girar]">
-          <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
-          <input type="number" class="canvas-text-toolbar__input" id="canvas-image-rotation" value="0" min="0" max="360" step="1">
-        </div>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <button class="canvas-text-toolbar__btn" id="canvas-image-more" title="Mais opções (Camadas, Borda, Desfoque e Sombra)">
-          <i data-lucide="sliders-horizontal" style="width: 15px; height: 15px;"></i>
-        </button>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-image-bind" title="Virar variável do Batch Create">{}</button>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <button class="canvas-text-toolbar__btn" id="canvas-image-dup" title="Duplicar imagem (⌘D)">
-          <i data-lucide="copy" style="width: 15px; height: 15px;"></i>
-        </button>
-        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--danger" id="canvas-image-del" title="Apagar imagem (Delete)">
-          <i data-lucide="trash-2" style="width: 15px; height: 15px;"></i>
-        </button>
+          <button class="pp-primary" id="canvas-bg-reposition-done" title="Concluir ajuste (Enter / Esc)">Pronto</button>
+        </section>
       </div>
 
-      <!-- Segunda linha avançada: Acabamento, borda, blur, sombra e camadas -->
-      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv" id="canvas-image-advanced">
-        <div class="canvas-text-toolbar__subrow">
-          <!-- Ordem das Camadas -->
-          <div class="canvas-text-toolbar__segmented" title="Ordem das Camadas (z-index)">
-            <button class="canvas-text-toolbar__btn" id="canvas-image-send-back" title="Mandar para trás de tudo (⌘[)"><i data-lucide="arrow-down-to-line" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-image-backward" title="Recuar uma camada ([)"><i data-lucide="arrow-down" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-image-forward" title="Avançar uma camada (])"><i data-lucide="arrow-up" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-image-bring-front" title="Trazer para frente de tudo (⌘])"><i data-lucide="arrow-up-to-line" style="width: 14px; height: 14px;"></i></button>
+      <!-- IMAGEM -->
+      <div class="pp-panel" id="canvas-image-toolbar">
+        <header class="pp-head">
+          <span class="pp-head__title">Imagem</span>
+          <button class="pp-btn pp-btn--type" id="canvas-image-bind" title="Virar variável do Batch Create">{}</button>
+          <button class="pp-btn" id="canvas-image-dup" title="Duplicar imagem (⌘D)"><i data-lucide="copy"></i></button>
+          <button class="pp-btn pp-btn--danger" id="canvas-image-del" title="Apagar imagem (Delete)"><i data-lucide="trash-2"></i></button>
+        </header>
+
+        <section class="pp-section">
+          <span class="pp-section__title">Posição</span>
+          <div class="pp-row">
+            <div class="pp-seg" title="Centralizar no post">
+              <button class="pp-btn" id="canvas-image-pos-center-h" title="Centralizar horizontal (⌥H)"><i data-lucide="align-center-horizontal"></i></button>
+              <button class="pp-btn" id="canvas-image-pos-center-v" title="Centralizar vertical (⌥V)"><i data-lucide="align-center-vertical"></i></button>
+              <button class="pp-btn" id="canvas-image-pos-center-both" title="Centro do post (⌥C)"><i data-lucide="crosshair"></i></button>
+            </div>
+            <label class="pp-field" title="Rotação (°)"><i data-lucide="rotate-cw"></i><input type="number" class="pp-input" id="canvas-image-rotation" value="0" min="0" max="360" step="1"></label>
           </div>
+        </section>
 
-          <span class="canvas-text-toolbar__sep"></span>
-
-          <!-- Posicionar no Post Segmented Control -->
-          <div class="canvas-text-toolbar__segmented" title="Centralizar Imagem no Post">
-            <button class="canvas-text-toolbar__btn" id="canvas-image-pos-center-h" title="Centralizar Horizontal no Post (⌥H)"><i data-lucide="align-center-horizontal" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-image-pos-center-v" title="Centralizar Vertical no Post (⌥V)"><i data-lucide="align-center-vertical" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-image-pos-center-both" title="Centro do Post (⌥C)"><i data-lucide="crosshair" style="width: 14px; height: 14px;"></i></button>
+        <section class="pp-section">
+          <span class="pp-section__title">Camada</span>
+          <div class="pp-row">
+            <div class="pp-seg" title="Ordem das camadas">
+              <button class="pp-btn" id="canvas-image-send-back" title="Mandar para trás de tudo (⌘[)"><i data-lucide="arrow-down-to-line"></i></button>
+              <button class="pp-btn" id="canvas-image-backward" title="Recuar uma camada ([)"><i data-lucide="arrow-down"></i></button>
+              <button class="pp-btn" id="canvas-image-forward" title="Avançar uma camada (])"><i data-lucide="arrow-up"></i></button>
+              <button class="pp-btn" id="canvas-image-bring-front" title="Trazer para frente de tudo (⌘])"><i data-lucide="arrow-up-to-line"></i></button>
+            </div>
+            <label class="pp-field" title="Opacidade (%)"><i data-lucide="droplet"></i><input type="number" class="pp-input" id="canvas-image-opacity" value="100" min="0" max="100" step="5"></label>
           </div>
+        </section>
 
-          <span class="canvas-text-toolbar__sep"></span>
-
-          <!-- Borda: espessura e cor -->
-          <div class="canvas-text-toolbar__field" title="Espessura da borda (px) [Arraste para ajustar]">
-            <i data-lucide="maximize" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-image-border-width" value="0" min="0" step="1">
+        <section class="pp-section">
+          <div class="pp-section__head">
+            <span class="pp-section__title">Aparência</span>
+            <button class="pp-btn" id="canvas-image-crop" title="Recortar / Zoom (Duplo clique ou Enter)"><i data-lucide="crop"></i></button>
           </div>
-          <label class="canvas-text-toolbar__color" title="Cor da borda">
-            <input type="color" id="canvas-image-border-color" value="#000000">
-          </label>
-
-          <span class="canvas-text-toolbar__sep"></span>
-
-          <!-- Desfoque e Sombra -->
-          <div class="canvas-text-toolbar__field" title="Desfoque / Blur (px) [Arraste para ajustar]">
-            <i data-lucide="aperture" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-image-blur" value="0" min="0" step="1">
+          <div class="pp-row">
+            <label class="pp-field" title="Arredondamento (px)"><i data-lucide="square-dashed"></i><input type="number" class="pp-input" id="canvas-image-radius" value="0" min="0" step="1"></label>
           </div>
+        </section>
 
-          <div class="canvas-text-toolbar__field" title="Sombra externa (px) [Arraste para ajustar]">
-            <i data-lucide="layers" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-image-shadow" value="0" min="0" step="1">
+        <section class="pp-section">
+          <span class="pp-section__title">Contorno</span>
+          <div class="pp-row">
+            <label class="pp-color" title="Cor da borda"><input type="color" id="canvas-image-border-color" value="#000000"><span class="pp-color__hex"></span></label>
+            <label class="pp-field" title="Espessura da borda (px)"><i data-lucide="minus"></i><input type="number" class="pp-input" id="canvas-image-border-width" value="0" min="0" step="1"></label>
           </div>
-        </div>
-      </div>
-    </div>
+        </section>
 
-    <!-- HUD de Recorte e Zoom da Imagem (Figma/Canva style) -->
-    <div class="canvas-text-toolbar" id="canvas-crop-toolbar">
-      <div class="canvas-text-toolbar__row">
-        <div class="canvas-text-toolbar__stepper">
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-crop-zoom-out" title="Diminuir zoom">
-            <i data-lucide="minus" style="width: 14px; height: 14px;"></i>
-          </button>
-          <div class="canvas-text-toolbar__field canvas-text-toolbar__field--stepper" title="Zoom da imagem (%) [Arraste ou use o scroll para ajustar]">
-            <i data-lucide="zoom-in" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-crop-zoom-val" value="100" min="100" max="500" step="5">
+        <section class="pp-section">
+          <span class="pp-section__title">Efeitos</span>
+          <div class="pp-row">
+            <label class="pp-field" title="Desfoque (px)"><i data-lucide="aperture"></i><input type="number" class="pp-input" id="canvas-image-blur" value="0" min="0" step="1"></label>
+            <label class="pp-field" title="Sombra (px)"><i data-lucide="layers"></i><input type="number" class="pp-input" id="canvas-image-shadow" value="0" min="0" step="1"></label>
           </div>
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-crop-zoom-in" title="Aumentar zoom">
-            <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
-          </button>
-        </div>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <button class="canvas-text-toolbar__btn" id="canvas-crop-reset" title="Redefinir recorte (100% e centralizado)">
-          <i data-lucide="rotate-ccw" style="width: 14px; height: 14px;"></i>
-        </button>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--primary canvas-text-toolbar__btn--pill" id="canvas-crop-done" title="Concluir recorte (Enter / Esc)">
-          <i data-lucide="check" style="width: 14px; height: 14px;"></i>
-          <span>Pronto</span>
-        </button>
-      </div>
-    </div>
-
-    <div class="canvas-text-toolbar" id="canvas-text-toolbar">
-      <!-- Linha 1: Essenciais de texto — Fonte, peso, tamanho stepper, cor, mais opções, bind e ações -->
-      <div class="canvas-text-toolbar__row">
-        <!-- Famílias e pesos são preenchidos pelo JS a partir de FONTS -->
-        <select class="canvas-text-toolbar__select" id="canvas-text-font" title="Fonte"></select>
-        <select class="canvas-text-toolbar__select canvas-text-toolbar__select--sm" id="canvas-text-weight" title="Peso"></select>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <!-- Stepper Unificado de Tamanho da Fonte -->
-        <div class="canvas-text-toolbar__stepper">
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-text-size-down" title="Diminuir">−</button>
-          <input type="number" class="canvas-text-toolbar__input" id="canvas-text-size" value="48" min="1" max="400" title="Tamanho da fonte [Arraste para ajustar]">
-          <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--step" id="canvas-text-size-up" title="Aumentar">+</button>
-        </div>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <!-- Amostra de Cor do Texto -->
-        <label class="canvas-text-toolbar__color" title="Cor do texto">
-          <input type="color" id="canvas-text-color" value="#000000">
-        </label>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <button class="canvas-text-toolbar__btn" id="canvas-text-more" title="Mais opções (Estilo, Negrito, Alinhamento, Espaçamento, Camadas…)">
-          <i data-lucide="sliders-horizontal" style="width: 15px; height: 15px;"></i>
-        </button>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-bind" title="Virar variável do Batch Create">{}</button>
-
-        <span class="canvas-text-toolbar__sep"></span>
-
-        <button class="canvas-text-toolbar__btn" id="canvas-text-dup" title="Duplicar texto (⌘D)"><i data-lucide="copy" style="width: 15px; height: 15px;"></i></button>
-        <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--danger" id="canvas-text-del" title="Apagar texto (Delete)"><i data-lucide="trash-2" style="width: 15px; height: 15px;"></i></button>
+        </section>
       </div>
 
-      <!-- Segunda seção: Painel Avançado estruturado em 2 sub-linhas perfeitas -->
-      <div class="canvas-text-toolbar__row canvas-text-toolbar__row--adv" id="canvas-text-advanced">
-        <!-- Sub-row 1: Tipografia, Formatação & Alinhamento -->
-        <div class="canvas-text-toolbar__subrow">
-          <!-- Preset / Estilos rápidos -->
-          <select class="canvas-text-toolbar__select canvas-text-toolbar__select--preset" id="canvas-text-preset" title="Estilo rápido de texto">
-            <option value="">Estilo...</option>
-            <option value="heading">👑 Título</option>
-            <option value="subheading">📝 Subtítulo</option>
-            <option value="body">📖 Corpo</option>
-            <option value="quote">✨ Citação</option>
-            <option value="badge">🏷️ Destaque</option>
-          </select>
-
-          <span class="canvas-text-toolbar__sep"></span>
-
-          <!-- B / I / U Segmented Control -->
-          <div class="canvas-text-toolbar__segmented" title="Estilos de texto">
-            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-bold" title="Negrito (⌘B)" style="font-weight: 700;">B</button>
-            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-italic" title="Itálico (⌘I)" style="font-style: italic; font-family: Georgia, serif;">I</button>
-            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-underline" title="Sublinhado (⌘U)" style="text-decoration: underline;">U</button>
+      <!-- RECORTE DE IMAGEM -->
+      <div class="pp-panel" id="canvas-crop-toolbar">
+        <header class="pp-head">
+          <span class="pp-head__title">Recortar</span>
+          <button class="pp-btn" id="canvas-crop-reset" title="Redefinir recorte (100% e centralizado)"><i data-lucide="rotate-ccw"></i></button>
+        </header>
+        <section class="pp-section">
+          <div class="pp-row pp-row--stepper">
+            <button class="pp-btn" id="canvas-crop-zoom-out" title="Diminuir zoom"><i data-lucide="minus"></i></button>
+            <label class="pp-field" title="Zoom da imagem (%)"><i data-lucide="zoom-in"></i><input type="number" class="pp-input" id="canvas-crop-zoom-val" value="100" min="100" max="500" step="5"></label>
+            <button class="pp-btn" id="canvas-crop-zoom-in" title="Aumentar zoom"><i data-lucide="plus"></i></button>
           </div>
-
-          <span class="canvas-text-toolbar__sep"></span>
-
-          <!-- Alinhamento Segmented Control -->
-          <div class="canvas-text-toolbar__segmented" title="Alinhamento do Texto">
-            <button class="canvas-text-toolbar__btn" id="canvas-text-align-left" title="Alinhar texto à esquerda"><i data-lucide="align-left" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-text-align-center" title="Centralizar linhas do texto"><i data-lucide="align-center" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-text-align-right" title="Alinhar texto à direita"><i data-lucide="align-right" style="width: 14px; height: 14px;"></i></button>
-          </div>
-
-          <span class="canvas-text-toolbar__sep"></span>
-
-          <!-- Posicionar no Post Segmented Control -->
-          <div class="canvas-text-toolbar__segmented" title="Centralizar Elemento no Post">
-            <button class="canvas-text-toolbar__btn" id="canvas-text-pos-center-h" title="Centralizar Horizontal no Post (⌥H)"><i data-lucide="align-center-horizontal" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-text-pos-center-v" title="Centralizar Vertical no Post (⌥V)"><i data-lucide="align-center-vertical" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-text-pos-center-both" title="Centro do Post (⌥C)"><i data-lucide="crosshair" style="width: 14px; height: 14px;"></i></button>
-          </div>
-
-          <span class="canvas-text-toolbar__sep"></span>
-
-          <!-- Caixa / Transformação Segmented Control -->
-          <div class="canvas-text-toolbar__segmented" title="Capitalização">
-            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-none" title="Como digitado">Aa</button>
-            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-upper" title="MAIÚSCULAS">AA</button>
-            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-case-lower" title="minúsculas">aa</button>
-          </div>
-        </div>
-
-        <!-- Sub-row 2: Métricas, Realce/Sombra & Ordem das Camadas -->
-        <div class="canvas-text-toolbar__subrow">
-          <!-- Métricas: Line-Height, Letter-Spacing e Opacidade -->
-          <div class="canvas-text-toolbar__field" title="Altura da linha (Line-height) [Arraste para ajustar]">
-            <i data-lucide="align-vertical-justify-center" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-text-lh" value="1.15" step="0.05" min="0.5" max="4">
-          </div>
-
-          <div class="canvas-text-toolbar__field" title="Espaço entre letras (Letter-spacing) [Arraste para ajustar]">
-            <i data-lucide="move-horizontal" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-text-ls" value="-0.02" step="0.01" min="-0.2" max="1">
-          </div>
-
-          <div class="canvas-text-toolbar__field" title="Opacidade do texto (%) [Arraste para ajustar]">
-            <i data-lucide="droplet" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-text-opacity" value="100" step="5" min="0" max="100">
-          </div>
-
-          <div class="canvas-text-toolbar__field" title="Rotação do texto (°) [0° a 360° - Arraste para girar]">
-            <i data-lucide="rotate-cw" style="width: 14px; height: 14px;"></i>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-text-rotation" value="0" min="0" max="360" step="1">
-          </div>
-
-          <span class="canvas-text-toolbar__sep"></span>
-
-          <!-- Fundo / Marca-texto -->
-          <div class="canvas-text-toolbar__field canvas-text-toolbar__field--highlight" title="Cor de fundo / marca-texto">
-            <i data-lucide="highlighter" style="width: 14px; height: 14px;"></i>
-            <label class="canvas-text-toolbar__color canvas-text-toolbar__color--bg" title="Cor do fundo">
-              <input type="color" id="canvas-text-bg" value="#000000">
-            </label>
-            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--sm" id="canvas-text-bg-clear" title="Remover fundo">×</button>
-          </div>
-
-          <!-- Sombra de contraste -->
-          <button class="canvas-text-toolbar__btn" id="canvas-text-shadow" title="Sombra de legibilidade">
-            <i data-lucide="sun" style="width: 14px; height: 14px;"></i>
-          </button>
-
-          <span class="canvas-text-toolbar__sep"></span>
-
-          <!-- Traçado (contorno do texto) -->
-          <div class="canvas-text-toolbar__field canvas-text-toolbar__field--highlight" title="Traçado: cor e peso do contorno (0 = sem traçado)">
-            <i data-lucide="pen-line" style="width: 14px; height: 14px;"></i>
-            <label class="canvas-text-toolbar__color canvas-text-toolbar__color--bg" title="Cor do traçado">
-              <input type="color" id="canvas-text-stroke-color" value="#000000">
-            </label>
-            <input type="number" class="canvas-text-toolbar__input" id="canvas-text-stroke-w" value="0" step="1" min="0" max="40" title="Peso do traçado (px)">
-          </div>
-          <div class="canvas-text-toolbar__segmented" title="Alinhamento do traçado">
-            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-stroke-center" title="Traçado no centro da borda">C</button>
-            <button class="canvas-text-toolbar__btn canvas-text-toolbar__btn--type" id="canvas-text-stroke-outside" title="Traçado por fora (não come a letra)">F</button>
-          </div>
-
-          <span class="canvas-text-toolbar__sep"></span>
-
-          <!-- Ordem das Camadas / z-index Segmented Control -->
-          <div class="canvas-text-toolbar__segmented" title="Ordem das Camadas (z-index)">
-            <button class="canvas-text-toolbar__btn" id="canvas-text-send-back" title="Mandar para trás de tudo (⌘[)"><i data-lucide="arrow-down-to-line" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-text-backward" title="Recuar uma camada ([)"><i data-lucide="arrow-down" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-text-forward" title="Avançar uma camada (])"><i data-lucide="arrow-up" style="width: 14px; height: 14px;"></i></button>
-            <button class="canvas-text-toolbar__btn" id="canvas-text-bring-front" title="Trazer para frente de tudo (⌘])"><i data-lucide="arrow-up-to-line" style="width: 14px; height: 14px;"></i></button>
-          </div>
-        </div>
+          <button class="pp-primary" id="canvas-crop-done" title="Concluir recorte (Enter / Esc)">Pronto</button>
+        </section>
       </div>
-    </div>
+
+      <!-- TEXTO -->
+      <div class="pp-panel" id="canvas-text-toolbar">
+        <header class="pp-head">
+          <span class="pp-head__title">Texto</span>
+          <button class="pp-btn pp-btn--type" id="canvas-text-bind" title="Virar variável do Batch Create">{}</button>
+          <button class="pp-btn" id="canvas-text-dup" title="Duplicar texto (⌘D)"><i data-lucide="copy"></i></button>
+          <button class="pp-btn pp-btn--danger" id="canvas-text-del" title="Apagar texto (Delete)"><i data-lucide="trash-2"></i></button>
+        </header>
+
+        <section class="pp-section">
+          <span class="pp-section__title">Posição</span>
+          <div class="pp-row">
+            <div class="pp-seg" title="Centralizar no post">
+              <button class="pp-btn" id="canvas-text-pos-center-h" title="Centralizar horizontal (⌥H)"><i data-lucide="align-center-horizontal"></i></button>
+              <button class="pp-btn" id="canvas-text-pos-center-v" title="Centralizar vertical (⌥V)"><i data-lucide="align-center-vertical"></i></button>
+              <button class="pp-btn" id="canvas-text-pos-center-both" title="Centro do post (⌥C)"><i data-lucide="crosshair"></i></button>
+            </div>
+            <label class="pp-field" title="Rotação (°)"><i data-lucide="rotate-cw"></i><input type="number" class="pp-input" id="canvas-text-rotation" value="0" min="0" max="360" step="1"></label>
+          </div>
+        </section>
+
+        <section class="pp-section">
+          <span class="pp-section__title">Camada</span>
+          <div class="pp-row">
+            <div class="pp-seg" title="Ordem das camadas">
+              <button class="pp-btn" id="canvas-text-send-back" title="Mandar para trás de tudo (⌘[)"><i data-lucide="arrow-down-to-line"></i></button>
+              <button class="pp-btn" id="canvas-text-backward" title="Recuar uma camada ([)"><i data-lucide="arrow-down"></i></button>
+              <button class="pp-btn" id="canvas-text-forward" title="Avançar uma camada (])"><i data-lucide="arrow-up"></i></button>
+              <button class="pp-btn" id="canvas-text-bring-front" title="Trazer para frente de tudo (⌘])"><i data-lucide="arrow-up-to-line"></i></button>
+            </div>
+            <label class="pp-field" title="Opacidade (%)"><i data-lucide="droplet"></i><input type="number" class="pp-input" id="canvas-text-opacity" value="100" step="5" min="0" max="100"></label>
+          </div>
+        </section>
+
+        <section class="pp-section">
+          <div class="pp-section__head">
+            <span class="pp-section__title">Tipografia</span>
+            <select class="pp-select pp-select--ghost" id="canvas-text-preset" title="Estilo rápido de texto">
+              <option value="">Estilo</option>
+              <option value="heading">Título</option>
+              <option value="subheading">Subtítulo</option>
+              <option value="body">Corpo</option>
+              <option value="quote">Citação</option>
+              <option value="badge">Destaque</option>
+            </select>
+          </div>
+          <!-- Famílias e pesos são preenchidos pelo JS a partir de FONTS -->
+          <select class="pp-select" id="canvas-text-font" title="Fonte"></select>
+          <div class="pp-row">
+            <select class="pp-select" id="canvas-text-weight" title="Peso"></select>
+            <label class="pp-field" title="Tamanho da fonte"><span class="pp-field__label">Aa</span><input type="number" class="pp-input" id="canvas-text-size" value="48" min="1" max="400"></label>
+            <label class="pp-field" title="Altura da linha"><i data-lucide="align-vertical-justify-center"></i><input type="number" class="pp-input" id="canvas-text-lh" value="1.15" step="0.05" min="0.5" max="4"></label>
+            <label class="pp-field" title="Espaço entre letras"><i data-lucide="move-horizontal"></i><input type="number" class="pp-input" id="canvas-text-ls" value="-0.02" step="0.01" min="-0.2" max="1"></label>
+          </div>
+          <div class="pp-row">
+            <div class="pp-seg" title="Alinhamento do texto">
+              <button class="pp-btn" id="canvas-text-align-left" title="Alinhar à esquerda"><i data-lucide="align-left"></i></button>
+              <button class="pp-btn" id="canvas-text-align-center" title="Centralizar linhas"><i data-lucide="align-center"></i></button>
+              <button class="pp-btn" id="canvas-text-align-right" title="Alinhar à direita"><i data-lucide="align-right"></i></button>
+            </div>
+            <div class="pp-seg" title="Estilo">
+              <button class="pp-btn pp-btn--type" id="canvas-text-bold" title="Negrito (⌘B)" style="font-weight: 700;">B</button>
+              <button class="pp-btn pp-btn--type" id="canvas-text-italic" title="Itálico (⌘I)" style="font-style: italic; font-family: Georgia, serif;">I</button>
+              <button class="pp-btn pp-btn--type" id="canvas-text-underline" title="Sublinhado (⌘U)" style="text-decoration: underline;">U</button>
+            </div>
+          </div>
+          <div class="pp-seg pp-seg--full" title="Capitalização">
+            <button class="pp-btn pp-btn--type" id="canvas-text-case-none" title="Como digitado">Aa</button>
+            <button class="pp-btn pp-btn--type" id="canvas-text-case-upper" title="MAIÚSCULAS">AA</button>
+            <button class="pp-btn pp-btn--type" id="canvas-text-case-lower" title="minúsculas">aa</button>
+          </div>
+        </section>
+
+        <section class="pp-section">
+          <span class="pp-section__title">Preenchimento</span>
+          <label class="pp-color" title="Cor do texto"><input type="color" id="canvas-text-color" value="#000000"><span class="pp-color__hex"></span></label>
+        </section>
+
+        <section class="pp-section">
+          <div class="pp-section__head">
+            <span class="pp-section__title">Marca-texto</span>
+            <button class="pp-btn" id="canvas-text-bg-clear" title="Remover fundo"><i data-lucide="minus"></i></button>
+          </div>
+          <label class="pp-color" title="Cor do fundo do texto"><input type="color" id="canvas-text-bg" value="#000000"><span class="pp-color__hex"></span></label>
+        </section>
+
+        <section class="pp-section">
+          <span class="pp-section__title">Contorno</span>
+          <div class="pp-row">
+            <label class="pp-color" title="Cor do traçado"><input type="color" id="canvas-text-stroke-color" value="#000000"><span class="pp-color__hex"></span></label>
+            <label class="pp-field" title="Peso do traçado (0 = sem)"><i data-lucide="minus"></i><input type="number" class="pp-input" id="canvas-text-stroke-w" value="0" step="1" min="0" max="40"></label>
+          </div>
+          <div class="pp-seg pp-seg--full" title="Posição do traçado">
+            <button class="pp-btn pp-btn--type" id="canvas-text-stroke-center" title="Traçado no centro da borda">Centro</button>
+            <button class="pp-btn pp-btn--type" id="canvas-text-stroke-outside" title="Traçado por fora (não come a letra)">Fora</button>
+          </div>
+        </section>
+
+        <section class="pp-section">
+          <div class="pp-section__head">
+            <span class="pp-section__title">Efeitos</span>
+            <button class="pp-btn" id="canvas-text-shadow" title="Sombra de legibilidade"><i data-lucide="sun"></i></button>
+          </div>
+        </section>
+      </div>
+    </aside>
   </div>
   <!-- --------------------------------------------------
        PILHA DE TOASTS (avisos curtos, canto inferior direito)
