@@ -6822,3 +6822,29 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   font-variant-numeric: tabular-nums;
   transform: translateX(-50%);
 }
+
+/* Arrasto de campo numérico: cursor real some (pointer lock), fica o virtual */
+body.is-scrubbing,
+body.is-scrubbing * {
+  cursor: none !important;
+  user-select: none !important;
+}
+
+.pp-field__label,
+.pp-field > i[data-lucide],
+.pp-field > svg {
+  cursor: ew-resize;
+}
+
+.pp-scrub-cursor {
+  position: fixed;
+  left: -11px;
+  top: -7px;
+  z-index: 10000;
+  pointer-events: none;
+  display: none;
+}
+
+.pp-scrub-cursor.is-on {
+  display: block;
+}

@@ -1399,31 +1399,37 @@
     /* --------------------------------------------------
        Controle Universal de Scrub (Arrastar p/ Esquerda e Direita em Campos Numéricos)
        -------------------------------------------------- */
-    const SCRUB_PX_PER_STEP = 3;
+    const SCRUB_PX_PER_STEP = 2;
+
+    /* Arrastar para os lados num campo numérico, como no Figma:
+       - o cursor é travado (pointer lock) e escondido, então o arrasto não
+         bate na borda da tela; um cursor virtual dá a volta pelas bordas;
+       - mais rápido = passos maiores (Shift ×10, Alt ×0,1 para ajuste fino);
+       - o canvas é atualizado no máximo uma vez por quadro. */
+    let scrubCursor = null;
+    function scrubCursorEl() {
+      if (!scrubCursor) {
+        scrubCursor = document.createElement('div');
+        scrubCursor.className = 'pp-scrub-cursor';
+        scrubCursor.innerHTML = '<svg viewBox="0 0 24 16" width="22" height="15"><path d="M1 8h22M1 8l5-5M1 8l5 5M23 8l-5-5M23 8l-5 5" fill="none" stroke="#000" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1 8h22M1 8l5-5M1 8l5 5M23 8l-5-5M23 8l-5 5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        document.body.appendChild(scrubCursor);
+      }
+      return scrubCursor;
+    }
 
     function initUniversalScrubController() {
-      // Procura todos os campos com inputs numéricos dentro das barras de ferramentas do editor
-      const fields = document.querySelectorAll('.pp-field');
-
-      fields.forEach(field => {
+      document.querySelectorAll('.pp-field').forEach(field => {
         const input = field.querySelector('.pp-input');
-        if (!input || input.type !== 'number') return;
-
-        // Evita anexar múltiplos listeners se a função for chamada novamente
-        if (field.dataset.scrubInitialized === 'true') return;
+        if (!input || input.type !== 'number' || field.dataset.scrubInitialized === 'true') return;
         field.dataset.scrubInitialized = 'true';
 
-        field.style.cursor = 'ew-resize';
-        const icon = field.querySelector('i, svg');
-        if (icon) icon.style.cursor = 'ew-resize';
-
         field.addEventListener('mousedown', (e) => {
-          // Apenas botão esquerdo
-          if (e.button !== 0) return;
-          // Não interceptar se clicar em botão, select ou color picker interno
+          if (e.button !== 0 || input.disabled) return;
           if (e.target.closest('button, select, input[type="color"]')) return;
+          // Campo já em edição: clique posiciona o cursor do texto normalmente
+          if (e.target === input && document.activeElement === input) return;
+          e.preventDefault();
 
-          const isClickOnInput = e.target === input;
           const startX = e.clientX;
           const startY = e.clientY;
           const startVal = parseFloat(input.value) || 0;
@@ -1432,53 +1438,81 @@
           const min = input.min === '' ? -Infinity : parseFloat(input.min);
           const max = input.max === '' ? Infinity : parseFloat(input.max);
 
-          let isDragging = false;
+          let dragging = false;
+          let locked = false;
+          let travel = 0;         // deslocamento acumulado em "passos"
+          let virtualX = startX;  // cursor virtual (dá a volta nas bordas)
+          let pending = null;
+          let frame = 0;
 
-          const onMouseMove = (ev) => {
-            const dx = ev.clientX - startX;
-            const dy = ev.clientY - startY;
-
-            if (!isDragging) {
-              // Limiar para diferenciar clique de arrasto
-              if (Math.hypot(dx, dy) < 3) return;
-              isDragging = true;
-              document.body.style.cursor = 'ew-resize';
-              document.body.style.userSelect = 'none';
-            }
-
-            const mult = ev.shiftKey ? 5 : (ev.altKey ? 0.2 : 1);
-            const deltaSteps = Math.round(dx / SCRUB_PX_PER_STEP) * step * mult;
-            const nextVal = Math.min(max, Math.max(min, startVal + deltaSteps));
-            
-            input.value = decimals > 0 ? nextVal.toFixed(decimals) : String(Math.round(nextVal));
-
-            // Dispara evento 'input' para atualizar imediatamente no Canvas
+          const push = () => {
+            frame = 0;
+            if (pending === null || pending === input.value) return;
+            input.value = pending;
             quietSaveDepth++;
-            try {
-              input.dispatchEvent(new Event('input', { bubbles: true }));
-            } finally {
-              quietSaveDepth--;
-            }
+            try { input.dispatchEvent(new Event('input', { bubbles: true })); }
+            finally { quietSaveDepth--; }
           };
 
-          const onMouseUp = () => {
-            window.removeEventListener('mousemove', onMouseMove);
-            window.removeEventListener('mouseup', onMouseUp);
-            document.body.style.cursor = '';
-            document.body.style.userSelect = '';
+          const begin = () => {
+            dragging = true;
+            document.body.classList.add('is-scrubbing');
+            // Sem pointer lock (navegador recusou) o arrasto segue pela posição do mouse
+            const lock = (opts) => {
+              try {
+                const req = field.requestPointerLock && field.requestPointerLock(opts);
+                return req && req.catch ? req : Promise.resolve();
+              } catch (err) { return Promise.reject(err); }
+            };
+            lock({ unadjustedMovement: true }).catch(() => lock().catch(() => {}));
+            const c = scrubCursorEl();
+            c.style.transform = `translate(${startX}px, ${startY}px)`;
+            c.classList.add('is-on');
+          };
 
-            if (!isDragging && isClickOnInput) {
-              // Clique direto no campo sem arrastar: foca e seleciona tudo para digitar
+          const onMove = (ev) => {
+            locked = document.pointerLockElement === field;
+            const dx = locked ? ev.movementX : ev.clientX - (onMove.lastX ?? startX);
+            onMove.lastX = ev.clientX;
+            if (!dragging) {
+              if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 3 && !locked) return;
+              begin();
+            }
+            // Acelera com a velocidade: devagar = preciso, rápido = vai longe
+            const speed = Math.abs(dx);
+            const accel = speed > 18 ? 4 : speed > 8 ? 2 : 1;
+            const mult = ev.shiftKey ? 10 : (ev.altKey ? 0.1 : 1);
+            travel += (dx / SCRUB_PX_PER_STEP) * accel * mult;
+
+            const next = Math.min(max, Math.max(min, startVal + Math.round(travel) * step));
+            // Parado no limite não acumula: voltar reage na hora, sem "zona morta"
+            if (next === min || next === max) travel = (next - startVal) / step;
+            pending = decimals > 0 ? next.toFixed(decimals) : String(Math.round(next));
+            if (!frame) frame = requestAnimationFrame(push);
+
+            virtualX = ((virtualX + dx) % innerWidth + innerWidth) % innerWidth;
+            if (scrubCursor) scrubCursor.style.transform = `translate(${virtualX}px, ${startY}px)`;
+          };
+
+          const onUp = () => {
+            window.removeEventListener('mousemove', onMove);
+            window.removeEventListener('mouseup', onUp);
+            if (document.pointerLockElement) document.exitPointerLock();
+            document.body.classList.remove('is-scrubbing');
+            if (scrubCursor) scrubCursor.classList.remove('is-on');
+            if (frame) cancelAnimationFrame(frame);
+            push();
+            if (dragging) {
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            } else {
+              // Clique sem arrastar: edita digitando
               input.focus();
               input.select();
-            } else if (isDragging) {
-              // Dispara 'change' para persistir e consolidar histórico
-              input.dispatchEvent(new Event('change', { bubbles: true }));
             }
           };
 
-          window.addEventListener('mousemove', onMouseMove);
-          window.addEventListener('mouseup', onMouseUp);
+          window.addEventListener('mousemove', onMove);
+          window.addEventListener('mouseup', onUp);
         });
       });
     }
