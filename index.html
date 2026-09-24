@@ -71,11 +71,11 @@
   <!-- Modal 1: Criar em Lote (Funil em 3 Passos: 1. Elementos -> 2. Conteúdo -> 3. Gerar) -->
   <div class="modal-overlay" id="canvas-batch-modal">
     <div class="openpanel-modal canvas-batch-modal-oa">
-      <!-- Um post por linha: cada linha troca o texto principal do post -->
+      <!-- Criar vários posts: cada cartão é um post novo a partir do modelo -->
       <div class="openpanel-modal__header canvas-batch-header-oa">
         <div>
           <h2 class="openpanel-modal__title">Criar vários posts</h2>
-          <div class="openpanel-modal__sub" id="canvas-batch-sub">Escreva um post por linha.</div>
+          <div class="openpanel-modal__sub" id="canvas-batch-sub">Um cartão por post. O que ficar vazio continua igual ao modelo.</div>
         </div>
         <button class="openpanel-close-btn" id="canvas-batch-close" title="Fechar (Esc)">
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5">
@@ -86,16 +86,12 @@
       </div>
 
       <div class="canvas-batch-body-oa">
-        <textarea class="canvas-batch-lines" id="canvas-batch-lines" spellcheck="false"
-          placeholder="Como começar o dia com foco&#10;3 erros que todo iniciante comete&#10;O segredo que ninguém te conta"></textarea>
-
-        <div class="canvas-batch-photos" id="canvas-batch-photos">
-          <button type="button" class="canvas-batch-photos__add" id="canvas-batch-photos-btn">
-            <i data-lucide="image-plus" style="width: 15px; height: 15px;"></i>
-            <span>Adicionar fotos</span>
-          </button>
-          <div class="canvas-batch-photos__list" id="canvas-batch-photos-list"></div>
-        </div>
+        <!-- Um cartão por post, com um campo para cada texto e foto do modelo -->
+        <div class="canvas-batch-posts" id="canvas-batch-posts"></div>
+        <button type="button" class="canvas-batch-addpost" id="canvas-batch-add-post">
+          <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+          <span>Adicionar post</span>
+        </button>
         <input type="file" id="canvas-batch-images-input" accept="image/*" multiple hidden>
       </div>
 

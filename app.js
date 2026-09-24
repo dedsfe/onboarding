@@ -7615,11 +7615,9 @@
       const modal = document.getElementById('canvas-batch-modal');
       const openBtn = document.getElementById('canvas-batch-btn');
       const closeBtn = document.getElementById('canvas-batch-close');
-      const linesInput = document.getElementById('canvas-batch-lines');
-      const subEl = document.getElementById('canvas-batch-sub');
+      const postsWrap = document.getElementById('canvas-batch-posts');
+      const addPostBtn = document.getElementById('canvas-batch-add-post');
       const imagesInput = document.getElementById('canvas-batch-images-input');
-      const photosBtn = document.getElementById('canvas-batch-photos-btn');
-      const photosList = document.getElementById('canvas-batch-photos-list');
       const countEl = document.getElementById('canvas-batch-count');
       const btnGenCanvas = document.getElementById('canvas-batch-generate-canvas-btn');
       const labelGenCanvas = document.getElementById('canvas-batch-generate-canvas-label');
@@ -7644,13 +7642,15 @@
       });
 
       /* ----------------------------------------------------
-         UM POST POR LINHA
-         Cada linha troca o texto principal do post modelo. Colado do
-         Sheets, as colunas (tab) preenchem os textos seguintes, do maior
-         para o menor. Fotos soltas vão uma por post. As variáveis ({{}})
-         são criadas só durante a geração e somem em seguida.
+         CRIAR VÁRIOS POSTS
+         O modelo é o post selecionado. Cada texto e cada foto dele vira um
+         campo ("slot"), e cada cartão é um post novo com esses campos.
+         Campo vazio = igual ao modelo. As variáveis ({{}}) só existem
+         durante a geração e somem em seguida.
          ---------------------------------------------------- */
-      let batchPhotos = [];
+      let slots = [];   // [{ kind: 'text'|'image'|'bg', holder, frame }]
+      let posts = [];   // [[valor por slot]]
+      let pickTarget = null; // { post, slot } da foto sendo escolhida
 
       function readFileAsDataURL(file) {
         return new Promise(resolve => {
@@ -7661,120 +7661,207 @@
         });
       }
 
-      function templateChain() {
+      // Textos primeiro, na ordem de leitura; depois fotos e fundos com imagem
+      function collectSlots() {
         const anchor = selectedFrame() || frames[0];
         if (!anchor) return [];
         const byId = new Map(frames.map(f => [f.id, f]));
-        return (computePosts().find(c => c.includes(anchor.id)) || [anchor.id]).map(id => byId.get(id)).filter(Boolean);
+        const chain = (computePosts().find(c => c.includes(anchor.id)) || [anchor.id]).map(id => byId.get(id)).filter(Boolean);
+        const read = (a, b) => a.y - b.y || a.x - b.x;
+        const texts = [], photos = [];
+        chain.forEach(f => {
+          const kids = (f.children || []).slice().sort(read);
+          kids.filter(c => c.type === 'text').forEach(c => texts.push({ kind: 'text', holder: c, frame: f }));
+          if (hasFrameBg(f)) photos.push({ kind: 'bg', holder: f, frame: f });
+          kids.filter(c => c.type === 'image').forEach(c => photos.push({ kind: 'image', holder: c, frame: f }));
+        });
+        return [...texts, ...photos];
       }
 
-      // Textos do post, do maior (título) para o menor
-      function textTargets() {
-        return templateChain()
-          .flatMap(f => (f.children || []).filter(c => c.type === 'text').map(c => ({ f, c })))
-          .sort((a, b) => (b.c.fontSize || 0) - (a.c.fontSize || 0) || a.c.y - b.c.y);
-      }
+      const blankPost = () => slots.map(() => '');
+      const filledPosts = () => posts.filter(p => p.some(Boolean));
 
-      // Foto que troca: a maior imagem do post, senão o fundo do primeiro slide
-      function photoTarget() {
-        const chain = templateChain();
-        const imgs = chain.flatMap(f => (f.children || []).filter(c => c.type === 'image').map(c => ({ f, c })));
-        imgs.sort((a, b) => (b.c.w * b.c.h) - (a.c.w * a.c.h));
-        return imgs[0] || (chain[0] ? { f: chain[0], c: null } : null);
-      }
-
-      function readLines() {
-        return (linesInput ? linesInput.value : '')
-          .split('\n')
-          .map(l => l.split('\t').map(x => x.trim()))
-          .filter(cells => cells.some(Boolean));
-      }
-
-      function uniqueBindName(base) {
-        const taken = new Set(getCanvasBinds().map(b => b.name));
-        let name = base;
-        for (let n = 2; taken.has(name); n++) name = `${base}_${n}`;
-        return name;
-      }
-
-      function postCount() {
-        return Math.max(readLines().length, batchPhotos.length);
+      function ensurePost(i) {
+        while (posts.length <= i) posts.push(blankPost());
+        return posts[i];
       }
 
       function updateBatchFooter() {
-        const n = postCount();
+        const n = filledPosts().length;
         if (countEl) countEl.textContent = n ? `${n} ${n === 1 ? 'post' : 'posts'}` : '';
         if (btnGenCanvas) btnGenCanvas.disabled = n === 0;
         if (labelGenCanvas) labelGenCanvas.textContent = n ? `Criar ${n} ${n === 1 ? 'post' : 'posts'}` : 'Criar posts';
       }
 
-      function renderPhotos() {
-        if (!photosList) return;
-        photosList.innerHTML = '';
-        batchPhotos.forEach((url, i) => {
-          const item = document.createElement('button');
-          item.type = 'button';
-          item.className = 'canvas-batch-photos__item';
-          item.title = 'Remover foto';
-          item.innerHTML = `<img alt=""><span>${i + 1}</span>`;
-          item.querySelector('img').src = url;
-          item.addEventListener('click', () => {
-            batchPhotos.splice(i, 1);
-            renderPhotos();
-            updateBatchFooter();
-          });
-          photosList.appendChild(item);
-        });
+      function focusField(post, slot) {
+        const el = postsWrap && postsWrap.querySelector(`[data-post="${post}"][data-slot="${slot}"]`);
+        if (el) el.focus();
       }
 
-      async function addPhotos(files) {
-        const images = Array.from(files || []).filter(f => f.type.startsWith('image/'));
-        if (!images.length) return;
-        const urls = await Promise.all(images.map(readFileAsDataURL));
-        batchPhotos.push(...urls.filter(Boolean));
-        renderPhotos();
+      function renderPosts() {
+        if (!postsWrap) return;
+        postsWrap.innerHTML = '';
+        if (!slots.length) {
+          postsWrap.innerHTML = '<div class="canvas-batch-empty">Adicione um texto ou uma foto no post para criar vários de uma vez.</div>';
+          if (addPostBtn) addPostBtn.hidden = true;
+          return;
+        }
+        if (addPostBtn) addPostBtn.hidden = false;
+
+        posts.forEach((values, pi) => {
+          const card = document.createElement('div');
+          card.className = 'canvas-batch-card';
+
+          const num = document.createElement('span');
+          num.className = 'canvas-batch-card__num';
+          num.textContent = pi + 1;
+          card.appendChild(num);
+
+          const texts = document.createElement('div');
+          texts.className = 'canvas-batch-card__texts';
+          const pics = document.createElement('div');
+          pics.className = 'canvas-batch-card__pics';
+
+          slots.forEach((slot, si) => {
+            if (slot.kind === 'text') {
+              const input = document.createElement('input');
+              input.type = 'text';
+              input.className = 'canvas-batch-card__input';
+              input.placeholder = (slot.holder.text || 'Texto').replace(/\s+/g, ' ').trim();
+              input.value = values[si];
+              input.dataset.post = pi;
+              input.dataset.slot = si;
+              input.addEventListener('input', () => { values[si] = input.value; updateBatchFooter(); });
+              input.addEventListener('keydown', (e) => {
+                // Enter desce para o mesmo campo do próximo post (criando se precisar)
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (pi === posts.length - 1) { ensurePost(pi + 1); renderPosts(); }
+                  focusField(pi + 1, si);
+                }
+              });
+              input.addEventListener('paste', (e) => {
+                const text = (e.clipboardData || window.clipboardData)?.getData('text/plain') || '';
+                if (!text.includes('\n') && !text.includes('\t')) return;
+                e.preventDefault();
+                pasteGrid(text, pi, si);
+              });
+              texts.appendChild(input);
+            } else {
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'canvas-batch-card__pic';
+              btn.title = values[si] ? 'Trocar foto' : (slot.kind === 'bg' ? 'Foto de fundo' : 'Foto');
+              const img = document.createElement('img');
+              img.alt = '';
+              if (values[si]) {
+                img.src = values[si];
+                btn.classList.add('is-filled');
+              } else if (slot.kind === 'bg') {
+                const src = frameBgSrc(slot.holder);
+                if (src) img.src = src;
+              } else {
+                resolveChildImageSrc(slot.holder).then(src => { if (src) img.src = src; });
+              }
+              btn.appendChild(img);
+              btn.insertAdjacentHTML('beforeend', '<i data-lucide="image-plus"></i>');
+              btn.addEventListener('click', () => {
+                pickTarget = { post: pi, slot: si };
+                if (imagesInput) imagesInput.click();
+              });
+              pics.appendChild(btn);
+            }
+          });
+
+          card.appendChild(texts);
+          if (pics.childElementCount) card.appendChild(pics);
+
+          const del = document.createElement('button');
+          del.type = 'button';
+          del.className = 'canvas-batch-card__del';
+          del.title = 'Remover post';
+          del.innerHTML = '<i data-lucide="x"></i>';
+          del.addEventListener('click', () => {
+            posts.splice(pi, 1);
+            if (!posts.length) posts.push(blankPost());
+            renderPosts();
+            updateBatchFooter();
+          });
+          card.appendChild(del);
+          postsWrap.appendChild(card);
+        });
+        if (window.lucide) lucide.createIcons();
+      }
+
+      /* Colado do Sheets/Excel: linhas viram posts e colunas (tab) viram os
+         campos de texto seguintes, a partir de onde o cursor está. */
+      function pasteGrid(text, startPost, startSlot) {
+        const textSlots = slots.map((s, i) => s.kind === 'text' ? i : -1).filter(i => i >= 0);
+        const from = Math.max(0, textSlots.indexOf(startSlot));
+        const rows = text.replace(/\r/g, '').split('\n').filter(r => r.trim());
+        rows.forEach((row, r) => {
+          const post = ensurePost(startPost + r);
+          row.split('\t').forEach((cell, c) => {
+            const si = textSlots[from + c];
+            if (si !== undefined) post[si] = cell.trim();
+          });
+        });
+        renderPosts();
         updateBatchFooter();
       }
 
-      /* Monta os registros da geração e liga variáveis temporárias nos
-         alvos; devolve a função que desfaz essas ligações. */
+      /* Várias fotos de uma vez vão descendo pelos posts no mesmo campo. */
+      async function putPhotos(files, startPost, slot) {
+        const images = Array.from(files || []).filter(f => f.type.startsWith('image/'));
+        if (!images.length || slot == null) return;
+        const urls = (await Promise.all(images.map(readFileAsDataURL))).filter(Boolean);
+        urls.forEach((url, k) => { ensurePost(startPost + k)[slot] = url; });
+        renderPosts();
+        updateBatchFooter();
+      }
+
+      /* Liga variáveis temporárias nos campos usados e monta os registros;
+         devolve a função que desfaz essas ligações. */
       function prepareBatch() {
-        const lines = readLines();
-        const cols = Math.max(0, ...lines.map(l => l.length));
+        const filled = filledPosts();
+        const taken = new Set(getCanvasBinds().map(b => b.name));
         const undo = [];
-        const bindOn = (holder, key, base) => {
-          if (!holder[key]) {
-            holder[key] = uniqueBindName(base);
-            undo.push(() => delete holder[key]);
+        const names = slots.map((slot, si) => {
+          if (!filled.some(p => p[si])) return null;
+          const key = slot.kind === 'bg' ? 'bgBind' : 'bind';
+          if (!slot.holder[key]) {
+            let name = `campo_${si + 1}`;
+            for (let n = 2; taken.has(name); n++) name = `campo_${si + 1}_${n}`;
+            taken.add(name);
+            slot.holder[key] = name;
+            undo.push(() => delete slot.holder[key]);
           }
-          return holder[key];
-        };
-
-        const textBinds = textTargets().slice(0, cols)
-          .map(({ c }) => bindOn(c, 'bind', slugifyBind(c.text) || 'texto'));
-        let photoBind = null;
-        const pt = batchPhotos.length ? photoTarget() : null;
-        if (pt) photoBind = pt.c ? bindOn(pt.c, 'bind', 'foto') : bindOn(pt.f, 'bgBind', 'fundo');
-
-        batchData.records = Array.from({ length: postCount() }, (_, i) => {
+          return slot.holder[key];
+        });
+        batchData.records = filled.map(p => {
           const rec = {};
-          textBinds.forEach((name, j) => { rec[name] = (lines[i] || [])[j] || ''; });
-          if (photoBind) rec[photoBind] = batchPhotos[i] || '';
+          names.forEach((name, si) => { if (name) rec[name] = p[si]; });
           return rec;
         });
         return () => undo.forEach(fn => fn());
       }
 
-      if (linesInput) linesInput.addEventListener('input', updateBatchFooter);
-      if (photosBtn && imagesInput) {
-        photosBtn.addEventListener('click', () => imagesInput.click());
-        imagesInput.addEventListener('change', () => {
-          addPhotos(imagesInput.files);
-          imagesInput.value = '';
-        });
-      }
+      if (addPostBtn) addPostBtn.addEventListener('click', () => {
+        posts.push(blankPost());
+        renderPosts();
+        updateBatchFooter();
+        const first = slots.findIndex(s => s.kind === 'text');
+        if (first >= 0) focusField(posts.length - 1, first);
+      });
 
-      // Soltar fotos ou um .csv em qualquer ponto do modal
+      if (imagesInput) imagesInput.addEventListener('change', () => {
+        const target = pickTarget;
+        pickTarget = null;
+        if (target) putPhotos(imagesInput.files, target.post, target.slot);
+        imagesInput.value = '';
+      });
+
+      // Soltar fotos (vão para a primeira foto do modelo) ou um .csv no modal
       modal.addEventListener('dragover', (e) => {
         if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
         e.preventDefault();
@@ -7793,12 +7880,16 @@
           const reader = new FileReader();
           reader.onload = (ev) => {
             const parsed = parseTSVOrCSV(ev.target.result, true);
-            linesInput.value = parsed.rows.map(r => parsed.headers.map(h => r[h] || '').join('\t')).join('\n');
-            updateBatchFooter();
+            const tsv = parsed.rows.map(r => parsed.headers.map(h => r[h] || '').join('\t')).join('\n');
+            const firstText = slots.findIndex(s => s.kind === 'text');
+            if (firstText >= 0) pasteGrid(tsv, 0, firstText);
           };
           reader.readAsText(csv, 'UTF-8');
+          return;
         }
-        addPhotos(files);
+        const card = e.target.closest && e.target.closest('.canvas-batch-card');
+        const startPost = card ? [...postsWrap.children].indexOf(card) : filledPosts().length;
+        putPhotos(files, Math.max(0, startPost), slots.findIndex(s => s.kind !== 'text'));
       });
 
       function isImageSrcValue(val) {
@@ -8594,9 +8685,8 @@
             renderAll();
             save();
           }
-          if (linesInput) linesInput.value = '';
-          batchPhotos = [];
-          renderPhotos();
+          posts = [blankPost()];
+          renderPosts();
           updateBatchFooter();
         });
       }
@@ -8604,14 +8694,15 @@
       function openBatchModal() {
         document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
         modal.classList.add('open');
-        const main = textTargets()[0];
-        if (subEl) {
-          subEl.textContent = main
-            ? `Escreva um post por linha. Cada linha troca “${(main.c.text || 'o título').slice(0, 40)}”.`
-            : 'Adicione um texto no post para criar vários de uma vez.';
-        }
+        // O modelo pode ter mudado desde a última vez: refaz os campos
+        const next = collectSlots();
+        const same = next.length === slots.length && next.every((s, i) => s.holder === slots[i].holder);
+        slots = next;
+        if (!same || !posts.length) posts = [blankPost()];
+        renderPosts();
         updateBatchFooter();
-        if (linesInput) setTimeout(() => linesInput.focus(), 50);
+        const first = slots.findIndex(s => s.kind === 'text');
+        if (first >= 0) setTimeout(() => focusField(0, first), 50);
         if (progressBox) progressBox.style.display = 'none';
         if (window.lucide) lucide.createIcons();
       }
