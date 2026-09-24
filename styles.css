@@ -6792,3 +6792,33 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 .xp-go__label { position: relative; }
+
+/* Ferramenta de página (F): cursor de mira e o retângulo sendo desenhado */
+.canvas-view.is-frame-tool,
+.canvas-view.is-frame-tool * {
+  cursor: crosshair !important;
+}
+
+.canvas-frame-ghost {
+  position: absolute;
+  z-index: 50;
+  background: rgba(37, 99, 235, 0.06);
+  outline: calc(1.5px * var(--inv, 1)) solid #2563EB;
+  pointer-events: none;
+}
+
+.canvas-frame-ghost__label {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  margin-top: calc(8px * var(--inv, 1));
+  padding: calc(2px * var(--inv, 1)) calc(6px * var(--inv, 1));
+  border-radius: calc(4px * var(--inv, 1));
+  background: #2563EB;
+  color: #FFFFFF;
+  font-size: calc(11px * var(--inv, 1));
+  font-weight: 600;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  transform: translateX(-50%);
+}

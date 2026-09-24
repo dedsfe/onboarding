@@ -4850,13 +4850,18 @@
       const framesToDup = selectedFrameIds.size > 0 ? getSelectedFrames() : [frames.find(f => f.id === id)].filter(Boolean);
       if (framesToDup.length === 0) return;
       const newFrameIds = new Set();
+      const idMap = new Map();
+      // Desloca o grupo pela largura dele todo: páginas ligadas não caem uma em cima da outra
+      const left = Math.min(...framesToDup.map(f => f.x));
+      const right = Math.max(...framesToDup.map(f => f.x + f.w));
+      const shift = right - left + FRAME_GAP;
       framesToDup.forEach(src => {
         const copyName = src.name ? `${src.name} (Cópia)` : `Post ${frames.length + 1}`;
         const copy = {
           ...src,
           id: frameSeq++,
           name: copyName,
-          x: src.x + src.w + FRAME_GAP,
+          x: src.x + shift,
           y: src.y,
           children: (src.children || []).map(c => {
             const chCopy = { ...c, id: childSeq++ };
@@ -4867,7 +4872,11 @@
         frames.push(copy);
         renderFrame(copy);
         newFrameIds.add(copy.id);
+        idMap.set(src.id, copy.id);
       });
+      links.filter(l => idMap.has(l.from) && idMap.has(l.to))
+        .forEach(l => links.push({ id: linkSeq++, from: idMap.get(l.from), to: idMap.get(l.to) }));
+      renderLinks();
       selectedFrameIds = newFrameIds;
       selectedId = [...newFrameIds][0];
       world.querySelectorAll('.canvas-frame').forEach((el) => {
@@ -4879,6 +4888,88 @@
       updateFrameLabels();
       save();
     }
+
+    /* --------------------------------------------------
+       Ferramenta de página (F), como no Figma: arraste para desenhar uma
+       página do tamanho que quiser. Clique simples cria um Instagram Feed.
+       Shift deixa quadrado; perto de um formato conhecido, encaixa nele.
+       -------------------------------------------------- */
+    let frameToolOn = false;
+
+    function setFrameTool(on) {
+      frameToolOn = on;
+      view.classList.toggle('is-frame-tool', on);
+      if (on) toast.info('Arraste para desenhar a página · Esc cancela');
+    }
+
+    // Encaixa no formato conhecido quando a proporção fica a menos de 2%
+    function snapToFormat(w, h) {
+      for (const [key, f] of Object.entries(FORMATS)) {
+        if (key === 'custom') continue;
+        if (Math.abs(w / h - f.w / f.h) / (f.w / f.h) < 0.02) {
+          return { w: Math.round(w), h: Math.round(w * f.h / f.w), name: f.name };
+        }
+      }
+      return { w: Math.round(w), h: Math.round(h), name: '' };
+    }
+
+    view.addEventListener('mousedown', (e) => {
+      if (!frameToolOn || e.button !== 0) return;
+      if (e.target.closest('.canvas-topbar, .canvas-hud, .canvas-props, .canvas-dropdown-card')) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const start = screenToWorld(e.clientX, e.clientY);
+      const ghost = document.createElement('div');
+      ghost.className = 'canvas-frame-ghost';
+      const label = document.createElement('span');
+      label.className = 'canvas-frame-ghost__label';
+      ghost.appendChild(label);
+      world.appendChild(ghost);
+      let rect = null;
+
+      const onMove = (ev) => {
+        const pt = screenToWorld(ev.clientX, ev.clientY);
+        let w = Math.abs(pt.x - start.x);
+        let h = Math.abs(pt.y - start.y);
+        if (ev.shiftKey) w = h = Math.max(w, h);
+        const size = ev.shiftKey ? { w: Math.round(w), h: Math.round(h), name: '' } : snapToFormat(w, h);
+        size.w = Math.min(CUSTOM_MAX, size.w);
+        size.h = Math.min(CUSTOM_MAX, size.h);
+        const x = pt.x < start.x ? start.x - size.w : start.x;
+        const y = pt.y < start.y ? start.y - size.h : start.y;
+        rect = { x: Math.round(x), y: Math.round(y), ...size };
+        Object.assign(ghost.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.w}px`, height: `${rect.h}px` });
+        label.textContent = `${rect.w} × ${rect.h}${rect.name ? ` · ${rect.name}` : ''}`;
+      };
+
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        ghost.remove();
+        setFrameTool(false);
+
+        // Clique sem arrastar: página padrão centrada no ponto
+        const tiny = !rect || rect.w * cam.scale < 12 || rect.h * cam.scale < 12;
+        const size = tiny ? { w: FORMATS['ig-feed'].w, h: FORMATS['ig-feed'].h } : { w: Math.max(CUSTOM_MIN, rect.w), h: Math.max(CUSTOM_MIN, rect.h) };
+        const known = Object.entries(FORMATS).find(([k, f]) => k !== 'custom' && f.w === size.w && f.h === size.h);
+        const frame = tiny
+          ? makeFrame('ig-feed', Math.round(start.x - size.w / 2), Math.round(start.y - size.h / 2))
+          : makeFrame(known ? known[0] : 'custom', rect.x, rect.y, known ? null : size);
+        frames.push(frame);
+        renderFrame(frame);
+        selectFrame(frame.id);
+        updateFrameMeta();
+        save();
+      };
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    }, true);
+
+    window.addEventListener('keydown', (e) => {
+      if (frameToolOn && e.key === 'Escape') setFrameTool(false);
+    });
 
     function deleteFrame(id) {
       const framesToDelete = selectedFrameIds.size > 0 ? getSelectedFrameIds() : (id !== null ? [id] : []);
@@ -6044,7 +6135,11 @@
                 }
               });
               return copy;
-            })
+            }),
+            // Carrossel copiado continua carrossel: só as ligações internas vão junto
+            links: links
+              .filter(l => framesToCopy.some(f => f.id === l.from) && framesToCopy.some(f => f.id === l.to))
+              .map(l => ({ from: l.from, to: l.to }))
           };
         }
       }
@@ -6181,10 +6276,12 @@
         const minX = Math.min(...data.frames.map(f => f.x || 0));
         const minY = Math.min(...data.frames.map(f => f.y || 0));
         const newFrameIds = new Set();
+        const idMap = new Map();
 
         for (const orig of data.frames) {
           const copy = JSON.parse(JSON.stringify(orig));
           copy.id = frameSeq++;
+          idMap.set(orig.id, copy.id);
           copy.name = orig.name ? `${orig.name} (cópia)` : '';
           
           copy.x = Math.round(worldPt.x + ((orig.x || 0) - minX));
@@ -6219,6 +6316,14 @@
           renderFrame(copy);
           newFrameIds.add(copy.id);
         }
+
+        (data.links || []).forEach(l => {
+          if (idMap.has(l.from) && idMap.has(l.to)) {
+            links.push({ id: linkSeq++, from: idMap.get(l.from), to: idMap.get(l.to) });
+          }
+        });
+        renderLinks();
+        updateFrameLabels();
 
         selectedChildNodes = [];
         selectedTextNode = { frameId: null, childId: null };
@@ -7254,6 +7359,14 @@
         e.preventDefault();
         e.stopPropagation();
         toggleBindsVisibility(true);
+        return;
+      }
+
+      // 'F': ferramenta de página, funciona com ou sem seleção
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        e.stopPropagation();
+        setFrameTool(!frameToolOn);
         return;
       }
 
