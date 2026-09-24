@@ -152,7 +152,11 @@
       'story':     { name: 'TikTok',            w: 1080, h: 1920 },
       'pinterest': { name: 'Pinterest',         w: 1000, h: 1500 },
       'yt-thumb':  { name: 'Thumbnail YouTube', w: 1280, h:  720 },
+      // Tamanho livre: w/h reais vêm de quem cria o frame e ficam no próprio frame
+      'custom':    { name: 'Personalizado',     w: 1080, h: 1080 },
     };
+    const CUSTOM_MIN = 50;
+    const CUSTOM_MAX = 8000;
     const FRAME_GAP = 120;
     /* Abaixo disso o rótulo mais longo já é mais largo que o frame inteiro na
        tela (1080 × 0.26 ≈ 280px), então some. Em zoom visual: ~78%. */
@@ -2376,9 +2380,9 @@
     }
 
     // `children` já nasce no modelo para receber os textos e imagens depois
-    function makeFrame(formatKey = 'ig-feed', x = 0, y = 0) {
+    function makeFrame(formatKey = 'ig-feed', x = 0, y = 0, size = null) {
       const key = (formatKey && FORMATS[formatKey]) ? formatKey : 'ig-feed';
-      const fmt = FORMATS[key];
+      const fmt = size || FORMATS[key];
       const defaultName = `Post ${frames.length + 1}`;
       return { id: frameSeq++, name: defaultName, format: key, x, y, w: fmt.w, h: fmt.h, bg: '#FFFFFF', children: [] };
     }
@@ -3531,6 +3535,7 @@
       // Mousedown para ações (Recorte vs Normal)
       el.addEventListener('mousedown', (e) => {
         const isCroppingThis = croppingImage && croppingImage.childId === child.id;
+        if (e.button === 0 && (e.metaKey || e.ctrlKey || e.shiftKey)) return;
 
         const rotHandle = e.target.closest('.canvas-node__rotate-handle');
         if (rotHandle && !isCroppingThis) {
@@ -3879,6 +3884,7 @@
       el.addEventListener('mousedown', (e) => {
         const rotHandle = e.target.closest('.canvas-node__rotate-handle');
         if (rotHandle) {
+        if (e.button === 0 && (e.metaKey || e.ctrlKey || e.shiftKey)) return;
           startRotateNode(e, child, frame, el);
           return;
         }
@@ -4287,7 +4293,7 @@
             <span class="canvas-safezone__badge canvas-safezone__badge--v">Margem (60px)</span>
           </div>
           <div class="canvas-safezone__box" style="top: 60px; bottom: 60px; left: 60px; right: 60px;">
-            <span class="canvas-safezone__label">✅ Área Segura Quadrada (960 × 960)</span>
+            <span class="canvas-safezone__label">✅ Área Segura ${frame.format === 'custom' ? '' : 'Quadrada '}(${frame.w - 120} × ${frame.h - 120})</span>
           </div>
         `;
       }
@@ -4612,6 +4618,8 @@
       el.addEventListener('mousedown', (e) => {
         if (e.button !== 0) return;
         if (e.target.closest('.canvas-frame__label')) return;
+        // Modificador pressionado: o laço de seleção do canvas assume
+        if (e.metaKey || e.ctrlKey || e.shiftKey) return;
         if (repositioningFrameId === frame.id) {
           e.stopPropagation();
           startFrameBgPan(e, frame, el);
@@ -4876,9 +4884,9 @@
       toast.success(`Faixa panorâmica criada: ${slices} posts de ${fmt.w} × ${fmt.h}`);
     }
 
-    function addFrame(formatKey = 'ig-feed') {
+    function addFrame(formatKey = 'ig-feed', size = null) {
       const key = (formatKey && FORMATS[formatKey]) ? formatKey : 'ig-feed';
-      const fmt = FORMATS[key];
+      const fmt = size ? { ...FORMATS[key], ...size } : FORMATS[key];
       let x, y;
       if (frames.length) {
         // Novo frame entra à direita do último: a fila natural de um carrossel
@@ -4890,14 +4898,14 @@
         x = Math.round(center.x - fmt.w / 2);
         y = Math.round(center.y - fmt.h / 2);
       }
-      const frame = makeFrame(key, x, y);
+      const frame = makeFrame(key, x, y, size);
       frames.push(frame);
       renderFrame(frame);
       selectFrame(frame.id);
       updateFrameMeta();
       zoomToFrame(frame);
       save();
-      toast.success(`Post (${fmt.name}) criado`);
+      toast.success(size ? `Post ${fmt.w} × ${fmt.h} criado` : `Post (${fmt.name}) criado`);
     }
 
     function duplicateFrame(id) {
@@ -5396,7 +5404,9 @@
        -------------------------------------------------- */
     view.addEventListener('mousedown', (e) => {
       if (e.target.closest('.canvas-hud')) return;
-      if (e.target.closest('.canvas-frame') || e.target.closest('.canvas-topbar')) return;
+      const marqueeOverride = e.button === 0 && (e.metaKey || e.ctrlKey || e.shiftKey);
+      if (e.target.closest('.canvas-topbar')) return;
+      if (e.target.closest('.canvas-frame') && !marqueeOverride) return;
       if (e.target.closest('.canvas-text-toolbar') || e.target.closest('.canvas-image-toolbar') || e.target.closest('.canvas-crop-toolbar')) return;
 
       const isPanning = isSpacePressed || e.button === 1 || e.altKey;
@@ -5431,6 +5441,13 @@
         const startScreenX = e.clientX;
         const startScreenY = e.clientY;
         const startWorldPt = screenToWorld(startScreenX, startScreenY);
+        const startedOnFrameEl = e.target.closest('.canvas-frame');
+        /* Laço inteiro dentro de um post = selecionar os textos/fotos dele.
+           Qualquer laço que cruze a borda seleciona os posts, não o conteúdo. */
+        const frameContainingBox = (x1, y1, x2, y2) => frames.find(f =>
+          x1 >= f.x && x2 <= f.x + f.w && y1 >= f.y && y2 <= f.y + f.h);
+        const additive = marqueeOverride;
+        const prevFrameIds = additive ? [...selectedFrameIds] : [];
         let marqueeEl = null;
         let moved = false;
 
@@ -5491,8 +5508,11 @@
             }
           });
 
+          prevFrameIds.forEach(id => { if (!hitFrames.includes(id)) hitFrames.push(id); });
+          const innerFrame = frameContainingBox(boxX1, boxY1, boxX2, boxY2);
+
           // Feedback visual em tempo real:
-          if (hitChildren.length > 0) {
+          if (innerFrame && hitChildren.length > 0) {
             world.querySelectorAll('.canvas-text-node, .canvas-image-node').forEach(el => {
               const cId = Number(el.dataset.id);
               el.classList.toggle('is-selected', hitChildren.some(n => n.childId === cId));
@@ -5537,7 +5557,8 @@
               });
             });
 
-            if (hitChildren.length > 0) {
+            const innerFrame = frameContainingBox(boxX1, boxY1, boxX2, boxY2);
+            if (innerFrame && hitChildren.length > 0) {
               selectedFrameIds.clear();
               selectedId = null;
               selectedChildNodes = hitChildren;
@@ -5560,6 +5581,7 @@
                   hitFrames.push(f.id);
                 }
               });
+              prevFrameIds.forEach(id => { if (!hitFrames.includes(id)) hitFrames.push(id); });
               selectedChildNodes = [];
               selectedTextNode = { frameId: null, childId: null };
               selectedFrameIds = new Set(hitFrames);
@@ -5572,7 +5594,10 @@
               updateTopbar();
               updateTextToolbar();
             }
-          } else {
+          } else if (startedOnFrameEl && additive) {
+            // ⌘/Shift + clique (sem arrastar) segue alternando aquele post
+            selectFrame(Number(startedOnFrameEl.dataset.id), true);
+          } else if (!startedOnFrameEl) {
             // Clique simples no vazio: limpa seleção
             selectFrame(null);
             selectTextNode(null, null);
@@ -6623,6 +6648,11 @@
             <i data-lucide="maximize-2"></i>
             <span>Ajustar Zoom (100%)</span>
           </button>
+          ${frames.length > 0 ? `
+          <button type="button" class="canvas-context-item canvas-context-item--danger" data-action="clear-canvas">
+            <i data-lucide="trash-2"></i>
+            <span>Limpar Canvas (Apagar Tudo)</span>
+          </button>` : ''}
         `;
       }
 
@@ -6638,6 +6668,13 @@
 
           if (action === 'toggle-binds') {
             toggleBindsVisibility(true);
+          } else if (action === 'clear-canvas') {
+            /* Ação destrutiva e sem undo: a confirmação nativa é proposital
+               (rara, e um clique acidental não pode apagar o projeto todo). */
+            if (frames.length > 0 && confirm(`Apagar TODOS os ${frames.length} frame(s) do canvas? Isso não pode ser desfeito.`)) {
+              if (window.__tcmCanvas) window.__tcmCanvas.limpar();
+              toast.success('Canvas limpo');
+            }
           } else if (action === 'reset-toolbar-pin') {
             if (typeof resetToolbarToElement === 'function') resetToolbarToElement(false);
           } else if (action === 'set-child-as-bg') {
@@ -6870,9 +6907,9 @@
       });
 
       formatsMenu.addEventListener('click', (e) => {
-        const item = e.target.closest('.canvas-dropdown-item');
+        const item = e.target.closest('.canvas-formats__tile');
         if (!item) return;
-        if (item.id === 'canvas-btn-open-panoramic' || item.classList.contains('canvas-formats__item--panoramic')) {
+        if (item.id === 'canvas-btn-open-panoramic') {
           closeAllDropdowns();
           if (window.openPanoramicModal) window.openPanoramicModal();
           return;
@@ -6881,6 +6918,39 @@
         addFrame(formatKey);
         closeAllDropdowns();
       });
+
+      // Tamanho livre: largura × altura digitadas, Enter ou "Criar" gera o post
+      const customW = document.getElementById('canvas-custom-w');
+      const customH = document.getElementById('canvas-custom-h');
+      const customBtn = document.getElementById('canvas-custom-create');
+      if (customW && customH && customBtn) {
+        const createCustom = () => {
+          const w = Math.round(Number(customW.value));
+          const h = Math.round(Number(customH.value));
+          const ok = v => Number.isFinite(v) && v >= CUSTOM_MIN && v <= CUSTOM_MAX;
+          if (!ok(w) || !ok(h)) {
+            toast.error(`Use entre ${CUSTOM_MIN} e ${CUSTOM_MAX} px`);
+            return;
+          }
+          addFrame('custom', { w, h });
+          closeAllDropdowns();
+        };
+        // Miniatura ao lado dos campos acompanha a proporção digitada
+        const customPreview = document.getElementById('canvas-custom-preview');
+        const syncPreview = () => {
+          const w = Number(customW.value), h = Number(customH.value);
+          if (customPreview && w > 0 && h > 0) customPreview.style.setProperty('--ratio', w / h);
+        };
+        customBtn.addEventListener('click', (e) => { e.stopPropagation(); createCustom(); });
+        [customW, customH].forEach(inp => {
+          inp.addEventListener('input', syncPreview);
+          inp.addEventListener('click', e => e.stopPropagation());
+          inp.addEventListener('keydown', (e) => {
+            e.stopPropagation();
+            if (e.key === 'Enter') createCustom();
+          });
+        });
+      }
     }
 
     // 2. Menu de Inserção de Elementos (Texto, Imagem, Mesh, Ícones, Fontes)
@@ -7541,7 +7611,10 @@
        com as células de dados selecionadas). */
     function parseTSVOrCSV(text, assumeHeader = 'auto') {
       if (!text || typeof text !== 'string') return { headers: [], rows: [], hasRealHeaders: false };
-      const clean = text.trim();
+      // BOM do Excel e a linha "sep=;" quebram o cabecalho se nao forem removidos
+      let raw = text.replace(/^\uFEFF/, '');
+      raw = raw.replace(/^\s*sep=.\r?\n/i, '');
+      const clean = raw.trim();
       if (!clean) return { headers: [], rows: [], hasRealHeaders: false };
 
       const isTSV = clean.includes('\t');
@@ -7838,12 +7911,28 @@
         }
 
         const binds = getCanvasBinds();
+        if (!binds.length) {
+          if (hint) hint.innerHTML = `<span style="color: #F59E0B;">Li ${parsed.rows.length} linha(s), mas nenhuma variável está conectada. Volte ao Passo 1 e marque os textos/fotos que mudam.</span>`;
+          toast.info('Nenhuma variável conectada: marque os campos no Passo 1 para o CSV preencher a tabela.');
+          setBatchStep(1);
+          renderStep1BindsStatus();
+          return false;
+        }
         batchData.csv = parsed;
         batchData.csvPick = {};
 
         if (parsed.hasRealHeaders) {
           binds.forEach(b => {
             batchData.csvPick[b.name] = matchHeaderForBind(b.name, parsed.headers);
+          });
+          /* Cabecalho com outros nomes (ex.: "Frase" para {{titulo_1}}) deixaria
+             a tabela vazia: preenche o que sobrou na ordem das colunas. */
+          const usados = new Set(Object.values(batchData.csvPick).filter(Boolean));
+          const livres = parsed.headers.filter(h => !usados.has(h));
+          binds.forEach(b => {
+            if (!batchData.csvPick[b.name] && livres.length) {
+              batchData.csvPick[b.name] = livres.shift();
+            }
           });
         } else {
           // Se não vieram cabeçalhos, mapeia na ordem sequencial das variáveis
@@ -7938,6 +8027,31 @@
           toast.success(`✓ ${urls.length} ${urls.length === 1 ? 'foto aplicada' : 'fotos aplicadas'} em {{${imgBind.name}}}`);
           renderBatchGrid();
           updateBatchFooter();
+        });
+      }
+
+
+      /* O .csv pode ser solto em qualquer ponto do modal (inclusive no Passo 1).
+         Sem isto, o handler global de 'drop' engole o arquivo em silencio. */
+      if (modal) {
+        modal.addEventListener('dragover', (e) => {
+          if (!e.dataTransfer || !e.dataTransfer.types.includes('Files')) return;
+          e.preventDefault();
+          modal.classList.add('is-csv-dragover');
+        });
+        modal.addEventListener('dragleave', (e) => {
+          if (e.target === modal || !modal.contains(e.relatedTarget)) modal.classList.remove('is-csv-dragover');
+        });
+        modal.addEventListener('drop', (e) => {
+          modal.classList.remove('is-csv-dragover');
+          const files = Array.from(e.dataTransfer && e.dataTransfer.files || []);
+          if (!files.length) return;
+          const csv = files.find(f => f.name.toLowerCase().endsWith('.csv') || f.type.includes('csv'));
+          if (!csv) return;
+          // O grid do Passo 2 ja trata o proprio drop; nao processar duas vezes
+          if (gridWrap && gridWrap.contains(e.target)) return;
+          e.preventDefault();
+          handleCSVFile(csv);
         });
       }
 
@@ -9278,14 +9392,27 @@
         if (progressText) progressText.textContent = 'Empacotando arquivo .ZIP...';
         const zipBlob = await zip.generateAsync({ type: 'blob' });
 
-        const downloadUrl = URL.createObjectURL(zipBlob);
-        const a = document.createElement('a');
-        a.href = downloadUrl;
-        a.download = `lote_posts_${totalRows}_${Date.now()}.zip`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(downloadUrl);
+        /* Ponte MCP ativa: o zip é entregue à ponte (que grava em disco via
+           servidor) em vez de disparar o download do navegador. */
+        let entregueAPonte = false;
+        if (typeof window.__tcmOnZip === 'function') {
+          try {
+            entregueAPonte = (await window.__tcmOnZip(zipBlob, `lote_posts_${totalRows}_${Date.now()}.zip`)) === true;
+          } catch (e) {
+            entregueAPonte = false;
+          }
+        }
+
+        if (!entregueAPonte) {
+          const downloadUrl = URL.createObjectURL(zipBlob);
+          const a = document.createElement('a');
+          a.href = downloadUrl;
+          a.download = `lote_posts_${totalRows}_${Date.now()}.zip`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(downloadUrl);
+        }
 
         const falhas = exportImageFailures.length;
         if (progressText) {
@@ -9587,6 +9714,28 @@
       window.addTextToSelectedFrame = addTextToSelectedFrame;
       window.FONTS = FONTS;
       window.renderAll = renderAll;
+
+      /* --------------------------------------------------
+         PONTE MCP (mcp-bridge.js) — motor de lote por comando.
+         A ponte WebSocket conecta a IA ao app aberto no navegador;
+         estes métodos são a superfície que ela enxerga.
+         -------------------------------------------------- */
+      window.__tcmBatch = {
+        binds: () => getCanvasBinds(),
+        registros: () => batchData.records.map(r => ({ ...r })),
+        definirLote: (registros) => {
+          batchData.records = (registros || []).map(r => ({ ...r }));
+          batchData.binds = getCanvasBinds();
+          batchData.csv = null;
+          batchData.csvPick = {};
+          renderBatchGrid();
+          updateBatchFooter();
+          return batchData.records.length;
+        },
+        exportar: () => runBatchExport(),
+        gerarNoCanvas: () => generateBatchOnCanvas(),
+        abrirModal: openBatchModal
+      };
     }
 
     // --------------------------------------------------
@@ -12513,6 +12662,9 @@
         closeTemplatesModal();
       }
 
+      // Ponte MCP: aplica template por id a partir da IA
+      window.__tcmApplyTemplate = applyTemplateToCanvas;
+
       if (previewBackBtn) {
         previewBackBtn.addEventListener('click', showCatalogView);
       }
@@ -13206,6 +13358,67 @@
 
       window.openAuthModal = openAuthModal;
     }
+
+    /* --------------------------------------------------
+       PONTE MCP (mcp-bridge.js) — comandos de canvas.
+       Nível canvas: limpar, aplicar template, bind de fundo e diagnóstico.
+       O motor de lote (__tcmBatch) mora no Batch Create Controller.
+       -------------------------------------------------- */
+    window.__tcmCanvas = {
+      limpar: () => {
+        frames = [];
+        links = [];
+        frameSeq = 1;
+        childSeq = 1;
+        linkSeq = 1;
+        selectFrame(null);
+        renderAll();
+        save();
+        return { ok: true };
+      },
+      aplicarTemplate: (id) => {
+        const tpl = window.CarouselTemplates && window.CarouselTemplates.getById(id);
+        if (!tpl || !tpl.generateFrames) return { erro: `template "${id}" não encontrado` };
+        const slides = tpl.generateFrames().length;
+        window.__tcmApplyTemplate(tpl);
+        return { ok: true, template: tpl.title, slides };
+      },
+      /* Amarra um bgBind na cadeia do frame selecionado (ou do primeiro):
+         a coluna de mesmo nome no lote troca o fundo de todos os slides do
+         post — é por aqui que as imagens da IA viram fundo. */
+      definirFundoBind: (nome) => {
+        const alvo = selectedFrame() || frames[0];
+        if (!alvo) return { erro: 'nenhum frame no canvas' };
+        const byId = new Map(frames.map(f => [f.id, f]));
+        const cadeia = computePosts().find(c => c.includes(alvo.id)) || [alvo.id];
+        cadeia.forEach(id => {
+          const f = byId.get(id);
+          if (f) f.bgBind = nome;
+        });
+        renderAll();
+        save();
+        return { ok: true, bind: nome, slides: cadeia.length };
+      },
+      info: () => ({
+        frames: frames.map(f => ({
+          id: f.id,
+          nome: f.name,
+          formato: f.format,
+          bgBind: f.bgBind || null
+        })),
+        cadeias: computePosts().map(c => c.length),
+        binds: (() => {
+          const mapa = new Map();
+          frames.forEach(f => {
+            if (f.bgBind) mapa.set(f.bgBind, { nome: f.bgBind, tipo: 'image', fundo: true });
+            (f.children || []).forEach(c => {
+              if (c.bind && !mapa.has(c.bind)) mapa.set(c.bind, { nome: c.bind, tipo: c.type });
+            });
+          });
+          return Array.from(mapa.values());
+        })()
+      })
+    };
 
     initToolbarGrips();
     initTemplatesModalController();
