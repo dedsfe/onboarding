@@ -88,10 +88,17 @@
       <div class="canvas-batch-body-oa">
         <!-- Um cartão por post, com um campo para cada texto e foto do modelo -->
         <div class="canvas-batch-posts" id="canvas-batch-posts"></div>
-        <button type="button" class="canvas-batch-addpost" id="canvas-batch-add-post">
-          <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
-          <span>Adicionar post</span>
-        </button>
+        <div class="canvas-batch-actions">
+          <button type="button" class="canvas-batch-addpost" id="canvas-batch-add-post">
+            <i data-lucide="plus" style="width: 14px; height: 14px;"></i>
+            <span>Adicionar post</span>
+          </button>
+          <button type="button" class="canvas-batch-addpost" id="canvas-batch-import-btn" title="Planilha .csv: cada linha vira um post">
+            <i data-lucide="file-spreadsheet" style="width: 14px; height: 14px;"></i>
+            <span>Importar planilha</span>
+          </button>
+        </div>
+        <input type="file" id="canvas-batch-csv-input" accept=".csv,.tsv,text/csv,text/tab-separated-values" hidden>
         <input type="file" id="canvas-batch-images-input" accept="image/*" multiple hidden>
       </div>
 

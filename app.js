@@ -7617,6 +7617,8 @@
       const closeBtn = document.getElementById('canvas-batch-close');
       const postsWrap = document.getElementById('canvas-batch-posts');
       const addPostBtn = document.getElementById('canvas-batch-add-post');
+      const importBtn = document.getElementById('canvas-batch-import-btn');
+      const csvInput = document.getElementById('canvas-batch-csv-input');
       const imagesInput = document.getElementById('canvas-batch-images-input');
       const countEl = document.getElementById('canvas-batch-count');
       const btnGenCanvas = document.getElementById('canvas-batch-generate-canvas-btn');
@@ -7703,10 +7705,10 @@
         postsWrap.innerHTML = '';
         if (!slots.length) {
           postsWrap.innerHTML = '<div class="canvas-batch-empty">Adicione um texto ou uma foto no post para criar vários de uma vez.</div>';
-          if (addPostBtn) addPostBtn.hidden = true;
+          if (addPostBtn) addPostBtn.parentElement.style.display = 'none';
           return;
         }
-        if (addPostBtn) addPostBtn.hidden = false;
+        if (addPostBtn) addPostBtn.parentElement.style.display = '';
 
         posts.forEach((values, pi) => {
           const card = document.createElement('div');
@@ -7793,21 +7795,92 @@
         if (window.lucide) lucide.createIcons();
       }
 
-      /* Colado do Sheets/Excel: linhas viram posts e colunas (tab) viram os
-         campos de texto seguintes, a partir de onde o cursor está. */
-      function pasteGrid(text, startPost, startSlot) {
+      /* Tabela (colada do Sheets ou de um .csv): cada linha vira um post.
+         Coluna com link de imagem vai para as fotos, na ordem; as outras
+         vão para os textos, a partir do campo onde o cursor está. */
+      const looksLikeImage = v => /^(https?:|data:image\/|blob:)/i.test(v) || /\.(jpe?g|png|webp|gif|avif)(\?.*)?$/i.test(v);
+
+      function fillFromTable(rows, startPost = 0, startSlot = null) {
+        rows = rows.filter(r => r.some(c => c && c.trim()));
+        if (!rows.length) return 0;
+        const width = Math.max(...rows.map(r => r.length));
         const textSlots = slots.map((s, i) => s.kind === 'text' ? i : -1).filter(i => i >= 0);
-        const from = Math.max(0, textSlots.indexOf(startSlot));
-        const rows = text.replace(/\r/g, '').split('\n').filter(r => r.trim());
+        const picSlots = slots.map((s, i) => s.kind !== 'text' ? i : -1).filter(i => i >= 0);
+        const isPicCol = c => {
+          const vals = rows.map(r => (r[c] || '').trim()).filter(Boolean);
+          return vals.length > 0 && vals.every(looksLikeImage);
+        };
+        const targets = [];
+        let t = Math.max(0, textSlots.indexOf(startSlot)), ph = 0;
+        for (let c = 0; c < width; c++) targets.push(isPicCol(c) ? picSlots[ph++] : textSlots[t++]);
+
+        let semArquivo = 0;
         rows.forEach((row, r) => {
           const post = ensurePost(startPost + r);
-          row.split('\t').forEach((cell, c) => {
-            const si = textSlots[from + c];
-            if (si !== undefined) post[si] = cell.trim();
+          row.forEach((cell, c) => {
+            const si = targets[c];
+            const v = (cell || '').trim();
+            if (si === undefined || !v) return;
+            if (slots[si].kind === 'text') post[si] = v;
+            else if (isImageSrcValue(v)) post[si] = v;
+            else semArquivo++; // só o nome do arquivo: não dá para buscar
           });
         });
+        if (semArquivo) toast.info('Algumas fotos vieram só com o nome do arquivo. Arraste as fotos para os cartões.');
         renderPosts();
         updateBatchFooter();
+        inlineRemotePhotos();
+        return rows.length;
+      }
+
+      /* Link de foto vira data URL já na importação: o post gerado não
+         depende do site continuar no ar e o export não esbarra em CORS. */
+      async function inlineRemotePhotos() {
+        const jobs = [];
+        posts.forEach(post => post.forEach((v, si) => {
+          if (slots[si].kind === 'text' || !/^https?:/i.test(v)) return;
+          jobs.push(fetch(v).then(r => r.ok ? r.blob() : null).then(blob => blob && readFileAsDataURL(blob))
+            .then(url => { if (url) post[si] = url; }).catch(() => {}));
+        }));
+        if (!jobs.length) return;
+        await Promise.all(jobs);
+        renderPosts();
+      }
+
+      /* Primeira linha é cabeçalho quando tem nome de coluna conhecido ou
+         quando fica em cima de uma coluna de fotos sem ser foto. */
+      const HEADER_WORDS = /^(t[ií]tulo|subt[ií]tulo|texto|frase|legenda|descri|nome|cta|chamada|foto|imagem|img|url|link|fundo|title|subtitle|text|caption|photo|image|name)/i;
+      function isHeaderRow(rows) {
+        if (rows.length < 2) return false;
+        const [head, ...body] = rows;
+        return head.some((cell, c) => {
+          const v = (cell || '').trim();
+          if (!v || looksLikeImage(v)) return false;
+          if (HEADER_WORDS.test(v)) return true;
+          const below = body.map(r => (r[c] || '').trim()).filter(Boolean);
+          return below.length > 0 && below.every(looksLikeImage);
+        });
+      }
+
+      function pasteGrid(text, startPost, startSlot) {
+        const rows = text.replace(/\r/g, '').split('\n').map(r => r.split('\t'));
+        if (isHeaderRow(rows)) rows.shift();
+        fillFromTable(rows, startPost, startSlot);
+      }
+
+      function importTableFile(file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const parsed = parseTSVOrCSV(ev.target.result, false);
+          const rows = parsed.rows.map(r => parsed.headers.map(h => r[h] || ''));
+          if (isHeaderRow(rows)) rows.shift();
+          // Começa no primeiro cartão vazio, sem apagar o que já foi digitado
+          const start = posts.findIndex(p => !p.some(Boolean));
+          const n = fillFromTable(rows, start < 0 ? posts.length : start);
+          if (n) toast.success(`${n} ${n === 1 ? 'post veio' : 'posts vieram'} da planilha`);
+          else toast.error('Não achei linhas nessa planilha.');
+        };
+        reader.readAsText(file, 'UTF-8');
       }
 
       /* Várias fotos de uma vez vão descendo pelos posts no mesmo campo. */
@@ -7854,6 +7927,14 @@
         if (first >= 0) focusField(posts.length - 1, first);
       });
 
+      if (importBtn && csvInput) {
+        importBtn.addEventListener('click', () => csvInput.click());
+        csvInput.addEventListener('change', () => {
+          if (csvInput.files[0]) importTableFile(csvInput.files[0]);
+          csvInput.value = '';
+        });
+      }
+
       if (imagesInput) imagesInput.addEventListener('change', () => {
         const target = pickTarget;
         pickTarget = null;
@@ -7875,16 +7956,9 @@
         const files = Array.from(e.dataTransfer && e.dataTransfer.files || []);
         if (!files.length) return;
         e.preventDefault();
-        const csv = files.find(f => f.name.toLowerCase().endsWith('.csv') || f.type.includes('csv'));
+        const csv = files.find(f => /\.(csv|tsv)$/i.test(f.name) || f.type.includes('csv'));
         if (csv) {
-          const reader = new FileReader();
-          reader.onload = (ev) => {
-            const parsed = parseTSVOrCSV(ev.target.result, true);
-            const tsv = parsed.rows.map(r => parsed.headers.map(h => r[h] || '').join('\t')).join('\n');
-            const firstText = slots.findIndex(s => s.kind === 'text');
-            if (firstText >= 0) pasteGrid(tsv, 0, firstText);
-          };
-          reader.readAsText(csv, 'UTF-8');
+          importTableFile(csv);
           return;
         }
         const card = e.target.closest && e.target.closest('.canvas-batch-card');

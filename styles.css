@@ -6816,14 +6816,20 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 .canvas-batch-card__del svg { width: 14px; height: 14px; }
 .canvas-batch-card__del:hover { background: rgba(255, 255, 255, 0.08); color: #FFFFFF; }
 
+.canvas-batch-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
 .canvas-batch-addpost {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   width: 100%;
   height: 44px;
-  margin-top: 8px;
   border: 1px dashed rgba(255, 255, 255, 0.18);
   border-radius: 14px;
   background: transparent;
