@@ -4840,8 +4840,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 /* ------------------------------------------------------------
    MODAIS DE LOTE & EXPORTAÇÃO (OA FROSTED DARK GLASS)
    ------------------------------------------------------------ */
-#canvas-batch-modal .openpanel-modal,
-#canvas-export-modal .openpanel-modal {
+#canvas-batch-modal .openpanel-modal {
   background: rgba(18, 18, 22, 0.86);
   backdrop-filter: blur(32px) saturate(190%);
   -webkit-backdrop-filter: blur(32px) saturate(190%);
@@ -4854,10 +4853,6 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   max-width: 780px;
 }
 
-#canvas-export-modal .openpanel-modal {
-  max-width: 480px;
-}
-
 /* Step indicator pill no topo do modal */
 
 /* Step Views */
@@ -4868,29 +4863,25 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 
 /* Passo 3: Cards de Escolha de Saída */
 
-#canvas-batch-modal .openpanel-modal__header,
-#canvas-export-modal .openpanel-modal__header {
+#canvas-batch-modal .openpanel-modal__header {
   padding: 18px 22px 14px 22px;
 }
 
-#canvas-batch-modal .openpanel-modal__title,
-#canvas-export-modal .openpanel-modal__title {
+#canvas-batch-modal .openpanel-modal__title {
   color: #FFFFFF;
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
-#canvas-batch-modal .openpanel-modal__sub,
-#canvas-export-modal .openpanel-modal__sub {
+#canvas-batch-modal .openpanel-modal__sub {
   color: rgba(255, 255, 255, 0.52);
   font-size: 12.5px;
   line-height: 1.4;
   margin-top: 3px;
 }
 
-#canvas-batch-modal .openpanel-close-btn,
-#canvas-export-modal .openpanel-close-btn {
+#canvas-batch-modal .openpanel-close-btn {
   width: 32px;
   height: 32px;
   background: rgba(255, 255, 255, 0.06);
@@ -4904,20 +4895,17 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   cursor: pointer;
 }
 
-#canvas-batch-modal .openpanel-close-btn:hover,
-#canvas-export-modal .openpanel-close-btn:hover {
+#canvas-batch-modal .openpanel-close-btn:hover {
   background: rgba(255, 255, 255, 0.15);
   color: #FFFFFF;
 }
 
-#canvas-batch-modal .openpanel-close-btn:active,
-#canvas-export-modal .openpanel-close-btn:active {
+#canvas-batch-modal .openpanel-close-btn:active {
   transform: scale(0.95);
 }
 
 /* Corpo dos modais */
-#canvas-batch-modal .canvas-batch-body-oa,
-#canvas-export-modal .canvas-batch-body-oa {
+#canvas-batch-modal .canvas-batch-body-oa {
   padding: 0 22px;
   margin-bottom: 6px;
 }
@@ -5027,8 +5015,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 /* ------------------------------------------------------------
    RODAPÉ E BOTÕES DOS MODAIS (UNIFICADO)
    ------------------------------------------------------------ */
-#canvas-batch-modal .openpanel-modal__footer,
-#canvas-export-modal .openpanel-modal__footer {
+#canvas-batch-modal .openpanel-modal__footer {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   padding: 16px 22px 18px 22px;
   display: flex;
@@ -5037,8 +5024,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   gap: 8px;
 }
 
-#canvas-batch-modal .openpanel-btn-secondary,
-#canvas-export-modal .openpanel-btn-secondary {
+#canvas-batch-modal .openpanel-btn-secondary {
   height: 34px;
   border-radius: var(--radius-pill);
   font-size: 12.5px;
@@ -5057,20 +5043,17 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   outline: none;
 }
 
-#canvas-batch-modal .openpanel-btn-secondary:hover,
-#canvas-export-modal .openpanel-btn-secondary:hover {
+#canvas-batch-modal .openpanel-btn-secondary:hover {
   background: rgba(255, 255, 255, 0.14);
   border-color: rgba(255, 255, 255, 0.20);
   color: #FFFFFF;
 }
 
-#canvas-batch-modal .openpanel-btn-secondary:active,
-#canvas-export-modal .openpanel-btn-secondary:active {
+#canvas-batch-modal .openpanel-btn-secondary:active {
   transform: scale(0.96);
 }
 
-#canvas-batch-modal .openpanel-btn-primary,
-#canvas-export-modal .openpanel-btn-primary {
+#canvas-batch-modal .openpanel-btn-primary {
   height: 34px;
   border-radius: var(--radius-pill);
   font-size: 12.5px;
@@ -5090,21 +5073,18 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   outline: none;
 }
 
-#canvas-batch-modal .openpanel-btn-primary:hover:not(:disabled),
-#canvas-export-modal .openpanel-btn-primary:hover:not(:disabled) {
+#canvas-batch-modal .openpanel-btn-primary:hover:not(:disabled) {
   background: #1D4ED8;
   box-shadow: 0 4px 14px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   transform: translateY(-1px);
 }
 
-#canvas-batch-modal .openpanel-btn-primary:active:not(:disabled),
-#canvas-export-modal .openpanel-btn-primary:active:not(:disabled) {
+#canvas-batch-modal .openpanel-btn-primary:active:not(:disabled) {
   transform: scale(0.96);
   background: #1E40AF;
 }
 
-#canvas-batch-modal .openpanel-btn-primary:disabled,
-#canvas-export-modal .openpanel-btn-primary:disabled {
+#canvas-batch-modal .openpanel-btn-primary:disabled {
   opacity: 0.35;
   cursor: not-allowed;
   transform: none;
@@ -5453,179 +5433,6 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   text-transform: none;
 }
 
-.canva-export-input-wrapper {
-  position: relative;
-  width: 100%;
-}
-
-.canva-export-input {
-  width: 100%;
-  height: 38px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 0 14px;
-  font-size: 13px;
-  font-family: inherit;
-  color: #FFFFFF;
-  outline: none;
-  transition: all 140ms ease;
-  box-sizing: border-box;
-}
-
-.canva-export-input:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.18);
-}
-
-.canva-export-input:focus {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
-}
-
-.canva-export-format-wrapper {
-  position: relative;
-  width: 100%;
-}
-
-.canva-export-format-trigger {
-  width: 100%;
-  height: 40px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  padding: 0 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  cursor: pointer;
-  user-select: none;
-  transition: all 140ms ease;
-  box-sizing: border-box;
-}
-
-.canva-export-format-trigger:hover {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(255, 255, 255, 0.18);
-}
-
-.canva-export-format-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.canva-format-icon {
-  width: 16px;
-  height: 16px;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.canva-format-name {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #FFFFFF;
-  letter-spacing: -0.01em;
-}
-
-.canva-format-tag {
-  background: #2563EB;
-  color: #FFFFFF;
-  font-size: 10.5px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill, 9999px);
-  letter-spacing: 0.01em;
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35);
-}
-
-.canva-format-tag--subtle {
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.85);
-  box-shadow: none;
-}
-
-.canva-chevron {
-  width: 15px;
-  height: 15px;
-  color: rgba(255, 255, 255, 0.5);
-  transition: transform 140ms ease;
-}
-
-.canva-export-format-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  background: #1C1D21;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 12px;
-  padding: 6px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.65);
-  z-index: 100;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.canva-format-option {
-  padding: 9px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 120ms ease;
-}
-
-.canva-format-option:hover {
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.canva-format-option.is-selected {
-  background: rgba(37, 99, 235, 0.16);
-  border: 1px solid rgba(37, 99, 235, 0.35);
-}
-
-.canva-format-option-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 2px;
-}
-
-.canva-format-option-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.canva-format-option-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: #FFFFFF;
-}
-
-.canva-format-option-desc {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.5);
-  line-height: 1.35;
-}
-
-.canva-export-hidden-select {
-  display: none !important;
-}
-
-.canva-export-slider-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.canva-slider-container {
-  flex: 1;
-  display: flex;
-  align-items: center;
-}
-
 .canva-range-slider {
   -webkit-appearance: none;
   appearance: none;
@@ -5663,22 +5470,6 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   border: none;
   cursor: pointer;
   transition: transform 120ms ease;
-}
-
-.canva-scale-badge {
-  width: 36px;
-  height: 36px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #FFFFFF;
-  font-variant-numeric: tabular-nums;
-  flex-shrink: 0;
 }
 
 /* Muitas opções: quebram em grade de 3 colunas em vez de espremer numa linha */
@@ -5726,73 +5517,6 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   color: #FFFFFF;
   font-weight: 600;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22);
-}
-
-.canva-custom-pages-list {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 8px 12px;
-  max-height: 130px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.canva-custom-page-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12.5px;
-  color: rgba(255, 255, 255, 0.85);
-  cursor: pointer;
-  user-select: none;
-}
-
-.canva-custom-page-item input[type="checkbox"] {
-  accent-color: #2563EB;
-  width: 15px;
-  height: 15px;
-  cursor: pointer;
-}
-
-.canva-batch-progress-box {
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.canva-batch-progress-header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.7);
-}
-
-.canva-batch-progress-pct {
-  font-weight: 600;
-  color: #60A5FA;
-}
-
-.canva-batch-progress-track {
-  width: 100%;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-pill, 9999px);
-  overflow: hidden;
-}
-
-.canva-batch-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #2563EB, #60A5FA);
-  border-radius: var(--radius-pill, 9999px);
-  transition: width 180ms ease;
 }
 
 .canva-export-submit-btn {
@@ -6860,3 +6584,211 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   color: rgba(255, 255, 255, 0.7);
   font-variant-numeric: tabular-nums;
 }
+
+/* ------------------------------------------------------------
+   BAIXAR: painel colado no Exportar
+   Miniaturas dos posts (Canva) + chips de escala e formato (Figma)
+   ------------------------------------------------------------ */
+.canvas-dropdown-card.xp {
+  left: auto;
+  right: 0;
+  width: 340px;
+  min-width: 0;
+  gap: 12px;
+  padding: 14px;
+  transform-origin: top right;
+}
+
+.xp-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.xp-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  font-variant-numeric: tabular-nums;
+}
+
+.xp-link {
+  padding: 2px 4px;
+  border: none;
+  background: none;
+  color: #60A5FA;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.xp-link:hover { color: #93C5FD; }
+
+.xp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  max-height: 232px;
+  overflow-y: auto;
+  padding: 2px;
+  margin: -2px;
+  scrollbar-width: thin;
+}
+
+.xp-grid.is-single {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
+.xp-grid.is-single .xp-thumb { width: 120px; }
+
+.xp-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: var(--ratio, 4 / 5);
+  max-height: 120px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  opacity: 0.45;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  transition: opacity 140ms ease, box-shadow 140ms ease, transform 100ms ease;
+}
+
+.xp-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.xp-thumb img:not([src]) { visibility: hidden; }
+.xp-thumb:hover { opacity: 0.75; }
+.xp-thumb:active { transform: scale(0.96); }
+
+.xp-thumb.is-picked {
+  opacity: 1;
+  box-shadow: 0 0 0 2px #2563EB;
+}
+
+.xp-thumb__check {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.7);
+  color: transparent;
+}
+
+.xp-thumb__check svg { width: 11px; height: 11px; stroke-width: 3; }
+
+.xp-thumb.is-picked .xp-thumb__check {
+  background: #2563EB;
+  box-shadow: none;
+  color: #FFFFFF;
+}
+
+/* Quantas imagens esse post vira (carrossel / faixa) */
+.xp-thumb__count {
+  position: absolute;
+  left: 5px;
+  bottom: 5px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #FFFFFF;
+  font-size: 10.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.xp-row {
+  display: flex;
+  gap: 8px;
+}
+
+.xp-seg {
+  display: flex;
+  padding: 2px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.xp-seg:first-child { flex: 1; }
+
+.xp-seg button {
+  flex: 1;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.xp-seg button:hover { color: #FFFFFF; }
+
+.xp-seg button.is-active {
+  background: rgba(255, 255, 255, 0.14);
+  color: #FFFFFF;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.xp-meta {
+  margin-top: -4px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.xp-meta strong {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.xp-go {
+  position: relative;
+  height: 40px;
+  border: none;
+  border-radius: 11px;
+  overflow: hidden;
+  background: #2563EB;
+  color: #FFFFFF;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: background 120ms ease;
+}
+
+.xp-go:hover:not(:disabled) { background: #1D4ED8; }
+.xp-go:disabled { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.4); box-shadow: none; cursor: default; }
+
+/* O próprio botão vira a barra de progresso */
+.xp-go__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  background: rgba(255, 255, 255, 0.18);
+  transition: width 200ms ease;
+}
+
+.xp-go__label { position: relative; }

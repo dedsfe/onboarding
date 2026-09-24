@@ -363,131 +363,6 @@
   </div>
 
 
-  <div class="modal-overlay" id="canvas-export-modal">
-    <div class="openpanel-modal canva-export-modal-card">
-      <!-- Header Estilo Canva -->
-      <div class="canva-export-header">
-        <div class="canva-export-header__left" id="canvas-export-back-btn">
-          <i data-lucide="chevron-left" class="canva-header-icon"></i>
-          <h2 class="canva-export-header__title">Baixar</h2>
-        </div>
-        <button type="button" class="canva-export-close-btn" id="canvas-export-close" title="Fechar (Esc)">
-          <i data-lucide="x" style="width: 15px; height: 15px;"></i>
-        </button>
-      </div>
-
-      <div class="canva-export-body">
-        <!-- 1. Nome do Arquivo -->
-        <div class="canva-export-section">
-          <label class="canva-export-label">Nome do arquivo</label>
-          <div class="canva-export-input-wrapper">
-            <input type="text" class="canva-export-input" id="canvas-export-filename" placeholder="Ex: Parte 01" spellcheck="false" autocomplete="off">
-          </div>
-        </div>
-
-        <!-- 2. Formato de Arquivo -->
-        <div class="canva-export-section">
-          <label class="canva-export-label">Formato de arquivo</label>
-          <div class="canva-export-format-wrapper">
-            <div class="canva-export-format-trigger" id="canvas-export-format-trigger" tabindex="0">
-              <div class="canva-export-format-left">
-                <i data-lucide="image" class="canva-format-icon" id="canvas-format-icon-display"></i>
-                <span class="canva-format-name" id="canvas-format-name-display">PNG</span>
-                <span class="canva-format-tag" id="canvas-format-tag-display">Sugestões</span>
-              </div>
-              <i data-lucide="chevron-down" class="canva-chevron" id="canvas-format-chevron"></i>
-            </div>
-            
-            <div class="canva-export-format-dropdown" id="canvas-export-format-dropdown" style="display: none;">
-              <div class="canva-format-option is-selected" data-value="png">
-                <div class="canva-format-option-header">
-                  <div class="canva-format-option-title-wrap">
-                    <i data-lucide="image" style="width: 16px; height: 16px; color: #60A5FA;"></i>
-                    <span class="canva-format-option-title">PNG</span>
-                  </div>
-                  <span class="canva-format-tag">Sugestões</span>
-                </div>
-                <div class="canva-format-option-desc">Alta fidelidade sem perdas · Imagens e ilustrações</div>
-              </div>
-              <div class="canva-format-option" data-value="jpeg">
-                <div class="canva-format-option-header">
-                  <div class="canva-format-option-title-wrap">
-                    <i data-lucide="file-image" style="width: 16px; height: 16px; color: #F59E0B;"></i>
-                    <span class="canva-format-option-title">JPG</span>
-                  </div>
-                  <span class="canva-format-tag canva-format-tag--subtle">Compacto</span>
-                </div>
-                <div class="canva-format-option-desc">Tamanho compacto · Ideal para web e redes sociais</div>
-              </div>
-            </div>
-
-            <!-- Select nativo invisível/sincronizado para manter total compatibilidade -->
-            <select class="canva-export-hidden-select" id="canvas-export-format">
-              <option value="png" selected>PNG · Sugestões</option>
-              <option value="jpeg">JPG · Compacto</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- 3. Tamanho / Resolução -->
-        <div class="canva-export-section">
-          <div class="canva-export-label-row">
-            <span class="canva-export-label">Tamanho</span>
-            <span class="canva-export-dim-meta" id="canvas-export-dim-preview">· 2.160 px × 2.700 px</span>
-          </div>
-          <div class="canva-export-slider-row">
-            <div class="canva-slider-container">
-              <input type="range" class="canva-range-slider" id="canvas-export-scale-slider" min="1" max="4" step="1" value="2">
-            </div>
-            <div class="canva-scale-badge" id="canvas-export-scale-badge">2</div>
-            <!-- Select oculto sincronizado -->
-            <select class="canva-export-hidden-select" id="canvas-export-scale">
-              <option value="1">1x</option>
-              <option value="2" selected>2x</option>
-              <option value="3">3x</option>
-              <option value="4">4x</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- 4. Selecionar Páginas / Posts -->
-        <div class="canva-export-section">
-          <label class="canva-export-label">Selecionar páginas</label>
-          <div class="canva-export-segmented" id="canvas-export-segmented-scope">
-            <button type="button" class="canva-seg-btn" data-scope="all">Tudo</button>
-            <button type="button" class="canva-seg-btn is-active" data-scope="current" id="canvas-seg-current-btn">Esta página (1)</button>
-            <button type="button" class="canva-seg-btn" data-scope="custom">Personalizado</button>
-          </div>
-          <!-- Lista de páginas para modo personalizado -->
-          <div class="canva-custom-pages-list" id="canvas-custom-pages-list" style="display: none;"></div>
-          <!-- Select oculto sincronizado -->
-          <select class="canva-export-hidden-select" id="canvas-export-scope">
-            <option value="current" selected>current</option>
-            <option value="all">all</option>
-            <option value="custom">custom</option>
-          </select>
-        </div>
-
-        <!-- Progresso de Download -->
-        <div class="canva-batch-progress-box" id="canvas-export-progress" style="display: none;">
-          <div class="canva-batch-progress-header">
-            <span id="canvas-export-progress-text">Exportando imagem...</span>
-            <span class="canva-batch-progress-pct" id="canvas-export-progress-pct">0%</span>
-          </div>
-          <div class="canva-batch-progress-track">
-            <div class="canva-batch-progress-fill" id="canvas-export-progress-fill" style="width: 0%;"></div>
-          </div>
-        </div>
-
-        <!-- 5. Botão de Ação Principal (Baixar) -->
-        <button type="button" class="canva-export-submit-btn" id="canvas-export-submit-btn">
-          <i data-lucide="download" style="width: 16px; height: 16px;"></i>
-          <span id="canvas-export-submit-label">Baixar</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
   <!-- --------------------------------------------------
        MODAL DE CRIAÇÃO: CARROSSEL PANORÂMICO
        -------------------------------------------------- -->
@@ -708,10 +583,44 @@
           <span class="canvas-topbar__btn-label">Salvar</span>
         </button>
 
-        <button class="canvas-topbar__btn canvas-topbar__btn--primary" id="canvas-export-btn" title="Exportar Post / Carrossel (PNG, JPG, 4K)">
-          <i data-lucide="download" style="width: 15px; height: 15px;"></i>
-          <span class="canvas-topbar__btn-label">Exportar</span>
-        </button>
+        <div class="canvas-topbar__item-wrap">
+          <button class="canvas-topbar__btn canvas-topbar__btn--primary" id="canvas-export-btn" title="Baixar posts (PNG ou JPG)">
+            <i data-lucide="download" style="width: 15px; height: 15px;"></i>
+            <span class="canvas-topbar__btn-label">Exportar</span>
+          </button>
+
+          <!-- Baixar: miniaturas para escolher (Canva) + escala e formato em chips (Figma) -->
+          <div class="canvas-dropdown-card xp" id="canvas-export-pop">
+            <div class="xp-head">
+              <span class="xp-title" id="canvas-export-title">Baixar</span>
+              <button type="button" class="xp-link" id="canvas-export-all">Selecionar tudo</button>
+            </div>
+            <div class="xp-grid" id="canvas-export-grid"></div>
+
+            <div class="xp-row">
+              <div class="xp-seg" id="canvas-export-scale-seg" role="radiogroup" aria-label="Tamanho">
+                <button type="button" data-scale="1">1x</button>
+                <button type="button" data-scale="2">2x</button>
+                <button type="button" data-scale="3">3x</button>
+                <button type="button" data-scale="4">4x</button>
+              </div>
+              <div class="xp-seg" id="canvas-export-format-seg" role="radiogroup" aria-label="Formato">
+                <button type="button" data-format="png">PNG</button>
+                <button type="button" data-format="jpeg">JPG</button>
+              </div>
+            </div>
+            <div class="xp-meta" id="canvas-export-meta"></div>
+
+            <button type="button" class="xp-go" id="canvas-export-submit-btn">
+              <span class="xp-go__fill" id="canvas-export-progress-fill"></span>
+              <span class="xp-go__label" id="canvas-export-submit-label">Baixar</span>
+            </button>
+
+            <!-- Valores lidos também pelo lote (mesma escala e formato) -->
+            <input type="hidden" id="canvas-export-scale-slider" value="1">
+            <input type="hidden" id="canvas-export-format" value="png">
+          </div>
+        </div>
 
         <!-- Hidden legacy bridges & inputs -->
         <input type="file" id="canvas-image-upload" accept="image/*" style="display: none">

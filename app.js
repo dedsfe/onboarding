@@ -10576,311 +10576,249 @@
       window.openIconLibrary = openLibrary;
     }
 
+    /* --------------------------------------------------
+       BAIXAR (Exportar)
+       Painel colado no botão. Cada post (frame solto ou carrossel ligado)
+       vira uma miniatura para marcar. Escolhas inteligentes:
+       - já vem marcado o que está selecionado no canvas (ou tudo);
+       - escala e formato lembram a última escolha; na primeira vez o
+         formato segue o conteúdo (foto → JPG, só texto/cor → PNG);
+       - o nome do arquivo sai do texto principal do post;
+       - 1 imagem baixa direto, mais de uma vira .zip com pasta por carrossel.
+       -------------------------------------------------- */
     function initCanvaExportController() {
       const exportBtn = document.getElementById('canvas-export-btn');
-      const modal = document.getElementById('canvas-export-modal');
-      const closeBtn = document.getElementById('canvas-export-close');
-      const backBtn = document.getElementById('canvas-export-back-btn');
+      const pop = document.getElementById('canvas-export-pop');
+      const grid = document.getElementById('canvas-export-grid');
+      const titleEl = document.getElementById('canvas-export-title');
+      const allBtn = document.getElementById('canvas-export-all');
+      const scaleSeg = document.getElementById('canvas-export-scale-seg');
+      const formatSeg = document.getElementById('canvas-export-format-seg');
+      const metaEl = document.getElementById('canvas-export-meta');
       const submitBtn = document.getElementById('canvas-export-submit-btn');
-      const filenameInput = document.getElementById('canvas-export-filename');
-      const formatSelect = document.getElementById('canvas-export-format');
-      const scaleSelect = document.getElementById('canvas-export-scale');
-      const scopeSelect = document.getElementById('canvas-export-scope');
-      const progressBox = document.getElementById('canvas-export-progress');
-      const progressText = document.getElementById('canvas-export-progress-text');
-      const progressPct = document.getElementById('canvas-export-progress-pct');
-      const progressFill = document.getElementById('canvas-export-progress-fill');
+      const submitLabel = document.getElementById('canvas-export-submit-label');
+      const fill = document.getElementById('canvas-export-progress-fill');
+      const scaleInput = document.getElementById('canvas-export-scale-slider');
+      const formatInput = document.getElementById('canvas-export-format');
+      if (!exportBtn || !pop) return;
 
-      // Novos controles visuais Canva
-      const formatTrigger = document.getElementById('canvas-export-format-trigger');
-      const formatDropdown = document.getElementById('canvas-export-format-dropdown');
-      const formatNameDisplay = document.getElementById('canvas-format-name-display');
-      const formatTagDisplay = document.getElementById('canvas-format-tag-display');
-      const formatIconDisplay = document.getElementById('canvas-format-icon-display');
-      const formatChevron = document.getElementById('canvas-format-chevron');
-      const scaleSlider = document.getElementById('canvas-export-scale-slider');
-      const scaleBadge = document.getElementById('canvas-export-scale-badge');
-      const dimPreview = document.getElementById('canvas-export-dim-preview');
-      const segmentedScope = document.getElementById('canvas-export-segmented-scope');
-      const segCurrentBtn = document.getElementById('canvas-seg-current-btn');
-      const customPagesList = document.getElementById('canvas-custom-pages-list');
+      const PREFS_KEY = 'tcm_export_prefs';
+      let prefs = {};
+      try { prefs = JSON.parse(localStorage.getItem(PREFS_KEY)) || {}; } catch (e) {}
+      let items = [];          // [{ frames: [frame], key }]
+      let picked = new Set();  // keys marcadas
+      let busy = false;
 
-      if (!exportBtn || !modal) return;
+      const byId = () => new Map(frames.map(f => [f.id, f]));
+      const imagesOf = item => item.frames.reduce((n, f) => n + Math.max(1, panoramicSliceCount(f)), 0);
+      const pickedItems = () => items.filter(it => picked.has(it.key));
+      const hasPhoto = f => hasFrameBg(f) || (f.children || []).some(c => c.type === 'image');
 
-      function updateDimensionDisplay(scaleVal) {
-        const scale = Number(scaleVal || scaleSlider?.value || 2);
-        const currFrame = selectedFrame() || frames[0];
-        const baseW = currFrame ? currFrame.w : 1080;
-        const baseH = currFrame ? currFrame.h : 1350;
-        const wScaled = (baseW * scale).toLocaleString('pt-BR');
-        const hScaled = (baseH * scale).toLocaleString('pt-BR');
-        if (dimPreview) dimPreview.textContent = `· ${wScaled} px × ${hScaled} px`;
-        if (scaleBadge) scaleBadge.textContent = scale;
-        if (scaleSlider) {
-          const min = Number(scaleSlider.min) || 1;
-          const max = Number(scaleSlider.max) || 4;
-          const pct = ((scale - min) / (max - min)) * 100;
-          scaleSlider.style.background = `linear-gradient(to right, #2563EB 0%, #2563EB ${pct}%, rgba(255, 255, 255, 0.12) ${pct}%, rgba(255, 255, 255, 0.12) 100%)`;
+      // Nome do post = seu maior texto; sem texto, o nome do frame
+      function itemName(item, index) {
+        const texts = item.frames.flatMap(f => (f.children || []).filter(c => c.type === 'text' && (c.text || '').trim()));
+        texts.sort((a, b) => (b.fontSize || 0) - (a.fontSize || 0));
+        const slug = texts.length ? slugifyBind(texts[0].text).replace(/_/g, '-').slice(0, 40) : '';
+        return `${String(index + 1).padStart(2, '0')}-${slug || sanitizeFilename(item.frames[0].name) || 'post'}`;
+      }
+
+      function savePrefs() {
+        try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) {}
+      }
+
+      function scale() { return Number(scaleInput.value) || 1; }
+      function format() { return formatInput.value === 'jpeg' ? 'jpeg' : 'png'; }
+
+      function setScale(v, remember) {
+        scaleInput.value = v;
+        if (remember) { prefs.scale = v; savePrefs(); }
+        refresh();
+      }
+      function setFormat(v, remember) {
+        formatInput.value = v;
+        if (remember) { prefs.format = v; savePrefs(); }
+        refresh();
+      }
+
+      function refresh() {
+        scaleSeg.querySelectorAll('button').forEach(b => b.classList.toggle('is-active', Number(b.dataset.scale) === scale()));
+        formatSeg.querySelectorAll('button').forEach(b => b.classList.toggle('is-active', b.dataset.format === format()));
+        grid.querySelectorAll('.xp-thumb').forEach(el => el.classList.toggle('is-picked', picked.has(el.dataset.key)));
+
+        const sel = pickedItems();
+        const imgs = sel.reduce((n, it) => n + imagesOf(it), 0);
+        const all = sel.length === items.length;
+        titleEl.textContent = items.length > 1 ? `Baixar · ${sel.length} de ${items.length}` : 'Baixar';
+        allBtn.textContent = all ? 'Limpar' : 'Selecionar tudo';
+        allBtn.hidden = items.length < 2;
+
+        const ref = (sel[0] || items[0] || { frames: [] }).frames[0];
+        const dims = ref ? `${(ref.w * scale()).toLocaleString('pt-BR')} × ${(ref.h * scale()).toLocaleString('pt-BR')} px` : '';
+        const scaleHint = scale() === 1 ? 'tamanho exato para postar' : 'mais nítido, a rede reduz ao publicar';
+        const fmtHint = format() === 'jpeg' ? 'JPG: arquivo leve, ótimo para foto' : 'PNG: nítido para texto e cor chapada';
+        metaEl.innerHTML = `<strong>${dims}</strong> · ${scaleHint}<br>${fmtHint}`;
+
+        submitBtn.disabled = busy || imgs === 0;
+        if (!busy) {
+          submitLabel.textContent = imgs === 0 ? 'Marque um post'
+            : imgs === 1 ? 'Baixar imagem'
+            : `Baixar ${imgs} imagens (.zip)`;
         }
       }
 
-      function updateFormatDisplay(val) {
-        const isPng = val === 'png';
-        if (formatNameDisplay) formatNameDisplay.textContent = isPng ? 'PNG' : 'JPG';
-        if (formatTagDisplay) {
-          formatTagDisplay.textContent = isPng ? 'Sugestões' : 'Compacto';
-          formatTagDisplay.className = isPng ? 'canva-format-tag' : 'canva-format-tag canva-format-tag--subtle';
-        }
-        if (formatIconDisplay) {
-          formatIconDisplay.setAttribute('data-lucide', isPng ? 'image' : 'file-image');
-        }
-        if (formatDropdown) {
-          formatDropdown.querySelectorAll('.canva-format-option').forEach(opt => {
-            opt.classList.toggle('is-selected', opt.dataset.value === val);
+      async function drawThumb(item, img) {
+        try {
+          const f = item.frames[0];
+          const canvas = await window.renderFrameToCanvas(f, { scale: Math.min(1, 220 / Math.max(f.w, f.h)), format: 'jpeg' });
+          img.src = canvas.toDataURL('image/jpeg', 0.8);
+        } catch (e) {}
+      }
+
+      function buildItems() {
+        const map = byId();
+        items = computePosts()
+          .map(chain => ({ frames: chain.map(id => map.get(id)).filter(Boolean) }))
+          .filter(it => it.frames.length)
+          .sort((a, b) => a.frames[0].y - b.frames[0].y || a.frames[0].x - b.frames[0].x)
+          .map(it => ({ ...it, key: String(it.frames[0].id) }));
+
+        // Selecionado no canvas manda; sem seleção, vai tudo
+        const selIds = new Set([...selectedFrameIds, selectedId].filter(v => v != null));
+        const fromSel = items.filter(it => it.frames.some(f => selIds.has(f.id)));
+        picked = new Set((fromSel.length ? fromSel : items).map(it => it.key));
+
+        grid.innerHTML = '';
+        grid.classList.toggle('is-single', items.length === 1);
+        items.forEach(item => {
+          const f = item.frames[0];
+          const el = document.createElement('button');
+          el.type = 'button';
+          el.className = 'xp-thumb';
+          el.dataset.key = item.key;
+          el.style.setProperty('--ratio', `${f.w} / ${f.h}`);
+          el.title = item.frames.length > 1 ? `${f.name || 'Carrossel'} · ${item.frames.length} slides` : (f.name || 'Post');
+          const img = document.createElement('img');
+          img.alt = '';
+          el.appendChild(img);
+          const n = imagesOf(item);
+          if (n > 1) el.insertAdjacentHTML('beforeend', `<span class="xp-thumb__count">${n}</span>`);
+          el.insertAdjacentHTML('beforeend', '<span class="xp-thumb__check"><i data-lucide="check"></i></span>');
+          el.addEventListener('click', (e) => {
+            // ⌘/Ctrl + clique: baixa só este
+            if (e.metaKey || e.ctrlKey) picked = new Set([item.key]);
+            else if (picked.has(item.key)) picked.delete(item.key);
+            else picked.add(item.key);
+            refresh();
           });
-        }
-        if (window.lucide) lucide.createIcons({ root: formatTrigger });
+          grid.appendChild(el);
+          drawThumb(item, img);
+        });
+        if (window.lucide) lucide.createIcons({ root: grid });
       }
 
-      function populateCustomPagesList() {
-        if (!customPagesList) return;
-        const currFrame = selectedFrame() || frames[0];
-        customPagesList.innerHTML = frames.map((f, i) => `
-          <label class="canva-custom-page-item">
-            <input type="checkbox" class="canva-custom-page-chk" value="${f.id}" ${f.id === currFrame?.id || frames.length === 1 ? 'checked' : ''}>
-            <span>${escapeHtml(formatFrameDisplayName ? formatFrameDisplayName(f) : (f.name || `Post ${i + 1}`))}</span>
-          </label>
-        `).join('');
+      function openExport() {
+        if (!frames.length) { toast.info('Crie um post antes de baixar.'); return; }
+        closeAllDropdowns();
+        buildItems();
+        // Primeira vez: formato pelo conteúdo; depois, a última escolha
+        const photos = pickedItems().some(it => it.frames.some(hasPhoto));
+        scaleInput.value = prefs.scale || 1;
+        formatInput.value = prefs.format || (photos ? 'jpeg' : 'png');
+        refresh();
+        pop.classList.add('is-open');
+        exportBtn.classList.add('active');
       }
 
-      function openExportModal() {
-        document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
-        modal.classList.add('open');
-        const currFrame = selectedFrame() || frames[0];
-        const currIdx = currFrame ? frames.indexOf(currFrame) : 0;
-        
-        if (segCurrentBtn) {
-          segCurrentBtn.textContent = `Esta página (${currIdx !== -1 ? currIdx + 1 : 1})`;
-        }
-
-        populateCustomPagesList();
-
-        if (filenameInput && currFrame) {
-          const currentScope = scopeSelect ? scopeSelect.value : 'current';
-          if (currentScope === 'all' && frames.length > 1) {
-            filenameInput.value = 'Carrossel';
-            filenameInput.placeholder = 'Carrossel';
-          } else {
-            const defaultName = currFrame.name || `Post ${currIdx !== -1 ? currIdx + 1 : currFrame.id}`;
-            filenameInput.value = defaultName;
-            filenameInput.placeholder = defaultName;
-          }
-        }
-
-        const currentScale = scaleSlider ? Number(scaleSlider.value) : 2;
-        updateDimensionDisplay(currentScale);
-        updateFormatDisplay(formatSelect ? formatSelect.value : 'png');
-
-        if (window.lucide) lucide.createIcons();
+      function closeExport() {
+        if (busy) return;
+        pop.classList.remove('is-open');
+        exportBtn.classList.remove('active');
       }
 
-      exportBtn.addEventListener('click', () => {
-        if (modal.classList.contains('open')) {
-          closeExportModal();
-        } else {
-          openExportModal();
-        }
+      exportBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (pop.classList.contains('is-open')) closeExport();
+        else openExport();
       });
-
-      function closeExportModal() {
-        modal.classList.remove('open');
-        if (formatDropdown) formatDropdown.style.display = 'none';
-        if (progressBox) progressBox.style.display = 'none';
-      }
-
-      if (closeBtn) closeBtn.addEventListener('click', closeExportModal);
-      if (backBtn) backBtn.addEventListener('click', closeExportModal);
-
-      modal.addEventListener('click', (e) => {
-        if (e.target === modal) closeExportModal();
-      });
-
+      pop.addEventListener('click', e => e.stopPropagation());
+      document.addEventListener('click', closeExport);
       window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modal.classList.contains('open')) {
-          closeExportModal();
-        }
+        if (!pop.classList.contains('is-open')) return;
+        if (e.key === 'Escape') closeExport();
+        else if (e.key === 'Enter' && !submitBtn.disabled) { e.preventDefault(); submitBtn.click(); }
+        else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'a') {
+          e.preventDefault();
+          picked = new Set(items.map(it => it.key));
+          refresh();
+        } else return;
+        e.stopPropagation();
+      }, true);
+
+      allBtn.addEventListener('click', () => {
+        picked = picked.size === items.length ? new Set() : new Set(items.map(it => it.key));
+        refresh();
       });
+      scaleSeg.addEventListener('click', e => { const b = e.target.closest('[data-scale]'); if (b) setScale(Number(b.dataset.scale), true); });
+      formatSeg.addEventListener('click', e => { const b = e.target.closest('[data-format]'); if (b) setFormat(b.dataset.format, true); });
 
-      // Format Trigger & Dropdown Handlers
-      if (formatTrigger && formatDropdown) {
-        formatTrigger.addEventListener('click', (e) => {
-          e.stopPropagation();
-          const isOpen = formatDropdown.style.display === 'flex';
-          formatDropdown.style.display = isOpen ? 'none' : 'flex';
-          if (formatChevron) {
-            formatChevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+      const saveBlob = (blob, filename) => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      };
+
+      submitBtn.addEventListener('click', async () => {
+        const sel = pickedItems();
+        const total = sel.reduce((n, it) => n + imagesOf(it), 0);
+        if (!total || busy) return;
+        if (total > 1 && !window.JSZip) { toast.info('Carregando o gerador de .zip, tente de novo em um instante.'); return; }
+
+        busy = true;
+        submitBtn.disabled = true;
+        const ext = format() === 'jpeg' ? 'jpg' : 'png';
+        const files = [];
+        let done = 0;
+        try {
+          for (const item of sel) {
+            const name = itemName(item, items.indexOf(item));
+            const slides = [];
+            for (const f of item.frames) {
+              slides.push(...await window.exportFrameToBlobs(f, { scale: scale(), format: format() }));
+              done += Math.max(1, panoramicSliceCount(f));
+              const pct = Math.round((done / total) * 100);
+              fill.style.width = `${pct}%`;
+              submitLabel.textContent = `Gerando ${done} de ${total}…`;
+            }
+            // Carrossel vai numa pasta com os slides em ordem
+            if (slides.length > 1) slides.forEach((blob, i) => files.push({ blob, name: `${name}/${String(i + 1).padStart(2, '0')}.${ext}` }));
+            else files.push({ blob: slides[0], name: `${name}.${ext}` });
           }
-        });
 
-        formatDropdown.querySelectorAll('.canva-format-option').forEach(opt => {
-          opt.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const val = opt.dataset.value;
-            if (formatSelect) formatSelect.value = val;
-            updateFormatDisplay(val);
-            formatDropdown.style.display = 'none';
-            if (formatChevron) formatChevron.style.transform = 'rotate(0deg)';
-          });
-        });
-
-        document.addEventListener('click', (e) => {
-          if (formatDropdown && !formatTrigger.contains(e.target) && !formatDropdown.contains(e.target)) {
-            formatDropdown.style.display = 'none';
-            if (formatChevron) formatChevron.style.transform = 'rotate(0deg)';
-          }
-        });
-      }
-
-      // Slider Scale Handlers
-      if (scaleSlider) {
-        scaleSlider.addEventListener('input', () => {
-          const val = Number(scaleSlider.value);
-          if (scaleSelect) scaleSelect.value = val;
-          updateDimensionDisplay(val);
-        });
-      }
-
-      // Segmented Scope Handlers
-      if (segmentedScope) {
-        segmentedScope.querySelectorAll('.canva-seg-btn').forEach(btn => {
-          btn.addEventListener('click', () => {
-            segmentedScope.querySelectorAll('.canva-seg-btn').forEach(b => b.classList.remove('is-active'));
-            btn.classList.add('is-active');
-            const scope = btn.dataset.scope;
-            if (scopeSelect) scopeSelect.value = scope;
-
-            if (customPagesList) {
-              customPagesList.style.display = scope === 'custom' ? 'flex' : 'none';
-            }
-
-            if (filenameInput) {
-              if (scope === 'all') {
-                if (!filenameInput.value || filenameInput.value.startsWith('Post')) {
-                  filenameInput.value = 'Carrossel';
-                  filenameInput.placeholder = 'Carrossel';
-                }
-              } else {
-                const currFrame = selectedFrame() || frames[0];
-                if (currFrame) {
-                  const defaultName = currFrame.name || `Post ${frames.indexOf(currFrame) !== -1 ? frames.indexOf(currFrame) + 1 : currFrame.id}`;
-                  filenameInput.value = defaultName;
-                  filenameInput.placeholder = defaultName;
-                }
-              }
-            }
-          });
-        });
-      }
-
-      // Submit Download Handler
-      if (submitBtn) {
-        submitBtn.addEventListener('click', async () => {
-          if (!window.exportFrameToBlob) return;
-
-          const userFilename = filenameInput ? filenameInput.value.trim() : '';
-          const format = formatSelect ? formatSelect.value : 'png';
-          const scale = Number(scaleSlider ? scaleSlider.value : (scaleSelect ? scaleSelect.value : 2));
-          const scope = scopeSelect ? scopeSelect.value : 'current';
-          const ext = format === 'jpeg' ? 'jpg' : 'png';
-
-          submitBtn.disabled = true;
-          if (progressBox) progressBox.style.display = 'flex';
-
-          let framesToExport = [];
-          if (scope === 'all') {
-            framesToExport = [...frames];
-          } else if (scope === 'custom') {
-            const checkedIds = customPagesList
-              ? Array.from(customPagesList.querySelectorAll('.canva-custom-page-chk:checked')).map(chk => Number(chk.value))
-              : [];
-            framesToExport = frames.filter(f => checkedIds.includes(f.id));
-            if (framesToExport.length === 0) {
-              toast.error('Selecione pelo menos um post para baixar');
-              submitBtn.disabled = false;
-              if (progressBox) progressBox.style.display = 'none';
-              return;
-            }
+          if (files.length === 1) {
+            saveBlob(files[0].blob, files[0].name);
           } else {
-            const f = selectedFrame() || frames[0];
-            if (f) framesToExport = [f];
-          }
-
-          if (framesToExport.length === 0) {
-            toast.error('Nenhum post disponível para baixar');
-            submitBtn.disabled = false;
-            if (progressBox) progressBox.style.display = 'none';
-            return;
-          }
-
-          /* Cada frame vira um arquivo — menos a faixa panorâmica, que vira
-             um arquivo por post. Só depois de montar a lista é que se decide
-             entre download direto e .zip. */
-          const files = [];
-          for (let i = 0; i < framesToExport.length; i++) {
-            const f = framesToExport[i];
-            const pct = Math.round(((i + 1) / framesToExport.length) * 100);
-            if (progressText) {
-              progressText.textContent = framesToExport.length > 1
-                ? `Gerando ${i + 1} de ${framesToExport.length}...`
-                : 'Gerando imagem em alta resolução...';
-            }
-            if (progressPct) progressPct.textContent = `${pct}%`;
-            if (progressFill) progressFill.style.width = `${pct}%`;
-
-            const blobs = await window.exportFrameToBlobs(f, { scale, format });
-            const base = sanitizeFilename(userFilename) || sanitizeFilename(f.name) || `post_${f.id}`;
-            const prefix = framesToExport.length > 1 ? `${i + 1}_` : '';
-            blobs.forEach((blob, sliceIdx) => {
-              const suffix = blobs.length > 1 ? `_${sliceIdx + 1}` : '';
-              files.push({ blob, name: `${prefix}${base}${suffix}.${ext}` });
-            });
-            await new Promise(r => setTimeout(r, 10));
-          }
-
-          const saveBlob = (blob, filename) => {
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-          };
-
-          if (files.length > 1) {
-            if (!window.JSZip) {
-              toast.info('Carregando biblioteca de exportação...');
-              submitBtn.disabled = false;
-              return;
-            }
-            if (progressText) progressText.textContent = 'Criando arquivo ZIP...';
+            submitLabel.textContent = 'Empacotando .zip…';
             const zip = new JSZip();
             files.forEach(file => zip.file(file.name, file.blob));
-            const zipBaseName = sanitizeFilename(userFilename) || 'carrossel';
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
-            saveBlob(zipBlob, `${zipBaseName}.zip`);
-            toast.success(`${files.length} imagens exportadas: ${zipBaseName}.zip`);
-          } else if (files.length === 1) {
-            saveBlob(files[0].blob, files[0].name);
-            toast.success(`Post exportado: ${files[0].name}`);
+            const stamp = new Date().toISOString().slice(0, 10);
+            saveBlob(await zip.generateAsync({ type: 'blob' }), `posts-${stamp}.zip`);
           }
-
-          if (progressText) progressText.textContent = '✓ Download concluído!';
-          submitBtn.disabled = false;
-          setTimeout(closeExportModal, 800);
-        });
-      }
+          toast.success(files.length === 1 ? `Baixado: ${files[0].name}` : `${files.length} imagens baixadas`);
+        } catch (err) {
+          console.error(err);
+          toast.error('Não consegui gerar as imagens. Tente de novo.');
+        } finally {
+          busy = false;
+          fill.style.width = '0%';
+          refresh();
+        }
+        if (files.length) closeExport();
+      });
     }
 
     // --------------------------------------------------
