@@ -1399,12 +1399,13 @@
     /* --------------------------------------------------
        Controle Universal de Scrub (Arrastar p/ Esquerda e Direita em Campos Numéricos)
        -------------------------------------------------- */
-    const SCRUB_PX_PER_STEP = 2;
+    const SCRUB_PX_PER_STEP = 1;
 
     /* Arrastar para os lados num campo numérico, como no Figma:
        - o cursor é travado (pointer lock) e escondido, então o arrasto não
          bate na borda da tela; um cursor virtual dá a volta pelas bordas;
-       - mais rápido = passos maiores (Shift ×10, Alt ×0,1 para ajuste fino);
+       - arrasta pelo rótulo/ícone; clicar no número edita como texto;
+       - 1px de mouse = 1 passo (Shift ×10, Alt ×0,1 para ajuste fino);
        - o canvas é atualizado no máximo uma vez por quadro. */
     let scrubCursor = null;
     function scrubCursorEl() {
@@ -1425,9 +1426,7 @@
 
         field.addEventListener('mousedown', (e) => {
           if (e.button !== 0 || input.disabled) return;
-          if (e.target.closest('button, select, input[type="color"]')) return;
-          // Campo já em edição: clique posiciona o cursor do texto normalmente
-          if (e.target === input && document.activeElement === input) return;
+          if (e.target.closest('button, select, input')) return;
           e.preventDefault();
 
           const startX = e.clientX;
@@ -1478,11 +1477,8 @@
               if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < 3 && !locked) return;
               begin();
             }
-            // Acelera com a velocidade: devagar = preciso, rápido = vai longe
-            const speed = Math.abs(dx);
-            const accel = speed > 18 ? 4 : speed > 8 ? 2 : 1;
             const mult = ev.shiftKey ? 10 : (ev.altKey ? 0.1 : 1);
-            travel += (dx / SCRUB_PX_PER_STEP) * accel * mult;
+            travel += (dx / SCRUB_PX_PER_STEP) * mult;
 
             const next = Math.min(max, Math.max(min, startVal + Math.round(travel) * step));
             // Parado no limite não acumula: voltar reage na hora, sem "zona morta"
@@ -1503,9 +1499,11 @@
             if (frame) cancelAnimationFrame(frame);
             push();
             if (dragging) {
+              // O <label> focaria o campo no clique que fecha o arrasto
+              field.addEventListener('click', ev => ev.preventDefault(), { once: true, capture: true });
               input.dispatchEvent(new Event('change', { bubbles: true }));
             } else {
-              // Clique sem arrastar: edita digitando
+              // Clique no rótulo sem arrastar: edita digitando
               input.focus();
               input.select();
             }
@@ -1582,12 +1580,13 @@
           o[k] = Math.min(CUSTOM_MAX, Math.max(CUSTOM_MIN, v));
           const known = Object.entries(FORMATS).find(([key, f]) => key !== 'custom' && f.w === o.w && f.h === o.h);
           o.format = known ? known[0] : 'custom';
-          const old = frameElOf(o);
-          const fresh = renderFrame(o);
-          if (old) old.replaceWith(fresh);
-          fresh.classList.add('is-selected');
-          renderLinks();
-          updateFrameLabels();
+          const el = frameElOf(o);
+          if (el) {
+            el.style.width = `${o.w}px`;
+            el.style.height = `${o.h}px`;
+            applyFrameBackground(o, el);
+          }
+          wakeRopes();
           updateFrameMeta();
         }
       } else if (t.kind === 'image') {
@@ -1613,6 +1612,12 @@
       save();
       syncGeoFields();
     }
+
+    let geoSyncFrame = 0;
+    new MutationObserver(() => {
+      if (geoSyncFrame || !propsPanel || !propsPanel.querySelector('.pp-panel.is-visible')) return;
+      geoSyncFrame = requestAnimationFrame(() => { geoSyncFrame = 0; syncGeoFields(); });
+    }).observe(world, { subtree: true, attributes: true, attributeFilter: ['style'] });
 
     if (propsPanel) propsPanel.addEventListener('input', (e) => {
       const input = e.target.closest('[data-geo]');

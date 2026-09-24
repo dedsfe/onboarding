@@ -2401,10 +2401,19 @@ body.is-rotating-element * {
   border-radius: 5px;
   background: var(--pp-input);
   color: var(--pp-faint);
-  cursor: ew-resize;
+  cursor: text;
 }
 
 .pp-field:hover { border-color: var(--pp-line); }
+
+/* Rótulo/ícone é a alça de arrasto: área generosa, como no Figma */
+.pp-field__label {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  margin-left: -8px;
+  padding-left: 8px;
+}
 .pp-field:focus-within { border-color: var(--pp-accent); }
 
 .pp-field__label {
