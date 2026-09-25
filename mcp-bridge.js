@@ -101,6 +101,22 @@
       return exigirLote().gerar(args || {});
     },
 
+    lote_previa: function (args) {
+      return exigirLote().previa(args || {});
+    },
+
+    lote_fotos: function (args) {
+      return exigirLote().fotos(args || {});
+    },
+
+    lote_exemplo: function (args) {
+      return exigirLote().exemplo(args || {});
+    },
+
+    lote_criar_molde: function (args) {
+      return exigirLote().criarMolde(args || {});
+    },
+
     gerar_no_canvas: function () {
       return { ok: exigirBatch().gerarNoCanvas() };
     },

@@ -9,6 +9,10 @@ Expõe o app para qualquer cliente IA (Claude Code, Claude Desktop, Cursor) via
 |---|---|
 | `ver_pedido_lote` ⭐ | Lê o pedido da tela **Criar em lote** (o que escrever, quantos, fotos, saída) + imagens do modelo e das fotos |
 | `gerar_lote` ⭐ | Recebe os textos da IA e gera os carrosséis na pasta de saída escolhida no app |
+| `ver_exemplo_lote` | Abre um slide do resultado desejado em alta pra ler a copy dos melhores posts |
+| `ver_fotos_lote` | Todas as fotos do lote com índice (pra casar foto × copy via `_foto`) |
+| `previsualizar_lote` | Renderiza até 3 carrosséis com a copy proposta + avisa texto estourando |
+| `criar_molde` | Cria o design do carrossel sem precisar de post no canvas |
 | `criar_posts` ⭐ | **Pipeline completo**: aplica template, injeta textos nos binds, troca o fundo por imagens, renderiza e salva o `.zip` pronto em `lotes/` |
 | `status_ponte` | App conectado? Frames, binds e cadeias do canvas atual |
 | `listar_templates` / `detalhar_template` | Catálogo de templates e estilo de cada um |

@@ -9415,6 +9415,56 @@
         return null;
       }
 
+      /* '#<id>:estilo' = { tamanho, cor, peso, alinhamento }: a IA do lote
+         ajusta um texto sem mexer no design salvo. */
+      function withStyleOverride(tc, overrides) {
+        const st = overrides && overrides['#' + tc.id + ':estilo'];
+        if (!st) return tc;
+        const out = { ...tc };
+        if (st.tamanho) out.fontSize = Number(st.tamanho);
+        if (st.cor) out.color = st.cor;
+        if (st.peso) out.fontWeight = Number(st.peso);
+        if (st.alinhamento) out.align = st.alinhamento;
+        return out;
+      }
+
+      function textOfChild(tc, overrides) {
+        if (overrides['#' + tc.id] !== undefined) return String(overrides['#' + tc.id]);
+        if (tc.bind && overrides[tc.bind] !== undefined) return String(overrides[tc.bind]);
+        if (tc.text !== undefined && tc.text !== '') return tc.text;
+        if (tc.html) {
+          const temp = document.createElement('div');
+          temp.innerHTML = tc.html.replace(/<br\s*[\/]?>/gi, '\n');
+          return temp.textContent || temp.innerText || '';
+        }
+        return '';
+      }
+
+      /* Mede a copy como o export vai desenhar: quantas linhas, se passa do
+         fim do slide e se alguma palavra sozinha é mais larga que a caixa.
+         É o que a IA usa pra revisar antes de gerar o lote. */
+      function measureCopy(frame, overrides = {}) {
+        const ctx = document.createElement('canvas').getContext('2d');
+        const ys = computeAdjustedTextPositions(frame, overrides, ctx);
+        return (frame.children || []).filter(c => c.type === 'text' && !c.hidden).map(child => {
+          const tc = withStyleOverride(effectiveTextChild(child), overrides);
+          const text = textOfChild(tc, overrides);
+          const fontSize = tc.fontSize || 48;
+          ctx.font = `${tc.italic ? 'italic ' : ''}${tc.fontWeight || 500} ${fontSize}px ${tc.fontFamily || '"Inter Tight", sans-serif'}`;
+          if ('letterSpacing' in ctx) ctx.letterSpacing = `${tc.letterSpacing != null ? tc.letterSpacing : 0}em`;
+          const lines = text ? wrapTextForCanvas(ctx, text, tc.w) : [];
+          const lh = fontSize * (tc.lineHeight || 1.15);
+          const h = lines.length ? (lines.length - 1) * lh + fontSize : 0;
+          const y = ys.has(tc.id) ? ys.get(tc.id) : tc.y;
+          return {
+            id: tc.id,
+            linhas: lines.length,
+            estoura_embaixo: y + h > frame.h - 8,
+            palavra_maior_que_caixa: text.split(/\s+/).some(w => w && ctx.measureText(w).width > tc.w),
+          };
+        });
+      }
+
       function wrapTextForCanvas(ctx, text, maxWidth) {
         const lines = [];
         const paragraphs = String(text).split('\n');
@@ -9446,8 +9496,9 @@
         let accumulatedDelta = 0;
 
         for (let i = 0; i < sorted.length; i++) {
-          const c = effectiveTextChild(sorted[i]);
-          const origH = getExactTextHeight(c);
+          const orig = effectiveTextChild(sorted[i]);
+          const c = withStyleOverride(orig, overrides);
+          const origH = getExactTextHeight(orig);
           
           let overrideText = '';
           if (overrides['#' + c.id] !== undefined) {
@@ -9703,7 +9754,7 @@
               ctx.restore();
             }
           } else if (child.type === 'text') {
-            const tc = effectiveTextChild(child); // estilo de trecho que cobre tudo vale como do nó
+            const tc = withStyleOverride(effectiveTextChild(child), overrides); // estilo de trecho que cobre tudo vale como do nó
             let text = '';
             /* '#<id>' troca a copy de um texto específico, mesmo sem {} —
                é assim que a IA do lote reescreve cada slide do carrossel. */
@@ -10255,6 +10306,56 @@
         exportar: () => runBatchExport(),
         gerarNoCanvas: () => generateBatchOnCanvas(),
         abrirModal: openBatchModal,
+        medirCopy: (frameId, overrides) => {
+          const f = frames.find(fr => fr.id === frameId);
+          return f ? measureCopy(f, overrides || {}) : [];
+        },
+        /* Molde sem canvas: a IA descreve os slides (fundo, textos com
+           posição/tamanho/cor) e isso vira um carrossel ligado no canvas. */
+        criarMolde: (spec) => {
+          const slides = (spec && spec.slides) || [];
+          if (!slides.length) throw new Error('molde sem slides');
+          const key = FORMATS[spec.formato] && spec.formato !== 'custom' ? spec.formato : 'ig-feed';
+          const fmt = FORMATS[key];
+          const last = realFrames().pop();
+          let x = last ? last.x + last.w + FRAME_GAP * 2 : 0;
+          const y = last ? last.y : 0;
+          const made = [];
+          slides.forEach((sl, si) => {
+            const f = makeFrame(key, x, y);
+            f.name = spec.nome || 'Molde da IA';
+            const fundo = sl.fundo || {};
+            if (fundo.cor) f.bg = fundo.cor;
+            if (fundo.foto) { f.bgBind = slugifyBind(fundo.foto) || 'foto'; f.bgOverlay = fundo.escurecer != null ? Number(fundo.escurecer) : 30; }
+            (sl.textos || []).forEach((t, ti) => {
+              const w = Math.round(Math.min(fmt.w, Math.max(40, Number(t.w) || fmt.w * 0.84)));
+              const child = {
+                ...TEXT_DEFAULTS,
+                id: childSeq++,
+                type: 'text',
+                text: String(t.texto || ''),
+                x: Math.round(Number(t.x != null ? t.x : (fmt.w - w) / 2)),
+                y: Math.round(Number(t.y != null ? t.y : fmt.h * 0.4 + ti * 160)),
+                w,
+                fontSize: Number(t.tamanho) || TEXT_DEFAULTS.fontSize,
+                fontWeight: Number(t.peso) || TEXT_DEFAULTS.fontWeight,
+                color: t.cor || TEXT_DEFAULTS.color,
+                align: t.alinhamento || TEXT_DEFAULTS.align,
+              };
+              if (t.fonte) child.fontFamily = `"${t.fonte}", sans-serif`;
+              if (t.chave) child.bind = slugifyBind(t.chave);
+              f.children.push(child);
+            });
+            frames.push(f);
+            made.push(f);
+            if (si > 0) links.push({ id: linkSeq++, from: made[si - 1].id, to: f.id });
+            x += fmt.w + FRAME_GAP;
+          });
+          renderAll();
+          selectFrame(made[0].id);
+          save();
+          return { ok: true, slides: made.length, formato: key, frames: made.map(f => f.id) };
+        },
         /* Carrossel modelo do lote: a cadeia do post selecionado (ou do
            primeiro) e as variáveis que moram nela. */
         modelo: () => {

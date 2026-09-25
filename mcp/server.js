@@ -353,63 +353,182 @@ function dataUrlParaImagem(url) {
   return m ? { type: 'image', mimeType: m[1], data: m[2] } : null;
 }
 
+const PLAYBOOK = [
+  'COMO FAZER UM LOTE DE ALTO NÍVEL (siga nesta ordem):',
+  '1. ESTUDE OS EXEMPLOS (resultado desejado): abra os slides em alta com ver_exemplo_lote e anote a estrutura (capa / meio / CTA), o tamanho do hook, as palavras-gatilho e o ritmo de cada slide. Eles são o padrão de qualidade.',
+  '2. PESQUISE O NICHO: use busca na web e, se tiver, ferramentas de tendências (ex.: trends get_top_trends / get_top_posts) para achar os posts que mais performam agora e os padrões de hook deles (curiosidade, número, contraste, dor, prova, segredo).',
+  '3. VEJA AS FOTOS com ver_fotos_lote e case cada foto com o ângulo que ela sugere (campo _foto = índice da foto).',
+  '4. ESCREVA as variações com ângulos realmente diferentes (nunca a mesma frase trocando palavras): hook forte na capa, uma ideia por slide, CTA no último. Em cada carrossel inclua _legenda (2–4 linhas + 3–5 hashtags do nicho).',
+  '5. REVISE com previsualizar_lote (2–3 carrosséis): leia as imagens e os "problemas"; encurte o que estourar ou use _estilo { chave: { tamanho } } para diminuir a fonte. Só então chame gerar_lote com TODAS as variações.',
+  '6. SEM MOLDE (molde: null): crie um com criar_molde reproduzindo o layout dos exemplos (posições em px no formato 1080×1350), com "chave" em cada texto e fundo.foto quando a foto do usuário for o fundo.',
+  '7. No fim, conte ao usuário em 2–3 linhas o que achou na pesquisa e quais ângulos usou.',
+].join('\n');
+
 server.tool(
   'ver_pedido_lote',
-  'PRIMEIRO PASSO para gerar carrosséis em lote a partir da tela "Criar em lote" do app. Devolve o pedido do usuário (o que escrever e quantos carrosséis), os carrosséis de RESULTADO DESEJADO (exemplos de como deve ficar), o molde do canvas com as variáveis de texto, as fotos e a pasta de saída — tudo com imagens. Depois escreva a COPY COMPLETA de `quantidade` carrosséis — um objeto por carrossel com todas as chaves de `copys` (um texto por slide/caixa de texto) — seguindo o pedido e o estilo dos exemplos, e chame gerar_lote.',
+  'PRIMEIRO PASSO para gerar carrosséis em lote a partir da tela "Criar em lote" do app. Devolve o pedido do usuário, quantas VARIAÇÕES ele quer, os carrosséis de RESULTADO DESEJADO (exemplos de como deve ficar), o molde (design) com os campos de copy, as fotos e a pasta de saída — com imagens — e o passo a passo para chegar num resultado de alto nível (estudar exemplos, pesquisar o nicho, prévia, gerar).',
   {},
   async () => {
     if (!ponteConectada()) return desconectado();
-    const info = await ponteCmd('lote_pedido', {}, 60000);
+    const info = await ponteCmd('lote_pedido', {}, 90000);
     const { imagens, ...resto } = info || {};
     const conteudo = [{ type: 'text', text: JSON.stringify(resto, null, 2) }];
     const modelo = (imagens && imagens.modelo) || [];
     const fotos = (imagens && imagens.fotos) || [];
     const exemplos = (imagens && imagens.exemplos) || [];
     exemplos.forEach((ex, i) => {
-      conteudo.push({ type: 'text', text: `RESULTADO DESEJADO — exemplo ${i + 1} "${ex.nome}" (${ex.slides.length} slide(s)). É assim que o usuário quer que fique: copie o tom, o tamanho e o tipo de texto.` });
+      conteudo.push({ type: 'text', text: `RESULTADO DESEJADO — exemplo ${i + 1} "${ex.nome}" (${ex.slides.length} slide(s)). É o padrão de qualidade: copie estrutura, tom, tamanho e tipo de texto. Para ler um slide em alta: ver_exemplo_lote { carrossel: ${i + 1}, slide: N }.` });
       ex.slides.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
     });
     if (modelo.length) {
-      conteudo.push({ type: 'text', text: `Molde do canvas (${modelo.length} slide(s)) — é o design que vai montar as imagens. Cada caixa de texto dele é uma chave em "copys" (texto_do_modelo mostra o que está lá hoje; mantenha um tamanho parecido para caber):` });
+      conteudo.push({ type: 'text', text: `Molde (${modelo.length} slide(s)) — é o design que monta as imagens. Cada caixa de texto é uma chave em "copys" (texto_do_modelo = o que está lá hoje; mantenha um tamanho parecido):` });
       modelo.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
     }
     if (fotos.length) {
-      conteudo.push({ type: 'text', text: `Fotos do usuário (${fotos.length} de ${resto.fotos ? resto.fotos.total : fotos.length}) — cada carrossel usa uma, na ordem:` });
+      conteudo.push({ type: 'text', text: `Fotos do usuário (${fotos.length} de ${resto.fotos ? resto.fotos.total : fotos.length}; todas com índice em ver_fotos_lote):` });
       fotos.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
     }
     if (resto.copys && resto.copys.length) {
       const exemplo = Object.fromEntries(resto.copys.map(c => [c.chave, '...']));
-      conteudo.push({ type: 'text', text: `Formato para gerar_lote: textos = [ ${JSON.stringify(exemplo)}, ... ] — ${resto.quantidade} objeto(s), um por carrossel.` });
+      exemplo._foto = 1;
+      exemplo._legenda = '...';
+      conteudo.push({ type: 'text', text: `Formato de cada carrossel (previsualizar_lote e gerar_lote): ${JSON.stringify(exemplo)} — gere ${resto.quantidade} variação(ões).` });
     }
     if (resto.modo === 'ia_decide') {
-      conteudo.push({ type: 'text', text: [
-        'MODO "A IA DECIDE" — o usuário quer que você crie a copy. Antes de escrever:',
-        `1. Descubra o nicho e o público: ${resto.pedido ? 'use a direção do usuário acima' : 'o usuário não deu direção, então deduza'} a partir dos exemplos de resultado desejado e das fotos.`,
-        '2. PESQUISE O MERCADO: use busca na web e, se você tiver, ferramentas de tendências (ex.: trends get_top_trends / get_top_posts) para achar hooks, ângulos e formatos de carrossel que estão performando agora nesse nicho.',
-        '3. Escreva a copy de cada carrossel com ângulos diferentes (não repita a mesma estrutura), em PT-BR, cabendo no tamanho de cada campo.',
-        '4. Chame gerar_lote e conte ao usuário, em 2–3 linhas, o que achou na pesquisa e quais ângulos usou.',
-      ].join('\n') });
+      conteudo.push({ type: 'text', text: `MODO "A IA DECIDE": o usuário quer que você crie a copy${resto.pedido ? ' seguindo a direção acima' : ' — ele não deu direção, deduza o nicho pelos exemplos e fotos'}.` });
     }
+    conteudo.push({ type: 'text', text: PLAYBOOK });
     if (resto.faltando && resto.faltando.length) {
-      conteudo.push({ type: 'text', text: `Antes de gerar, falta no app: ${resto.faltando.join('; ')}. Peça para o usuário resolver e tente de novo.` });
+      conteudo.push({ type: 'text', text: `Antes de gerar, falta: ${resto.faltando.join('; ')}.` });
     }
     return { content: conteudo };
   }
 );
 
 server.tool(
+  'ver_exemplo_lote',
+  'Abre um slide do RESULTADO DESEJADO em alta resolução (1080px) para ler a copy e o layout dos melhores posts que o usuário escolheu como referência.',
+  {
+    carrossel: z.number().int().min(1).default(1).describe('Número do carrossel de exemplo (1 = primeiro)'),
+    slide: z.number().int().min(1).default(1).describe('Número do slide dentro do exemplo'),
+  },
+  async ({ carrossel, slide }) => {
+    if (!ponteConectada()) return desconectado();
+    try {
+      const r = await ponteCmd('lote_exemplo', { carrossel, slide }, 30000);
+      return { content: [
+        { type: 'text', text: `Exemplo "${r.carrossel}" — slide ${r.slide} de ${r.de}.` },
+        dataUrlParaImagem(r.img),
+      ].filter(Boolean) };
+    } catch (e) {
+      return { content: [{ type: 'text', text: e.message }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  'ver_fotos_lote',
+  'Mostra as fotos que o usuário escolheu para o lote, com o índice de cada uma (12 por página). Use o índice em _foto para casar a foto certa com cada copy.',
+  { pagina: z.number().int().min(1).default(1) },
+  async ({ pagina }) => {
+    if (!ponteConectada()) return desconectado();
+    try {
+      const r = await ponteCmd('lote_fotos', { pagina }, 60000);
+      const conteudo = [{ type: 'text', text: `Fotos ${pagina}/${r.paginas} (total ${r.total}):` }];
+      r.fotos.forEach(f => {
+        conteudo.push({ type: 'text', text: `#${f.indice} — ${f.nome}` });
+        const img = dataUrlParaImagem(f.img);
+        if (img) conteudo.push(img);
+      });
+      return { content: conteudo };
+    } catch (e) {
+      return { content: [{ type: 'text', text: e.message }], isError: true };
+    }
+  }
+);
+
+const estiloTexto = z.object({
+  tamanho: z.number().optional().describe('Tamanho da fonte em px (slide de 1080 de largura)'),
+  cor: z.string().optional().describe('Cor hex, ex.: #FFFFFF'),
+  peso: z.number().optional().describe('Peso da fonte: 400, 600, 700, 800'),
+  alinhamento: z.enum(['left', 'center', 'right']).optional(),
+});
+
+const carrosselLote = z
+  .object({
+    _foto: z.union([z.number().int().min(1), z.string()]).optional().describe('Índice (1 = primeira) ou nome da foto para a variável de foto principal'),
+    _fotos: z.record(z.string(), z.union([z.number().int().min(1), z.string()])).optional().describe('Outras variáveis de foto: { foto2: 5 }'),
+    _estilo: z.record(z.string(), estiloTexto).optional().describe('Ajuste por campo de copy: { slide2_texto1: { tamanho: 56 } }'),
+    _legenda: z.string().optional().describe('Legenda do post (vai para legenda.txt), com hashtags'),
+  })
+  .catchall(z.string());
+
+server.tool(
+  'previsualizar_lote',
+  'Renderiza até 3 carrosséis com a copy proposta e devolve as imagens de cada slide + problemas (texto passando do fim do slide, palavra maior que a caixa). Use ANTES de gerar_lote para revisar e corrigir.',
+  { textos: z.array(carrosselLote).min(1).max(3).describe('1 a 3 carrosséis no mesmo formato de gerar_lote') },
+  async ({ textos }) => {
+    if (!ponteConectada()) return desconectado();
+    try {
+      const r = await ponteCmd('lote_previa', { textos }, 120000);
+      const conteudo = [];
+      r.carrosseis.forEach(c => {
+        conteudo.push({ type: 'text', text: `Carrossel ${c.indice}: ${c.problemas.length ? '⚠️ ' + c.problemas.join(' | ') : '✓ tudo cabe'}` });
+        c.slides.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
+      });
+      return { content: conteudo };
+    } catch (e) {
+      return { content: [{ type: 'text', text: `Não deu pra pré-visualizar: ${e.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  'criar_molde',
+  'Cria o molde (design) do carrossel no app quando o usuário não tem post no canvas: descreva cada slide — fundo (cor e/ou foto do usuário) e os textos com posição, tamanho e cor — reproduzindo o layout dos exemplos de resultado desejado. Coordenadas em px no formato escolhido (ig-feed = 1080×1350). Cada texto com "chave" vira um campo de copy.',
+  {
+    nome: z.string().optional(),
+    formato: z.enum(['ig-feed', 'ig-square', 'ig-story', 'reels', 'story', 'pinterest']).default('ig-feed'),
+    slides: z.array(z.object({
+      fundo: z.object({
+        cor: z.string().optional().describe('Cor de fundo hex'),
+        foto: z.string().optional().describe('Nome da variável de foto (ex.: "foto") — a foto do usuário vira o fundo'),
+        escurecer: z.number().min(0).max(90).optional().describe('Película escura sobre a foto, 0–90 (%)'),
+      }).optional(),
+      textos: z.array(z.object({
+        chave: z.string().optional().describe('Nome do campo de copy (ex.: "hook", "dica", "cta")'),
+        texto: z.string().describe('Texto de exemplo'),
+        x: z.number().optional(), y: z.number().optional(), w: z.number().optional(),
+        tamanho: z.number().optional(), peso: z.number().optional(), cor: z.string().optional(),
+        alinhamento: z.enum(['left', 'center', 'right']).optional(),
+        fonte: z.string().optional().describe('Família da fonte, ex.: "Inter Tight", "Poppins", "Bebas Neue"'),
+      })).optional(),
+    })).min(1).max(20),
+  },
+  async (spec) => {
+    if (!ponteConectada()) return desconectado();
+    try {
+      const r = await ponteCmd('lote_criar_molde', spec, 30000);
+      return { content: [{ type: 'text', text: `✅ Molde criado: ${r.slides} slide(s) em ${r.formato}. Chame ver_pedido_lote de novo para ver os campos de copy e a imagem do molde.` }] };
+    } catch (e) {
+      return { content: [{ type: 'text', text: `Não criou o molde: ${e.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
   'gerar_lote',
-  'Gera os carrosséis da tela "Criar em lote" com a copy que você escreveu (depois de ver_pedido_lote). Mande um objeto por carrossel com as chaves de `copys` (slide1_texto1, slide2_texto1, … ou nomes de variáveis) e o texto de cada uma. Cada carrossel usa a próxima foto do usuário e é gravado na pasta de saída escolhida no app.',
+  'Gera TODAS as variações da tela "Criar em lote" com a copy que você escreveu (depois de revisar com previsualizar_lote). Um objeto por carrossel com as chaves de `copys` + extras opcionais (_foto, _fotos, _estilo, _legenda). Grava cada carrossel numa pasta (slides em PNG + legenda.txt) e um copys.csv com tudo, na pasta de saída do app.',
   {
     textos: z
-      .union([z.array(z.string().min(1)).min(1), z.array(z.record(z.string(), z.string())).min(1)])
-      .describe('Um objeto por carrossel: { chave_de_copys: texto }. (Lista de strings também vale: só troca o primeiro texto de cada carrossel.)'),
+      .union([z.array(z.string().min(1)).min(1), z.array(carrosselLote).min(1)])
+      .describe('Um objeto por carrossel: { chave_de_copys: texto, _foto?, _legenda?, _estilo? }. (Lista de strings também vale: só troca o primeiro texto.)'),
   },
   async ({ textos }) => {
     if (!ponteConectada()) return desconectado();
     try {
       const r = await ponteCmd('lote_gerar', { textos }, EXPORT_TIMEOUT_MS);
-      return { content: [{ type: 'text', text: `✅ ${r.gerados} carrossel(éis) de ${r.slides} slide(s) gerado(s) → ${r.destino}.` }] };
+      return { content: [{ type: 'text', text: `✅ ${r.gerados} carrossel(éis) de ${r.slides} slide(s) gerado(s) → ${r.destino} (com legenda.txt e copys.csv).` }] };
     } catch (e) {
       return { content: [{ type: 'text', text: `Não gerou: ${e.message}` }], isError: true };
     }

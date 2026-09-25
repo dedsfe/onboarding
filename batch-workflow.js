@@ -33,6 +33,7 @@
     brief: { pedido: '', quantidade: '' },
     briefMode: false,
     // Resultado desejado: carrosséis de exemplo (referência para a IA)
+    qty: { n: '', ok: false }, // Variações: quantos carrosséis sair do lote
     ref: null,        // { name, carousels: [{ name, files: [..] }], dir }
     refSkipped: false,
     pendingRef: null,
@@ -201,6 +202,7 @@
     if (!m || imageBinds(m).length) list.push('photos');
     list.push('ref');
     list.push('texts'); // sempre à vista: sem texto no modelo, o passo explica o que fazer
+    list.push('qty');
     list.push('out');
     return list;
   }
@@ -208,6 +210,7 @@
     if (step === 'photos') return !!(state.photos && state.photos.files.length);
     if (step === 'ref') return !!(state.ref && state.ref.carousels.length) || state.refSkipped;
     if (step === 'texts') return !!(state.texts && textCount() > 0) || hasBrief() || (state.copySkipped && !copySlots(model()).length);
+    if (step === 'qty') return !!state.qty.ok;
     if (step === 'out') return !!state.out;
     return false;
   }
@@ -231,21 +234,27 @@
   function hasBrief() { return !state.texts && state.briefMode && !!state.brief.ok; }
   function waitingAi() { return hasBrief(); }
 
-  // Quantos carrosséis o pedido quer: o número digitado ou um por foto
-  function briefCount() {
-    var q = parseInt(state.brief.quantidade, 10);
-    if (q > 0) return Math.min(q, 200);
-    return state.photos ? state.photos.files.length : 10;
+  // Sugestão antes de o usuário escolher: linhas do CSV, fotos ou 10
+  function suggestedCount() {
+    if (state.texts && !state.texts.fromAi && textCount()) return textCount();
+    if (state.photos) return state.photos.files.length;
+    return 10;
   }
+
+  function variationsCount() {
+    var n = parseInt(state.qty.n, 10);
+    return n > 0 ? Math.min(n, 500) : suggestedCount();
+  }
+
+  function briefCount() { return variationsCount(); }
+  function saveQty() { idbSet('qty', { n: state.qty.n, ok: !!state.qty.ok }); }
 
   function saveBrief() { idbSet('brief', { pedido: state.brief.pedido, quantidade: state.brief.quantidade, on: state.briefMode, ok: !!state.brief.ok }); }
 
+  // A IA já mandou a copy: sai o que ela escreveu. Senão manda o passo Variações.
   function totalToMake(m) {
-    if (waitingAi()) return briefCount();
-    if (!copySlots(m).length) return state.photos ? state.photos.files.length : 0;
-    if (copySlots(m).length && state.texts) return textCount();
-    if (state.photos) return state.photos.files.length;
-    return 0;
+    if (state.texts && state.texts.fromAi) return textCount();
+    return variationsCount();
   }
 
   /* ----------------------------------------------------- passo 1: fotos */
@@ -533,6 +542,8 @@
         try { var files = await photosFromDir(p); if (files.length) state.photos = { name: p.name, files: files, dir: p }; } catch (e) {}
       } else state.pendingPhotos = p;
     }
+    var q = await idbGet('qty');
+    if (q) state.qty = { n: q.n || '', ok: !!q.ok };
     var rf = await idbGet('ref');
     if (rf && rf.queryPermission && !state.ref) {
       if ((await rf.queryPermission({ mode: 'read' })) === 'granted') {
@@ -552,6 +563,7 @@
   var STEP_INFO = {
     photos: { n: 'Fotos', title: 'Escolha a pasta com as fotos', sub: 'Cada carrossel vai usar uma foto dessa pasta, na ordem dos nomes.' },
     ref: { n: 'Resultado desejado', title: 'Mostre o resultado que você quer', sub: 'Uma pasta com carrosséis de exemplo (uma subpasta por carrossel) ou algumas fotos em sequência. A IA usa como referência.' },
+    qty: { n: 'Variações', title: '', sub: '' },
     texts: { n: 'Copy', title: 'Agora a copy: a IA decide ou você manda um CSV', sub: 'A IA pesquisa o nicho e escreve o texto de todos os slides de cada carrossel.' },
     out: { n: 'Saída', title: 'Por último, onde salvar os carrosséis', sub: 'Cada carrossel pronto vira uma pasta com os slides em PNG.' },
     ready: { title: 'Tudo pronto', sub: '' },
@@ -623,9 +635,11 @@
     var nr = refNode(m, cur); inputsCol.appendChild(nr); inNodes.push(nr);
     if (list.indexOf('texts') !== -1) { var nt = textsNode(m, cur); inputsCol.appendChild(nt); inNodes.push(nt); }
     var nm = modelNode(m);
+    var nq = qtyNode(m, cur);
     var no = outNode(m, cur, total);
     if (inNodes.length) flow.appendChild(inputsCol);
     flow.appendChild(nm);
+    flow.appendChild(nq);
     flow.appendChild(no);
 
     var body = h('div', { class: 'bw-body' }, [stage, sidePanel(m, cur)]);
@@ -648,7 +662,7 @@
 
     paintIcons();
     el.stage = stage; el.wires = wires;
-    el.links = inNodes.map(function (n) { return [n, nm]; }).concat([[nm, no]]);
+    el.links = inNodes.map(function (n) { return [n, nm]; }).concat([[nm, nq], [nq, no]]);
     requestAnimationFrame(function () {
       drawWires();
       // Passo da vez sempre à vista (a coluna de entradas pode passar da altura)
@@ -768,7 +782,7 @@
         state.brief.pedido.trim() ? h('p', { class: 'bw-brief-sum__text', text: state.brief.pedido.trim() }) : null,
       ]));
       body.push(h('div', { class: 'bw-row' }, [
-        h('span', { class: 'bw-meta', text: plural(briefCount(), 'carrossel', 'carrosséis') + (m ? ' · ' + plural(copySlots(m).length, 'texto', 'textos') + ' cada' : ' · textos definidos pela IA') }),
+        h('span', { class: 'bw-meta', text: m ? plural(copySlots(m).length, 'texto', 'textos') + ' por carrossel' : '' }),
         bindSelect(textBinds(m), state.textBind, function (v) { state.textBind = v; }),
       ]));
     } else if (st === 'done') {
@@ -816,19 +830,50 @@
       placeholder: 'Direção (opcional)',
     });
     ta.value = state.brief.pedido;
-    var qty = h('input', { class: 'bw-qty', type: 'number', min: '1', max: '200', placeholder: String(state.photos ? state.photos.files.length : 10) });
-    qty.value = state.brief.quantidade;
     var ok = h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('check') + '<span>Pronto</span>' });
     ta.addEventListener('input', function () { state.brief.pedido = ta.value; saveBrief(); });
-    qty.addEventListener('input', function () { state.brief.quantidade = qty.value; saveBrief(); });
     ok.addEventListener('click', function () { state.brief.ok = true; saveBrief(); render(); });
     setTimeout(function () { ta.focus(); }, 30);
     return h('div', { class: 'bw-brief' }, [
       ta,
-      h('label', { class: 'bw-brief__row', title: 'Quantos carrosséis' }, [h('span', { class: 'bw-brief__qicon', html: icon('layers') }), qty]),
       ok,
       h('button', { class: 'bw-link', html: icon('sheet') + '<span>CSV</span>', onclick: function () { state.briefMode = false; saveBrief(); pickTexts(); } }),
     ]);
+  }
+
+  function qtyNode(m, cur) {
+    var st = stateOf('qty', cur);
+    var body = [];
+    var n = variationsCount();
+    if (st === 'active') {
+      var num = h('input', { class: 'bw-qty-big', type: 'number', min: '1', max: '500', value: String(n) });
+      var set = function (v) {
+        v = Math.max(1, Math.min(500, parseInt(v, 10) || 1));
+        state.qty.n = String(v); num.value = String(v); saveQty();
+        chips.querySelectorAll('.bw-chip-n').forEach(function (c) { c.classList.toggle('is-on', Number(c.dataset.n) === v); });
+      };
+      num.addEventListener('input', function () { if (num.value) set(num.value); });
+      var chips = h('div', { class: 'bw-chips-n' });
+      [10, 25, 50, 100].forEach(function (v) {
+        chips.appendChild(h('button', { class: 'bw-chip-n' + (v === n ? ' is-on' : ''), 'data-n': String(v), text: String(v), onclick: function () { set(v); } }));
+      });
+      body.push(h('div', { class: 'bw-stepper' }, [
+        h('button', { class: 'bw-stepper__btn', html: icon('minus'), onclick: function () { set((parseInt(num.value, 10) || 1) - 1); } }),
+        num,
+        h('button', { class: 'bw-stepper__btn', html: icon('plus'), onclick: function () { set((parseInt(num.value, 10) || 0) + 1); } }),
+      ]));
+      body.push(chips);
+      body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('check') + '<span>OK</span>', onclick: function () { set(num.value); state.qty.ok = true; saveQty(); render(); } }));
+    } else if (st === 'done') {
+      body.push(h('div', { class: 'bw-big', html: '<strong>×' + n + '</strong>' }));
+    } else {
+      body.push(ghost('copy'));
+    }
+    return node('qty', {
+      icon: 'layers', title: 'Variações', sub: st === 'done' ? null : 'Passo ' + (steps(m).indexOf('qty') + 1),
+      state: st, body: body,
+      action: st === 'done' ? swapBtn(function () { state.qty.ok = false; saveQty(); render(); }) : null,
+    });
   }
 
   function refNode(m, cur) {
@@ -892,7 +937,7 @@
       if (nCopy) body.push(h('span', { class: 'bw-meta', html: icon('type') + '<span>' + plural(nCopy, 'texto de copy', 'textos de copy') + ' em ' + plural(m.frames.length, 'slide', 'slides') + '</span>' }));
     }
     return node('model', {
-      icon: 'palette', title: 'Modelo do canvas',
+      icon: 'palette', title: 'Molde',
       sub: m ? m.nome + ' · ' + plural(m.frames.length, 'slide', 'slides') : 'nenhum post no canvas',
       state: m && m.binds.length ? 'done' : 'active', body: body,
     });
@@ -1024,6 +1069,72 @@
     return bind === state.textBind ? (t.lines[i % t.lines.length] || '') : '';
   }
 
+  /* Resolve a foto de um carrossel: pedido da IA (índice 1-based ou nome)
+     ou a próxima da pasta. */
+  function photoItem(i, pick) {
+    var files = state.photos ? state.photos.files : [];
+    if (!files.length) return null;
+    if (pick != null && pick !== '') {
+      var n = Number(pick);
+      if (Number.isInteger(n) && n >= 1 && n <= files.length) return files[n - 1];
+      var byName = files.find(function (f) { return nameOf(f) === String(pick); });
+      if (byName) return byName;
+    }
+    return files[i % files.length];
+  }
+
+  async function photoData(item, cache) {
+    var key = nameOf(item);
+    if (!cache.has(key)) cache.set(key, await readAsDataUrl(await fileOf(item)));
+    return cache.get(key);
+  }
+
+  /* A copy de um carrossel vira overrides do export. Linhas de uma IA/CSV
+     trazem chaves de copy + extras: _foto, _fotos, _estilo, _legenda. */
+  async function buildOverrides(m, i, row, cache) {
+    var overrides = {};
+    var hook = '', legenda = '';
+    if (row) {
+      Object.keys(row).forEach(function (k) {
+        if (k.charAt(0) === '_' || !row[k]) return;
+        overrides[overrideKeyOf(m, k)] = String(row[k]);
+      });
+      var first = copySlots(m)[0];
+      hook = first ? (row[first.key] || '') : '';
+      legenda = row._legenda ? String(row._legenda) : '';
+      if (row._estilo && typeof row._estilo === 'object') {
+        Object.keys(row._estilo).forEach(function (k) {
+          var slot = copySlots(m).find(function (c) { return c.key === k; });
+          if (slot) overrides['#' + slot.childId + ':estilo'] = row._estilo[k];
+        });
+      }
+    } else {
+      textBinds(m).forEach(function (b) { var v = textFor(i, b.name); if (v) overrides[b.name] = v; });
+      var slots = copySlots(m);
+      if (!textBinds(m).length && slots.length && state.texts && state.texts.lines.length) {
+        overrides['#' + slots[0].childId] = state.texts.lines[i % state.texts.lines.length];
+      }
+      hook = state.textBind ? textFor(i, state.textBind) : (state.texts && state.texts.lines ? state.texts.lines[i % state.texts.lines.length] : '');
+    }
+    if (state.photos) {
+      // Variável de foto principal + outras que a IA mapear (_fotos: { foto2: 3 })
+      var extra = (row && row._fotos && typeof row._fotos === 'object') ? row._fotos : {};
+      if (state.photoBind) overrides[state.photoBind] = await photoData(photoItem(i, row && row._foto), cache);
+      var keys = Object.keys(extra);
+      for (var k = 0; k < keys.length; k++) {
+        if (imageBinds(m).some(function (b) { return b.name === keys[k]; })) {
+          overrides[keys[k]] = await photoData(photoItem(i, extra[keys[k]]), cache);
+        }
+      }
+    }
+    return { overrides: overrides, hook: hook, legenda: legenda };
+  }
+
+  function rowFor(i) {
+    var t = state.texts;
+    return t && t.rows && t.rows.length ? t.rows[i % t.rows.length] : null;
+  }
+
   async function generate() {
     var m = model();
     if (!m || state.running) return null;
@@ -1038,47 +1149,38 @@
     var label = el.go.querySelector('span');
     var zip = state.out.zip ? new window.JSZip() : null;
     var imageCache = new Map();
+    var resumo = [['pasta'].concat(copySlots(m).map(function (c) { return c.key; }), ['legenda'])];
 
     try {
       for (var i = 0; i < total; i++) {
         label.textContent = 'Gerando ' + (i + 1) + ' de ' + total + '…';
         fill.style.width = Math.round((i / total) * 100) + '%';
 
-        var overrides = {};
-        var hook = '';
-        if (state.texts && state.texts.rows) {
-          var row = state.texts.rows[i] || {};
-          Object.keys(row).forEach(function (k) { if (row[k]) overrides[overrideKeyOf(m, k)] = String(row[k]); });
-          var firstSlot = copySlots(m)[0];
-          hook = firstSlot ? (row[firstSlot.key] || '') : '';
-        } else {
-          textBinds(m).forEach(function (b) { var v = textFor(i, b.name); if (v) overrides[b.name] = v; });
-          // Arquivo de linhas num modelo sem {}: a linha vira o primeiro texto do carrossel
-          var slots = copySlots(m);
-          if (!textBinds(m).length && slots.length && state.texts && state.texts.lines.length) {
-            overrides['#' + slots[0].childId] = state.texts.lines[i % state.texts.lines.length];
-          }
-        }
-        if (state.photos && state.photoBind) {
-          var item = state.photos.files[i % state.photos.files.length];
-          var key = nameOf(item);
-          if (!imageCache.has(key)) imageCache.set(key, await readAsDataUrl(await fileOf(item)));
-          overrides[state.photoBind] = imageCache.get(key);
-        }
-
-        if (!hook) hook = state.textBind ? textFor(i, state.textBind) : (state.texts && state.texts.lines ? state.texts.lines[i] : '');
-        var folder = String(i + 1).padStart(2, '0') + (hook ? '-' + fileSlug(hook) : '');
+        var row = rowFor(i);
+        var built = await buildOverrides(m, i, row, imageCache);
+        var folder = String(i + 1).padStart(2, '0') + (built.hook ? '-' + fileSlug(built.hook) : '');
         var dest = zip ? null : await state.out.dir.getDirectoryHandle(folder, { create: true });
         for (var s = 0; s < m.frames.length; s++) {
-          var blobs = await window.exportFrameToBlobs(m.frames[s], { scale: 2, format: 'png', overrides: overrides });
+          var blobs = await window.exportFrameToBlobs(m.frames[s], { scale: 2, format: 'png', overrides: built.overrides });
           for (var b = 0; b < blobs.length; b++) {
             var file = 'slide-' + (s + 1) + (blobs.length > 1 ? '-' + (b + 1) : '') + '.png';
             if (zip) zip.file(folder + '/' + file, blobs[b]);
             else await writeFile(dest, file, blobs[b]);
           }
         }
+        // Legenda pronta pra colar no post
+        if (built.legenda) {
+          if (zip) zip.file(folder + '/legenda.txt', built.legenda);
+          else await writeFile(dest, 'legenda.txt', built.legenda);
+        }
+        resumo.push([folder].concat(copySlots(m).map(function (c) { return row ? (row[c.key] || '') : ''; }), [built.legenda]));
         await new Promise(function (r) { setTimeout(r, 0); });
       }
+      // Planilha com toda a copy do lote, pra revisar ou reaproveitar
+      var csv = '﻿' + resumo.map(function (r) { return r.map(csvCell).join(','); }).join('\n') + '\n';
+      if (zip) zip.file('copys.csv', csv);
+      else await writeFile(state.out.dir, 'copys.csv', csv);
+
       fill.style.width = '100%';
       if (zip) {
         label.textContent = 'Empacotando .zip…';
@@ -1105,8 +1207,8 @@
   }
 
   /* ----------------------------------------------- ponte com a IA (MCP)
-     mcp-bridge.js chama isto: a IA lê o pedido (com o modelo e as fotos em
-     miniatura) e depois devolve os textos para gerar. */
+     mcp-bridge.js chama isto. Fluxo da IA: ver_pedido → (ver_fotos,
+     ver_exemplo, pesquisa) → previsualizar → ajustar → gerar. */
   function smallJpeg(source, maxSide) {
     return new Promise(function (resolve) {
       var img = new Image();
@@ -1115,63 +1217,64 @@
         var c = document.createElement('canvas');
         c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        resolve(c.toDataURL('image/jpeg', 0.75));
+        resolve(c.toDataURL('image/jpeg', 0.8));
       };
       img.onerror = function () { resolve(null); };
       img.src = source;
     });
   }
 
-  async function lotePedido() {
+  async function fileJpeg(item, maxSide) {
+    var u = URL.createObjectURL(await fileOf(item));
+    try { return await smallJpeg(u, maxSide); } finally { URL.revokeObjectURL(u); }
+  }
+
+  async function frameJpeg(frame, maxSide, overrides) {
+    var c = await window.renderFrameToCanvas(frame, { scale: Math.min(1, maxSide / Math.max(frame.w, frame.h)), format: 'jpeg', overrides: overrides || {} });
+    return c.toDataURL('image/jpeg', 0.82);
+  }
+
+  async function ready() {
     if (!el.overlay) build();
     await restore();
     var m = model();
     resolveBinds(m);
+    return m;
+  }
+
+  async function lotePedido() {
+    var m = await ready();
     var faltando = [];
-    if (!m) faltando.push('carrossel modelo no canvas');
-    else if (!m.binds.length) faltando.push('variáveis {} no modelo');
-    if (imageBinds(m).length && !state.photos) faltando.push(state.pendingPhotos ? 'reabrir a pasta de fotos no app (um clique)' : 'pasta de fotos (passo 1)');
-    if (!state.out) faltando.push(state.pendingOut ? 'reabrir a pasta de saída no app (um clique)' : 'pasta de saída (passo 3)');
+    if (!m) faltando.push('molde: não há post no canvas — crie um com criar_molde (a partir dos exemplos) ou peça pro usuário desenhar');
+    if (!state.photos && (!m || imageBinds(m).length)) faltando.push(state.pendingPhotos ? 'reabrir a pasta de fotos no app (um clique)' : 'pasta de fotos (passo Fotos)');
+    if (!state.out) faltando.push(state.pendingOut ? 'reabrir a pasta de saída no app (um clique)' : 'pasta de saída (passo Saída)');
 
     var modeloImgs = [];
-    if (m) {
-      for (var i = 0; i < Math.min(m.frames.length, 4); i++) {
-        var c = await window.renderFrameToCanvas(m.frames[i], { scale: Math.min(1, 512 / Math.max(m.frames[i].w, m.frames[i].h)), format: 'jpeg' });
-        modeloImgs.push(c.toDataURL('image/jpeg', 0.8));
-      }
-    }
-    // Exemplos: até 3 carrosséis × 5 slides, pequenos (é referência de estilo)
+    if (m) for (var i = 0; i < Math.min(m.frames.length, 6); i++) modeloImgs.push(await frameJpeg(m.frames[i], 512));
+
+    // Exemplos grandes o bastante pra ler a copy dos melhores posts
     var refImgs = [];
     if (state.ref && !state.refSkipped) {
       var carr = state.ref.carousels.slice(0, 3);
       for (var ci = 0; ci < carr.length; ci++) {
         var slidesRef = [];
-        for (var si = 0; si < Math.min(carr[ci].files.length, 5); si++) {
-          var u = URL.createObjectURL(await fileOf(carr[ci].files[si]));
-          slidesRef.push(await smallJpeg(u, 384));
-          URL.revokeObjectURL(u);
-        }
+        for (var si = 0; si < Math.min(carr[ci].files.length, 6); si++) slidesRef.push(await fileJpeg(carr[ci].files[si], 640));
         refImgs.push({ nome: carr[ci].name, slides: slidesRef.filter(Boolean) });
       }
     }
     var fotoImgs = [];
     if (state.photos) {
       var files = state.photos.files.slice(0, 8);
-      for (var j = 0; j < files.length; j++) {
-        var url = URL.createObjectURL(await fileOf(files[j]));
-        fotoImgs.push(await smallJpeg(url, 320));
-        URL.revokeObjectURL(url);
-      }
+      for (var j = 0; j < files.length; j++) fotoImgs.push(await fileJpeg(files[j], 320));
     }
     return {
-      modo: state.texts ? 'textos_prontos' : 'ia_decide',
+      modo: state.texts && !state.texts.fromAi ? 'textos_prontos' : 'ia_decide',
       pedido: state.brief.pedido.trim() || null,
-      quantidade: briefCount(),
-      quantidade_origem: parseInt(state.brief.quantidade, 10) > 0 ? 'pedida' : (state.photos ? 'uma por foto' : 'padrão'),
-      modelo: m ? { nome: m.nome, slides: m.frames.length, variaveis: m.binds.map(function (b) { return { nome: b.name, tipo: b.type === 'image' ? 'imagem' : 'texto' }; }) } : null,
+      quantidade: totalToMake(m) || variationsCount(),
+      molde: m ? { nome: m.nome, slides: m.frames.length, variaveis: m.binds.map(function (b) { return { nome: b.name, tipo: b.type === 'image' ? 'imagem' : 'texto' }; }) } : null,
       copys: copySlots(m).map(function (c) { return { chave: c.key, slide: c.slide, texto_do_modelo: c.exemplo, caracteres: c.exemplo.length }; }),
-      variavel_de_texto: state.textBind,
-      variaveis_de_texto: textBinds(m).map(function (b) { return b.name; }),
+      variavel_de_foto: state.photoBind,
+      variaveis_de_foto: imageBinds(m).map(function (b) { return b.name; }),
       fotos: state.photos ? { pasta: state.photos.name, total: state.photos.files.length, nomes: state.photos.files.map(nameOf) } : null,
       saida: state.out ? (state.out.zip ? '.zip baixado no navegador' : 'pasta ' + state.out.name) : null,
       textos_ja_escolhidos: state.texts && !state.texts.fromAi ? textCount() : 0,
@@ -1184,24 +1287,85 @@
     };
   }
 
+  function checkRows(m, textos) {
+    var chaves = copySlots(m).map(function (c) { return c.key; });
+    var desconhecidas = [];
+    textos.forEach(function (t) {
+      Object.keys(t || {}).forEach(function (k) {
+        if (k.charAt(0) !== '_' && chaves.indexOf(k) === -1 && desconhecidas.indexOf(k) === -1) desconhecidas.push(k);
+      });
+    });
+    if (desconhecidas.length) throw new Error('chaves que não existem no molde: ' + desconhecidas.join(', ') + '. Use as chaves de "copys": ' + chaves.join(', '));
+    return chaves;
+  }
+
+  // Prévia: renderiza até 3 carrosséis com a copy proposta e mede se cabe
+  async function lotePrevia(args) {
+    var textos = (args && args.textos) || [];
+    if (!textos.length) throw new Error('mande ao menos um carrossel em "textos"');
+    var m = await ready();
+    if (!m) throw new Error('não há molde: crie com criar_molde ou peça pro usuário desenhar no canvas');
+    checkRows(m, textos);
+    var slots = copySlots(m);
+    var cache = new Map();
+    var out = [];
+    for (var i = 0; i < Math.min(textos.length, 3); i++) {
+      var built = await buildOverrides(m, i, textos[i], cache);
+      var imgs = [], problemas = [];
+      for (var s = 0; s < m.frames.length; s++) {
+        imgs.push(await frameJpeg(m.frames[s], 540, built.overrides));
+        window.__tcmBatch.medirCopy(m.frames[s].id, built.overrides).forEach(function (med) {
+          var slot = slots.find(function (c) { return c.childId === med.id; });
+          if (!slot) return;
+          if (med.estoura_embaixo) problemas.push(slot.key + ': passa do fim do slide (' + med.linhas + ' linhas)');
+          if (med.palavra_maior_que_caixa) problemas.push(slot.key + ': uma palavra não cabe na largura da caixa');
+        });
+      }
+      out.push({ indice: i + 1, slides: imgs, problemas: problemas });
+    }
+    return { carrosseis: out };
+  }
+
+  async function loteFotos(args) {
+    await ready();
+    if (!state.photos) throw new Error('nenhuma pasta de fotos escolhida no app');
+    var porPagina = 12;
+    var pagina = Math.max(1, Number(args && args.pagina) || 1);
+    var files = state.photos.files.slice((pagina - 1) * porPagina, pagina * porPagina);
+    var fotos = [];
+    for (var i = 0; i < files.length; i++) {
+      fotos.push({ indice: (pagina - 1) * porPagina + i + 1, nome: nameOf(files[i]), img: await fileJpeg(files[i], 384) });
+    }
+    return { pagina: pagina, paginas: Math.ceil(state.photos.files.length / porPagina), total: state.photos.files.length, fotos: fotos };
+  }
+
+  async function loteExemplo(args) {
+    await ready();
+    if (!state.ref || state.refSkipped) throw new Error('nenhum resultado desejado escolhido no app');
+    var c = state.ref.carousels[(Number(args && args.carrossel) || 1) - 1];
+    if (!c) throw new Error('carrossel de exemplo inexistente (há ' + state.ref.carousels.length + ')');
+    var f = c.files[(Number(args && args.slide) || 1) - 1];
+    if (!f) throw new Error('slide inexistente (o exemplo tem ' + c.files.length + ')');
+    return { carrossel: c.name, slide: Number(args && args.slide) || 1, de: c.files.length, img: await fileJpeg(f, 1080) };
+  }
+
+  async function loteCriarMolde(spec) {
+    var res = window.__tcmBatch.criarMolde(spec || {});
+    if (el.overlay) render();
+    return res;
+  }
+
   async function loteGerar(args) {
     var textos = (args && args.textos) || [];
-    if (!textos.length) throw new Error('mande ao menos um texto em "textos"');
-    if (!el.overlay) build();
-    await restore();
-    var m = model();
-    if (!m) throw new Error('não há carrossel modelo no canvas');
-    resolveBinds(m);
-    if (!state.out) throw new Error(state.pendingOut ? 'a pasta de saída precisa ser reaberta no app (Criar em lote → Reabrir)' : 'escolha a pasta de saída no app (Criar em lote → passo 3)');
-    if (imageBinds(m).length && !state.photos) throw new Error('escolha a pasta de fotos no app (Criar em lote → passo 1)');
+    if (!textos.length) throw new Error('mande ao menos um carrossel em "textos"');
+    var m = await ready();
+    if (!m) throw new Error('não há molde: crie com criar_molde ou peça pro usuário desenhar no canvas');
+    if (!state.out) throw new Error(state.pendingOut ? 'a pasta de saída precisa ser reaberta no app (Criar em lote → Reabrir)' : 'escolha a pasta de saída no app (Criar em lote → Saída)');
+    if (imageBinds(m).length && !state.photos) throw new Error('escolha a pasta de fotos no app (Criar em lote → Fotos)');
 
     var texts = { name: 'copy da IA', fromAi: true, lines: [], columns: null };
     if (typeof textos[0] === 'object') {
-      // Um objeto por carrossel com a copy de cada slide: { slide1_texto1: '...', ... }
-      var chaves = copySlots(m).map(function (c) { return c.key; });
-      var desconhecidas = [];
-      textos.forEach(function (t) { Object.keys(t || {}).forEach(function (k) { if (chaves.indexOf(k) === -1 && desconhecidas.indexOf(k) === -1) desconhecidas.push(k); }); });
-      if (desconhecidas.length) throw new Error('chaves que não existem no modelo: ' + desconhecidas.join(', ') + '. Use as chaves de "copys": ' + chaves.join(', '));
+      var chaves = checkRows(m, textos);
       texts.rows = textos.map(function (t) { return t || {}; });
       texts.lines = texts.rows.map(function (t) { return chaves.map(function (k) { return t[k] || ''; }).filter(Boolean).join(' · '); });
     } else {
@@ -1216,7 +1380,10 @@
     return res;
   }
 
-  window.__tcmLote = { pedido: lotePedido, gerar: loteGerar };
+  window.__tcmLote = {
+    pedido: lotePedido, gerar: loteGerar, previa: lotePrevia,
+    fotos: loteFotos, exemplo: loteExemplo, criarMolde: loteCriarMolde,
+  };
 
   /* ------------------------------------------------------ abrir/fechar */
   async function open() {
