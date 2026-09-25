@@ -1969,6 +1969,7 @@
         }
         if (quietSaveDepth > 0) markSavedQuiet();
         else markSaving();
+        scheduleLayersRefresh();
       } catch (e) {
         /* Falhar em silêncio aqui custa o trabalho inteiro do usuário no
            próximo reload — ele precisa saber na hora. */
@@ -4767,6 +4768,7 @@
     }
 
     function updateTopbar() {
+      scheduleLayersRefresh();
       const selectedFrames = getSelectedFrames();
       const hasFrames = selectedFrames.length > 0;
       const firstFrame = selectedFrames[0];
@@ -5038,7 +5040,7 @@
 
     view.addEventListener('mousedown', (e) => {
       if (!frameToolOn || e.button !== 0) return;
-      if (e.target.closest('.canvas-topbar, .canvas-hud, .canvas-props, .canvas-dropdown-card')) return;
+      if (e.target.closest('.canvas-topbar, .canvas-hud, .canvas-props, .canvas-layers, .canvas-dropdown-card')) return;
       e.preventDefault();
       e.stopPropagation();
 
@@ -5546,7 +5548,289 @@
       updateFrameMeta();
       applyCamera();
       syncImageChrome();
+      scheduleLayersRefresh();
     }
+
+    /* --------------------------------------------------
+       Painel de Camadas (estilo Figma)
+       Posts no topo; dentro, textos e imagens na ordem do Figma: quem está
+       por cima no canvas aparece primeiro (frame.children ao contrário).
+       Nada aqui guarda estado próprio além de quais posts estão abertos —
+       a lista é refeita a partir de `frames` e da seleção.
+       Chamado por save(), updateTopbar() e renderAll(), então usa `var`:
+       essas funções rodam antes desta parte do arquivo ser executada.
+       -------------------------------------------------- */
+    var layersRaf = 0;
+    var layersSig = '';
+    var layersOpenFrames = null; // Set de frame ids abertos na árvore
+    var layersDrag = null; // { frameId, childId }
+
+    const LY_ICONS = {
+      chev: '<path d="m9 18 6-6-6-6"/>',
+      frame: '<line x1="22" x2="2" y1="6" y2="6"/><line x1="22" x2="2" y1="18" y2="18"/><line x1="6" x2="6" y1="2" y2="22"/><line x1="18" x2="18" y1="2" y2="22"/>',
+      text: '<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/>',
+      image: '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+      eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+      eyeOff: '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>',
+      lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+      unlock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+    };
+
+    function lyIcon(name) {
+      return `<svg class="lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">${LY_ICONS[name]}</svg>`;
+    }
+
+    function layerChildName(child) {
+      if (child.name && child.name.trim()) return child.name;
+      if (child.type === 'image') return 'Imagem';
+      // Como no Figma: camada de texto se chama pelo próprio texto
+      const raw = (child.text || '').replace(/\s+/g, ' ').trim();
+      return raw ? raw.slice(0, 40) : 'Texto';
+    }
+
+    function scheduleLayersRefresh() {
+      if (layersRaf) return;
+      layersRaf = requestAnimationFrame(() => {
+        layersRaf = 0;
+        renderLayers();
+      });
+    }
+
+    /* Aplica olho/cadeado nos nós do canvas. Barato: roda a cada refresh. */
+    function syncLayerFlags() {
+      frames.forEach(f => (f.children || []).forEach(c => {
+        const el = world.querySelector(`.canvas-text-node[data-id="${c.id}"], .canvas-image-node[data-id="${c.id}"]`);
+        if (!el) return;
+        el.classList.toggle('is-layer-hidden', !!c.hidden);
+        el.classList.toggle('is-layer-locked', !!c.locked);
+      }));
+    }
+
+    function renderLayers(force = false) {
+      const list = document.getElementById('canvas-layers-list');
+      if (!list) return;
+      syncLayerFlags();
+      if (!layersOpenFrames) layersOpenFrames = new Set();
+      // Seleção dentro de um post fechado abre o post, como no Figma
+      selectedChildNodes.forEach(n => layersOpenFrames.add(n.frameId));
+
+      // Mesmo nome que o rótulo do post no canvas (Post N · Slide M)
+      const posMap = new Map();
+      computePosts().forEach((chain, i) => {
+        chain.forEach((id, idx) => posMap.set(id, { post: i + 1, page: idx + 1, total: chain.length }));
+      });
+      const rows = [];
+      frames.forEach(f => {
+        const open = layersOpenFrames.has(f.id);
+        const kids = (f.children || []).slice().reverse();
+        rows.push({
+          kind: 'frame', f, open, hasKids: kids.length > 0,
+          name: formatFrameDisplayName(f, posMap),
+          sel: selectedFrameIds.has(f.id) && selectedChildNodes.length === 0,
+        });
+        if (open) kids.forEach(c => rows.push({
+          kind: 'child', f, c,
+          name: layerChildName(c),
+          sel: isChildNodeSelected(f.id, c.id),
+          inSel: selectedFrameIds.has(f.id) && selectedChildNodes.length === 0,
+        }));
+      });
+
+      // Pan e zoom também salvam: não refaz a lista se nada visível mudou
+      const sig = JSON.stringify(rows.map(r => [r.kind, r.f.id, r.c && r.c.id, r.name, r.sel, r.inSel, r.open, r.hasKids, r.c && r.c.hidden, r.c && r.c.locked]));
+      if (!force && sig === layersSig) return;
+      if (list.querySelector('.ly-row__rename')) return; // não atropela quem está renomeando
+      layersSig = sig;
+
+      if (rows.length === 0) {
+        list.innerHTML = '<div class="ly-empty">Crie um post com o + lá em cima.</div>';
+        return;
+      }
+
+      const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+      list.innerHTML = rows.map(r => {
+        if (r.kind === 'frame') {
+          return `<div class="ly-row ly-row--frame${r.sel ? ' is-selected' : ''}" role="treeitem" aria-expanded="${r.open}" data-frame="${r.f.id}" style="--depth:0">
+            <span class="ly-row__chev${r.open ? ' is-open' : ''}${r.hasKids ? '' : ' is-blank'}" data-act="toggle">${lyIcon('chev')}</span>
+            <span class="ly-row__icon">${lyIcon('frame')}</span>
+            <span class="ly-row__name">${esc(r.name)}</span>
+          </div>`;
+        }
+        const c = r.c;
+        const cls = ['ly-row', 'ly-row--child'];
+        if (r.sel) cls.push('is-selected');
+        else if (r.inSel) cls.push('is-in-selected');
+        if (c.hidden) cls.push('is-hidden');
+        return `<div class="${cls.join(' ')}" role="treeitem" draggable="true" data-frame="${r.f.id}" data-child="${c.id}" style="--depth:1">
+          <span class="ly-row__chev is-blank"></span>
+          <span class="ly-row__icon">${lyIcon(c.type === 'image' ? 'image' : 'text')}</span>
+          <span class="ly-row__name">${esc(r.name)}</span>
+          <button type="button" class="ly-row__btn${c.locked ? ' is-on' : ''}" data-act="lock" title="${c.locked ? 'Destravar' : 'Travar'}">${lyIcon(c.locked ? 'lock' : 'unlock')}</button>
+          <button type="button" class="ly-row__btn${c.hidden ? ' is-on' : ''}" data-act="hide" title="${c.hidden ? 'Mostrar' : 'Esconder'}">${lyIcon(c.hidden ? 'eyeOff' : 'eye')}</button>
+        </div>`;
+      }).join('');
+
+      const selRow = list.querySelector('.ly-row.is-selected');
+      if (selRow) selRow.scrollIntoView({ block: 'nearest' });
+    }
+
+    function layerRowTarget(row) {
+      const f = frames.find(fr => fr.id === Number(row.dataset.frame));
+      const c = f && row.dataset.child ? (f.children || []).find(ch => ch.id === Number(row.dataset.child)) : null;
+      return { f, c };
+    }
+
+    function startLayerRename(row) {
+      const { f, c } = layerRowTarget(row);
+      if (!f) return;
+      const nameEl = row.querySelector('.ly-row__name');
+      const input = document.createElement('input');
+      input.className = 'ly-row__rename';
+      input.value = c ? layerChildName(c) : formatFrameDisplayName(f);
+      nameEl.replaceWith(input);
+      input.focus();
+      input.select();
+
+      let done = false;
+      const finish = (commit) => {
+        if (done) return;
+        done = true;
+        const val = input.value.trim();
+        if (commit) {
+          if (c) c.name = val || undefined; // vazio volta ao nome automático
+          else if (val) f.name = val;
+          if (!c) updateFrameMeta();
+          input.remove();
+          save();
+        } else {
+          input.remove();
+        }
+        renderLayers(true);
+      };
+      input.addEventListener('keydown', (e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') finish(true);
+        else if (e.key === 'Escape') finish(false);
+      });
+      input.addEventListener('blur', () => finish(true));
+      input.addEventListener('mousedown', e => e.stopPropagation());
+    }
+
+    (function initLayersPanel() {
+      const panel = document.getElementById('canvas-layers');
+      const list = document.getElementById('canvas-layers-list');
+      if (!panel || !list) return;
+
+      const setCollapsed = (on) => {
+        panel.classList.toggle('is-collapsed', on);
+        try { localStorage.setItem('oa_canvas_layers_hidden', on ? '1' : '0'); } catch { /* sem storage, só não lembra */ }
+      };
+      try { if (localStorage.getItem('oa_canvas_layers_hidden') === '1') panel.classList.add('is-collapsed'); } catch { /* idem */ }
+      document.getElementById('canvas-layers-toggle')?.addEventListener('click', () => setCollapsed(true));
+      document.getElementById('canvas-layers-open')?.addEventListener('click', () => setCollapsed(false));
+
+      // O canvas usa a roda para pan/zoom; aqui ela tem que rolar a lista
+      panel.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
+
+      list.addEventListener('click', (e) => {
+        const row = e.target.closest('.ly-row');
+        if (!row) return;
+        const { f, c } = layerRowTarget(row);
+        if (!f) return;
+        const act = e.target.closest('[data-act]')?.dataset.act;
+        const multi = e.shiftKey || e.metaKey || e.ctrlKey;
+
+        if (act === 'toggle') {
+          if (layersOpenFrames.has(f.id)) layersOpenFrames.delete(f.id);
+          else layersOpenFrames.add(f.id);
+          renderLayers(true);
+          return;
+        }
+        if (act === 'hide' && c) {
+          c.hidden = !c.hidden;
+          // Escondeu o que estava selecionado: a seleção não pode ficar num fantasma
+          if (c.hidden && isChildNodeSelected(f.id, c.id)) selectTextNode(null, null);
+          save();
+          return;
+        }
+        if (act === 'lock' && c) {
+          c.locked = !c.locked;
+          save();
+          return;
+        }
+        if (c) selectTextNode(f.id, c.id, multi);
+        else selectFrame(f.id, multi);
+      });
+
+      list.addEventListener('dblclick', (e) => {
+        const row = e.target.closest('.ly-row');
+        if (!row || e.target.closest('[data-act]')) return;
+        if (e.target.closest('.ly-row__name')) {
+          startLayerRename(row);
+          return;
+        }
+        const { f } = layerRowTarget(row);
+        if (f) zoomToFrame(f);
+      });
+
+      /* Arrastar para mudar a ordem (dentro do mesmo post). Soltar na metade
+         de cima de uma linha põe por cima dela no canvas; embaixo, por baixo. */
+      const clearDropMarks = () => list.querySelectorAll('.drop-above, .drop-below')
+        .forEach(el => el.classList.remove('drop-above', 'drop-below'));
+
+      list.addEventListener('dragstart', (e) => {
+        const row = e.target.closest('.ly-row--child');
+        if (!row) return;
+        layersDrag = { frameId: Number(row.dataset.frame), childId: Number(row.dataset.child) };
+        row.classList.add('is-dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', '');
+      });
+
+      list.addEventListener('dragover', (e) => {
+        if (!layersDrag) return;
+        const row = e.target.closest('.ly-row--child');
+        clearDropMarks();
+        // Não deixa o soltar-imagem do canvas ver este arrasto (ele força "copy")
+        e.stopPropagation();
+        if (!row || Number(row.dataset.frame) !== layersDrag.frameId) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        const r = row.getBoundingClientRect();
+        row.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-above' : 'drop-below');
+      });
+
+      list.addEventListener('drop', (e) => {
+        if (!layersDrag) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const row = list.querySelector('.drop-above, .drop-below');
+        const above = row && row.classList.contains('drop-above');
+        clearDropMarks();
+        if (!row) return;
+        const frame = frames.find(f => f.id === layersDrag.frameId);
+        const targetId = Number(row.dataset.child);
+        if (!frame || targetId === layersDrag.childId) return;
+        const kids = frame.children;
+        const from = kids.findIndex(ch => ch.id === layersDrag.childId);
+        if (from === -1) return;
+        const [moved] = kids.splice(from, 1);
+        const to = kids.findIndex(ch => ch.id === targetId);
+        // A lista é invertida: "acima" na lista = depois no array (mais pra frente)
+        kids.splice(above ? to + 1 : to, 0, moved);
+        reorderChildDOM(frame);
+        save();
+      });
+
+      list.addEventListener('dragend', () => {
+        layersDrag = null;
+        clearDropMarks();
+        list.querySelectorAll('.is-dragging').forEach(el => el.classList.remove('is-dragging'));
+        renderLayers(true);
+      });
+
+      renderLayers(true);
+    })();
 
     // Observer global: qualquer mudança de is-selected re-sincroniza o chrome
     watchSelectionForChrome();
@@ -5559,7 +5843,7 @@
       const marqueeOverride = e.button === 0 && (e.metaKey || e.ctrlKey || e.shiftKey);
       if (e.target.closest('.canvas-topbar')) return;
       if (e.target.closest('.canvas-frame') && !marqueeOverride) return;
-      if (e.target.closest('.canvas-props')) return;
+      if (e.target.closest('.canvas-props, .canvas-layers, .canvas-layers-open')) return;
 
       const isPanning = isSpacePressed || e.button === 1 || e.altKey;
 
@@ -5636,6 +5920,7 @@
           const hitChildren = [];
           frames.forEach(f => {
             (f.children || []).forEach(c => {
+              if (c.hidden || c.locked) return;
               const nodeX1 = f.x + c.x;
               const nodeY1 = f.y + c.y;
               const nodeX2 = nodeX1 + c.w;
@@ -5699,6 +5984,7 @@
             const hitChildren = [];
             frames.forEach(f => {
               (f.children || []).forEach(c => {
+                if (c.hidden || c.locked) return;
                 const nodeX1 = f.x + c.x;
                 const nodeY1 = f.y + c.y;
                 const nodeX2 = nodeX1 + c.w;
@@ -8446,6 +8732,7 @@
         const adjustedTextYMap = computeAdjustedTextPositions(frame, overrides, ctx);
         const children = frame.children || [];
         for (const child of children) {
+          if (child.hidden) continue; // olho fechado no painel de camadas
           if (child.type === 'image') {
             const src = await resolveChildImageSrc(child, overrides);
             const img = await loadExportImage(src);

@@ -751,6 +751,24 @@
     </div>
 
     <!-- --------------------------------------------------
+         PAINEL DE CAMADAS (estilo Figma)
+         Fixo à esquerda: posts e, dentro deles, textos e imagens. A lista é
+         montada pelo app.js (renderLayers) a partir de `frames`.
+         -------------------------------------------------- -->
+    <aside class="canvas-layers" id="canvas-layers" aria-label="Camadas">
+      <div class="ly-head">
+        <span class="ly-head__title">Camadas</span>
+        <button type="button" class="ly-head__btn" id="canvas-layers-toggle" title="Esconder camadas" aria-label="Esconder camadas">
+          <i data-lucide="panel-left-close"></i>
+        </button>
+      </div>
+      <div class="ly-list" id="canvas-layers-list" role="tree"></div>
+    </aside>
+    <button type="button" class="canvas-layers-open" id="canvas-layers-open" title="Mostrar camadas" aria-label="Mostrar camadas">
+      <i data-lucide="layers"></i>
+    </button>
+
+    <!-- --------------------------------------------------
          PAINEL DE PROPRIEDADES (estilo Figma)
          Um painel fixo à direita. Cada seleção acende um dos blocos abaixo
          (.is-visible); o painel só aparece quando algum está aceso.
