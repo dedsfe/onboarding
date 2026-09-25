@@ -608,7 +608,6 @@
     } else {
       guide.appendChild(guideText(STEP_INFO[cur].title, STEP_INFO[cur].sub, list.indexOf(cur) + 1, list.length));
     }
-    el.shell.appendChild(guide);
 
     // Fluxo: entradas → resultado desejado → saída
     var stage = h('div', { class: 'bw-stage' });
@@ -642,7 +641,7 @@
     el.go.disabled = !m || !m.binds.length || cur !== 'ready' || !total || waitingAi();
     if (cur === 'ready' && waitingAi()) el.go.querySelector('span').textContent = 'Esperando a IA…';
     el.shell.appendChild(h('footer', { class: 'bw-foot' }, [
-      h('div', { class: 'bw-foot__status', text: cur !== 'ready' ? 'Complete os passos para gerar.' : (waitingAi() ? 'A IA gera pelo MCP: mande a frase da direita no Claude.' : '') }),
+      h('div', { class: 'bw-foot__status' }),
       el.progress,
       el.go,
     ]));
@@ -659,6 +658,11 @@
         if (ab.bottom > sb.bottom || ab.top < sb.top) stage.scrollTop += ab.top - sb.top - (sb.height - ab.height) / 2;
       }
     });
+  }
+
+  // Silhueta do que vai entrar ali: ícone apagado numa área tracejada
+  function ghost(ic, extra) {
+    return h('div', { class: 'bw-ghost' + (extra ? ' ' + extra : ''), html: icon(ic) });
   }
 
   function guideText(title, sub, n, total, ok) {
@@ -732,11 +736,13 @@
         body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('folder-open') + '<span>Reabrir “' + escapeHtml(state.pendingPhotos.name) + '”</span>', onclick: function () { reopen('photos'); } }));
         body.push(h('button', { class: 'bw-link', text: 'ou escolher outra pasta', onclick: pickPhotos }));
       } else {
-        body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('folder-search') + '<span>Escolher pasta de fotos</span>', onclick: pickPhotos }));
-        body.push(h('span', { class: 'bw-hint', text: 'ou arraste a pasta pra cá' }));
+        body.push(h('div', { class: 'bw-dropzone' }, [
+          h('span', { class: 'bw-dropzone__icon', html: icon('images') }),
+          h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('folder-search') + '<span>Escolher pasta</span>', onclick: pickPhotos }),
+        ]));
       }
     } else {
-      body.push(h('span', { class: 'bw-hint', text: 'Uma pasta com as imagens' }));
+      body.push(ghost('images'));
     }
     return node('photos', {
       icon: 'images', title: 'Fotos', sub: st === 'done' ? null : 'Passo ' + (steps(m).indexOf('photos') + 1),
@@ -751,18 +757,15 @@
     var body = [];
     var semTexto = !!m && !copySlots(m).length;
     if (semTexto && st === 'done') {
-      body.push(h('span', { class: 'bw-hint', text: 'Sem copy: os carrosséis mudam só as fotos.' }));
+      body.push(h('span', { class: 'bw-pill bw-pill--muted', html: icon('image') + '<span>Só fotos</span>' }));
     } else if (semTexto && st === 'active') {
-      body.push(h('div', { class: 'bw-warn' }, [
-        h('span', { class: 'bw-warn__title', html: icon('type') + '<span>Seu modelo não tem textos</span>' }),
-        h('span', { class: 'bw-warn__text', text: 'Feche, aperte T no canvas e crie os textos em cada slide. Eles viram a copy que a IA escreve.' }),
-      ]));
-      body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('pencil') + '<span>Adicionar textos no canvas</span>', onclick: close }));
-      body.push(h('button', { class: 'bw-link', text: 'seguir só com fotos', onclick: function () { state.copySkipped = true; render(); } }));
+      body.push(ghost('type', 'is-warn'));
+      body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('pencil') + '<span>Adicionar textos</span>', title: 'Fecha e volta pro canvas (T cria texto)', onclick: close }));
+      body.push(h('button', { class: 'bw-link', text: 'Só fotos', onclick: function () { state.copySkipped = true; render(); } }));
     } else if (st === 'done' && waitingAi()) {
       body.push(h('div', { class: 'bw-brief-sum' }, [
         h('span', { class: 'bw-brief-sum__tag', html: icon('sparkles') + '<span>A IA decide</span>' }),
-        h('p', { class: 'bw-brief-sum__text', text: state.brief.pedido.trim() || 'Vai pesquisar o que está funcionando no seu nicho e escrever a copy.' }),
+        state.brief.pedido.trim() ? h('p', { class: 'bw-brief-sum__text', text: state.brief.pedido.trim() }) : null,
       ]));
       body.push(h('div', { class: 'bw-row' }, [
         h('span', { class: 'bw-meta', text: plural(briefCount(), 'carrossel', 'carrosséis') + (m ? ' · ' + plural(copySlots(m).length, 'texto', 'textos') + ' cada' : ' · textos definidos pela IA') }),
@@ -782,15 +785,15 @@
     } else if (st === 'active') {
       body.push(h('button', { class: 'bw-choice', onclick: function () { state.briefMode = true; state.brief.ok = false; saveBrief(); render(); } }, [
         h('span', { class: 'bw-choice__icon', html: icon('sparkles') }),
-        h('span', { class: 'bw-choice__txt' }, [h('strong', { text: 'A IA decide' }), h('span', { text: 'Ela pesquisa o nicho e escreve' })]),
+        h('span', { class: 'bw-choice__txt' }, [h('strong', { text: 'A IA decide' })]),
       ]));
       body.push(h('button', { class: 'bw-choice', onclick: pickTexts }, [
         h('span', { class: 'bw-choice__icon', html: icon('sheet') }),
-        h('span', { class: 'bw-choice__txt' }, [h('strong', { text: 'Arrastar CSV' }), h('span', { text: 'Uma linha por carrossel' })]),
+        h('span', { class: 'bw-choice__txt' }, [h('strong', { text: 'CSV' })]),
       ]));
-      body.push(h('button', { class: 'bw-link', html: icon('download') + '<span>baixar CSV modelo</span>', onclick: downloadCsvTemplate }));
+      body.push(h('button', { class: 'bw-link', html: icon('download') + '<span>CSV modelo</span>', onclick: downloadCsvTemplate }));
     } else {
-      body.push(h('span', { class: 'bw-hint', text: 'A IA decide ou você manda um CSV' }));
+      body.push(ghost('type'));
     }
     var action = null;
     if (st === 'done') {
@@ -810,7 +813,7 @@
   function briefForm(m) {
     var ta = h('textarea', {
       class: 'bw-textarea', rows: '3',
-      placeholder: 'Opcional. Ex.: produtividade pra quem trabalha em casa, tom direto, último slide com CTA pra seguir.',
+      placeholder: 'Direção (opcional)',
     });
     ta.value = state.brief.pedido;
     var qty = h('input', { class: 'bw-qty', type: 'number', min: '1', max: '200', placeholder: String(state.photos ? state.photos.files.length : 10) });
@@ -821,12 +824,10 @@
     ok.addEventListener('click', function () { state.brief.ok = true; saveBrief(); render(); });
     setTimeout(function () { ta.focus(); }, 30);
     return h('div', { class: 'bw-brief' }, [
-      h('label', { class: 'bw-brief__label', text: 'Quer dar uma direção?' }),
-      h('span', { class: 'bw-hint bw-brief__hint', text: 'Se deixar vazio, a IA deduz o nicho pelos exemplos e fotos, pesquisa o mercado e escreve os ' + plural(copySlots(m).length, 'texto', 'textos') + ' de cada carrossel.' }),
       ta,
-      h('label', { class: 'bw-brief__row' }, [h('span', { text: 'Quantos carrosséis' }), qty]),
+      h('label', { class: 'bw-brief__row', title: 'Quantos carrosséis' }, [h('span', { class: 'bw-brief__qicon', html: icon('layers') }), qty]),
       ok,
-      h('button', { class: 'bw-link', text: 'ou arrastar um CSV', onclick: function () { state.briefMode = false; saveBrief(); pickTexts(); } }),
+      h('button', { class: 'bw-link', html: icon('sheet') + '<span>CSV</span>', onclick: function () { state.briefMode = false; saveBrief(); pickTexts(); } }),
     ]);
   }
 
@@ -834,7 +835,7 @@
     var st = stateOf('ref', cur);
     var body = [];
     if (st === 'done' && state.refSkipped) {
-      body.push(h('span', { class: 'bw-hint', text: 'Sem exemplo: a IA segue só o pedido.' }));
+      body.push(h('span', { class: 'bw-pill bw-pill--muted', html: icon('skip-forward') + '<span>Pulado</span>' }));
     } else if (st === 'done') {
       state.ref.carousels.slice(0, 1).forEach(function (c) {
         var strip = h('div', { class: 'bw-strip bw-strip--seq' });
@@ -848,12 +849,17 @@
         body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('folder-open') + '<span>Reabrir “' + escapeHtml(state.pendingRef.name) + '”</span>', onclick: function () { reopen('ref'); } }));
         body.push(h('button', { class: 'bw-link', text: 'ou escolher outra pasta', onclick: pickRef }));
       } else {
-        body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('folder-search') + '<span>Escolher pasta de exemplos</span>', onclick: pickRef }));
-        body.push(h('button', { class: 'bw-btn bw-cta', html: icon('images') + '<span>Escolher fotos em sequência</span>', onclick: pickRefPhotos }));
+        body.push(h('div', { class: 'bw-dropzone' }, [
+          h('span', { class: 'bw-dropzone__icon', html: icon('gallery-horizontal-end') }),
+          h('div', { class: 'bw-pair' }, [
+            h('button', { class: 'bw-btn bw-btn--primary', html: icon('folder-search') + '<span>Pasta</span>', title: 'Uma subpasta por carrossel', onclick: pickRef }),
+            h('button', { class: 'bw-btn', html: icon('images') + '<span>Fotos</span>', title: 'Fotos em sequência = um carrossel', onclick: pickRefPhotos }),
+          ]),
+        ]));
       }
-      body.push(h('button', { class: 'bw-link', text: 'pular este passo', onclick: function () { state.refSkipped = true; render(); } }));
+      body.push(h('button', { class: 'bw-link', html: icon('skip-forward') + '<span>Pular</span>', onclick: function () { state.refSkipped = true; render(); } }));
     } else {
-      body.push(h('span', { class: 'bw-hint', text: 'Carrosséis de exemplo' }));
+      body.push(ghost('gallery-horizontal-end'));
     }
     return node('ref', {
       icon: 'target', title: 'Resultado desejado', sub: st === 'done' ? null : 'Passo ' + (steps(m).indexOf('ref') + 1),
@@ -866,13 +872,12 @@
   function modelNode(m) {
     var body = [];
     if (!m) {
-      body.push(h('span', { class: 'bw-hint', text: 'Sem post no canvas: o molde vai sair do Resultado desejado.' }));
+      body.push(h('div', { class: 'bw-slides bw-slides--ghost' }, [ghost('sparkles', 'is-slide'), ghost('sparkles', 'is-slide')]));
     } else {
       var slides = h('div', { class: 'bw-slides' });
       m.frames.slice(0, 3).forEach(function (f) { slides.appendChild(slideThumb(f)); });
       body.push(slides);
       var chips = h('div', { class: 'bw-binds' });
-      if (!m.binds.length) chips.appendChild(h('span', { class: 'bw-hint', text: 'Nada marcado com {} ainda' }));
       m.binds.forEach(function (b) {
         var fed = (b.type === 'image' && state.photos && state.photoBind === b.name)
           || (b.type !== 'image' && state.texts && (state.texts.columns ? !!state.texts.columns[b.name] : state.textBind === b.name));
@@ -911,7 +916,7 @@
         }));
       }
     } else {
-      body.push(h('span', { class: 'bw-hint', text: 'Onde os carrosséis prontos caem' }));
+      body.push(ghost('package'));
     }
     return node('out', {
       icon: 'package', title: 'Saída', sub: st === 'done' ? null : 'Passo ' + (steps(m).indexOf('out') + 1),
@@ -927,11 +932,9 @@
       var btn = h('button', { class: 'bw-btn bw-copy', html: icon('copy') + '<span>Copiar frase</span>' });
       btn.addEventListener('click', function () { copyPrompt(m, btn); });
       side.appendChild(h('div', { class: 'bw-ai' }, [
-        h('div', { class: 'bw-ai__head', html: icon('bot') + '<span>Agora é com a IA</span>' }),
-        h('p', { class: 'bw-ai__text', text: 'No Claude (com o MCP carousel-maker ligado), mande a frase abaixo. Ela olha os exemplos, o modelo e as fotos, pesquisa o que funciona no seu nicho, escreve a copy de ' + plural(briefCount(), 'carrossel', 'carrosséis') + ' e gera tudo na sua pasta de saída.' }),
+        h('div', { class: 'bw-ai__head', html: icon('bot') + '<span>Claude</span>' }),
         h('pre', { class: 'bw-ai__prompt', text: aiPrompt(m) }),
         btn,
-        state.out ? null : h('p', { class: 'bw-ai__warn', text: 'Escolha a saída (passo 3) antes, pra IA ter onde salvar.' }),
       ]));
     }
     if (state.ref && !state.refSkipped) {
@@ -956,7 +959,7 @@
       side.appendChild(section('file-text', state.texts.name, plural(textCount(), 'linha', 'linhas'), list));
     }
     if (!side.children.length) {
-      side.appendChild(h('div', { class: 'bw-side__empty', html: icon('mouse-pointer-click') + '<span>O que você escolher aparece aqui.</span>' }));
+      side.appendChild(h('div', { class: 'bw-side__empty', html: icon('images') }));
     }
     return side;
   }

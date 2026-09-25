@@ -28,7 +28,7 @@
   width: min(1280px, 100%);
   height: min(800px, 100%);
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto 1fr auto;
   background: var(--bw-bg);
   color: var(--bw-text);
   border: 1px solid var(--bw-line);
@@ -464,3 +464,42 @@
 .bw-warn__title { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--bw-amber); }
 .bw-warn__title svg { width: 13px !important; height: 13px !important; }
 .bw-warn__text { font-size: 11px; line-height: 1.45; color: var(--bw-muted); }
+
+/* Visual no lugar de frase: silhuetas e área de soltar */
+.bw-ghost {
+  display: grid;
+  place-items: center;
+  height: 56px;
+  border: 1.5px dashed #4a4a4a;
+  border-radius: 8px;
+  color: #5a5a5a;
+}
+.bw-ghost svg { width: 22px !important; height: 22px !important; }
+.bw-ghost.is-warn { border-color: rgba(245, 166, 35, 0.5); color: var(--bw-amber); background: rgba(245, 166, 35, 0.06); }
+.bw-ghost.is-slide { flex: 1; height: 110px; aspect-ratio: 4 / 5; }
+.bw-slides--ghost { width: 100%; }
+.bw-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 14px 10px 10px;
+  border: 1.5px dashed rgba(13, 153, 255, 0.45);
+  border-radius: 10px;
+}
+.bw-dropzone__icon { color: var(--bw-accent); display: grid; }
+.bw-dropzone__icon svg { width: 26px !important; height: 26px !important; }
+.bw-node.is-over .bw-dropzone { border-style: solid; background: rgba(13, 153, 255, 0.08); }
+.bw-pill--muted { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; background: var(--bw-card); color: var(--bw-muted); font-family: Inter, system-ui, sans-serif; }
+.bw-pill--muted svg { width: 12px !important; height: 12px !important; }
+.bw-brief__qicon { display: grid; color: var(--bw-muted); }
+.bw-side__empty svg { width: 34px !important; height: 34px !important; color: #4a4a4a; }
+.bw-ai__head span { font-size: 12px; }
+
+.bw-pair { display: flex; gap: 6px; width: 100%; }
+.bw-pair .bw-btn { flex: 1; justify-content: center; padding: 0 10px; }
+
+.bw-ghost { width: 100%; box-sizing: border-box; }
+.bw-slides--ghost .bw-ghost { width: auto; }

@@ -110,8 +110,8 @@ async function main() {
   });
 
   await page.click('#canvas-batch-btn');
-  await page.click('text=Escolher pasta de fotos');
-  await page.click('text=Escolher pasta de exemplos');
+  await page.click('.bw-node--photos .bw-btn--primary');
+  await page.click('.bw-node--ref .bw-btn--primary');
   await page.waitForSelector('.bw-node--ref.is-done');
   // "A IA decide" sem direção nenhuma: ela tem que pesquisar o nicho sozinha
   await page.click('.bw-choice:has-text("A IA decide")');
@@ -173,7 +173,7 @@ async function main() {
   const csvPath = require('path').join(require('os').tmpdir(), 'tcm-e2e-copy.csv');
   require('fs').writeFileSync(csvPath, csv);
   await page.click('.bw-node--texts .bw-swap');
-  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('.bw-choice:has-text("Arrastar CSV")')]);
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('.bw-choice:has-text("CSV")')]);
   await chooser.setFiles(csvPath);
   await page.waitForSelector('.bw-go:has-text("Gerar 2 carrosséis")', { timeout: 5000 }).catch(() => {});
   const botaoCsv = await page.textContent('.bw-go');
