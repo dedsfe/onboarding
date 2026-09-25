@@ -195,7 +195,8 @@ async function main() {
   // 4. Gera as 3 variações com foto escolhida, legenda e estilo
   const gerado = await tool('gerar_lote', { textos: [
     { hook: 'Trabalhe menos, entregue mais', dica: 'Bloqueie a manhã', corpo: 'Sem reunião antes das 11h.', _foto: 3, _legenda: 'Teste 1 #produtividade' },
-    { hook: 'Seu sofá não é escritório', dica: 'Tenha um canto fixo', corpo: 'O cérebro associa lugar a foco.', _foto: 1, _legenda: 'Teste 2 #homeoffice', _estilo: { corpo: { tamanho: 34 } } },
+    { hook: 'Seu sofá não é escritório', dica: 'Tenha um canto fixo', corpo: 'O cérebro associa lugar a foco.', _foto: 1, _legenda: 'Teste 2 #homeoffice', _estilo: { corpo: { tamanho: 34 } },
+      _variacoes: [{ hook: 'Sofá é pra descansar' }] },
     { hook: 'O truque dos 25 minutos', dica: 'Pomodoro de verdade', corpo: '25 de foco, 5 de pausa, repete.', _foto: 'foto-2.png', _legenda: 'Teste 3 #foco' },
   ] });
   if (gerado.isError) fail('gerar_lote: ' + textoDe(gerado));
@@ -206,17 +207,27 @@ async function main() {
     const r = { pastas: [], csv: '' };
     for await (const e of dir.values()) {
       if (e.kind === 'file') { if (e.name === 'copys.csv') r.csv = await (await e.getFile()).text(); continue; }
-      const fs = []; let legenda = '';
+      const fs = []; let legenda = '', canto = '';
       for await (const f of e.values()) {
         fs.push(f.name);
         if (f.name === 'legenda.txt') legenda = await (await f.getFile()).text();
+        if (f.name === 'slide-1.png') {
+          const bmp = await createImageBitmap(await f.getFile());
+          const c = new OffscreenCanvas(bmp.width, bmp.height); const x = c.getContext('2d'); x.drawImage(bmp, 0, 0);
+          canto = Array.from(x.getImageData(5, bmp.height - 5, 1, 1).data.slice(0, 3)).join(',');
+        }
       }
-      r.pastas.push({ nome: e.name, arquivos: fs.sort().join(','), legenda });
+      r.pastas.push({ nome: e.name, arquivos: fs.sort().join(','), legenda, canto });
     }
     r.pastas.sort((a, b) => a.nome.localeCompare(b.nome));
     return r;
   });
-  if (saida.pastas.length !== 3) fail('esperava 3 carrosséis na saída: ' + JSON.stringify(saida.pastas));
+  if (saida.pastas.length !== 4) fail('esperava 4 carrosséis na saída (3 + 1 variação de copy): ' + JSON.stringify(saida.pastas));
+  const [v1, v2] = [saida.pastas[1], saida.pastas[2]];
+  if (!/^02-v1-seu-sofa/.test(v1.nome) || !/^02-v2-sofa-e-pra-descansar/.test(v2.nome)) fail('variações de copy deveriam sair em 02-v1 e 02-v2: ' + v1.nome + ' | ' + v2.nome);
+  if (v1.canto !== v2.canto) fail('as variações de copy deveriam usar a mesma foto: ' + v1.canto + ' × ' + v2.canto);
+  if (!/^03-o-truque/.test(saida.pastas[3].nome)) fail('depois das variações a numeração deveria seguir em 03: ' + saida.pastas[3].nome);
+  if (v2.legenda !== 'Teste 2 #homeoffice') fail('a variação deveria herdar a legenda: ' + v2.legenda);
   if (!saida.pastas.every(p => p.arquivos === 'legenda.txt,slide-1.png,slide-2.png')) fail('cada carrossel deveria ter 2 slides + legenda: ' + JSON.stringify(saida.pastas));
   if (saida.pastas[1].legenda !== 'Teste 2 #homeoffice') fail('legenda errada: ' + saida.pastas[1].legenda);
   if (!/pasta,hook,dica,corpo,legenda/.test(saida.csv) || !/Teste 3 #foco/.test(saida.csv)) fail('copys.csv incompleto: ' + saida.csv.slice(0, 200));

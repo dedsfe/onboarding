@@ -1272,7 +1272,7 @@
       }
       hook = state.textBind ? textFor(i, state.textBind) : (state.texts && state.texts.lines ? state.texts.lines[i % state.texts.lines.length] : '');
     }
-    var plan = photoPlan(m, i, row);
+    var plan = photoPlan(m, row && row._grupo ? row._grupo - 1 : i, row);
     var binds = Object.keys(plan);
     for (var k = 0; k < binds.length; k++) overrides[binds[k]] = await photoData(plan[binds[k]], cache);
     return { overrides: overrides, hook: hook, legenda: legenda };
@@ -1306,7 +1306,9 @@
 
         var row = rowFor(i);
         var built = await buildOverrides(m, i, row, imageCache);
-        var folder = String(i + 1).padStart(2, '0') + (built.hook ? '-' + fileSlug(built.hook) : '');
+        var folder = String(row && row._grupo ? row._grupo : i + 1).padStart(2, '0')
+          + (row && row._v ? '-v' + row._v : '')
+          + (built.hook ? '-' + fileSlug(built.hook) : '');
         var dest = zip ? null : await state.out.dir.getDirectoryHandle(folder, { create: true });
         for (var s = 0; s < m.frames.length; s++) {
           var blobs = await window.exportFrameToBlobs(m.frames[s], { scale: 2, format: 'png', overrides: built.overrides });
@@ -1434,6 +1436,33 @@
     };
   }
 
+  /* Variações de copy (teste A/B): { hook: 'A', _variacoes: [{ hook: 'B' }] }
+     vira um carrossel por versão, com as MESMAS fotos e o mesmo design — só
+     muda a copy. Cada versão herda o que não trocou (legenda, estilo...). */
+  function expandRows(m, textos) {
+    var out = [];
+    textos.forEach(function (t, i) {
+      var row = t || {};
+      var vars = Array.isArray(row._variacoes) ? row._variacoes.filter(function (v) { return v && typeof v === 'object'; }) : [];
+      var base = Object.assign({}, row);
+      delete base._variacoes;
+      // _grupo = número do carrossel original (pasta e fotos não andam com as versões)
+      if (!vars.length) { out.push(Object.assign(base, { _grupo: i + 1 })); return; }
+      // Fotos fixadas pelo nome: todas as versões usam as fotos da original
+      var plan = photoPlan(m, i, row);
+      var binds = Object.keys(plan);
+      if (binds.length) {
+        base._foto = nameOf(plan[binds[0]]);
+        base._fotos = {};
+        binds.slice(1).forEach(function (b) { base._fotos[b] = nameOf(plan[b]); });
+      }
+      [{}].concat(vars).forEach(function (v, vi) {
+        out.push(Object.assign({}, base, v, { _grupo: i + 1, _v: vi + 1 }));
+      });
+    });
+    return out;
+  }
+
   function checkRows(m, textos) {
     var chaves = copySlots(m).map(function (c) { return c.key; });
     var desconhecidas = [];
@@ -1452,11 +1481,12 @@
     if (!textos.length) throw new Error('mande ao menos um carrossel em "textos"');
     var m = await ready();
     if (!m) throw new Error('não há molde: crie com criar_molde ou peça pro usuário desenhar no canvas');
+    textos = expandRows(m, textos);
     checkRows(m, textos);
     var slots = copySlots(m);
     var cache = new Map();
     var out = [];
-    for (var i = 0; i < Math.min(textos.length, 3); i++) {
+    for (var i = 0; i < Math.min(textos.length, 6); i++) {
       var built = await buildOverrides(m, i, textos[i], cache);
       var imgs = [], problemas = [];
       for (var s = 0; s < m.frames.length; s++) {
@@ -1468,7 +1498,7 @@
           if (med.palavra_maior_que_caixa) problemas.push(slot.key + ': uma palavra não cabe na largura da caixa');
         });
       }
-      out.push({ indice: i + 1, slides: imgs, problemas: problemas });
+      out.push({ indice: textos[i]._grupo || i + 1, versao: textos[i]._v || null, slides: imgs, problemas: problemas });
     }
     return { carrosseis: out };
   }
@@ -1525,6 +1555,7 @@
 
     var texts = { name: 'copy da IA', fromAi: true, lines: [], columns: null };
     if (typeof textos[0] === 'object') {
+      textos = expandRows(m, textos);
       var chaves = checkRows(m, textos);
       texts.rows = textos.map(function (t) { return t || {}; });
       texts.lines = texts.rows.map(function (t) { return chaves.map(function (k) { return t[k] || ''; }).filter(Boolean).join(' · '); });

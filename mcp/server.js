@@ -367,6 +367,7 @@ const PLAYBOOK = [
   '4. ESCREVA as variações com ângulos realmente diferentes (nunca a mesma frase trocando palavras): hook forte na capa, uma ideia por slide, CTA no último. Em cada carrossel inclua _legenda (2–4 linhas + 3–5 hashtags do nicho).',
   '5. REVISE com previsualizar_lote (2–3 carrosséis): leia as imagens e os "problemas"; encurte o que estourar ou use _estilo { chave: { tamanho } } para diminuir a fonte. Só então chame gerar_lote com TODAS as variações.',
   '6. SEM MOLDE (molde: null): ANTES de criar, abra 2–3 slides dos exemplos com ver_exemplo_lote e meça posições e tamanhos reais (hook costuma ter 80–120px, texto de apoio 36–48px). Crie com criar_molde reproduzindo esse layout, com "chave" em cada texto e fundo.foto quando a foto do usuário for o fundo (texto claro + escurecer ≥ 30). Olhe as imagens que o criar_molde devolve e refaça até ficar no nível dos exemplos.',
+  '6b. VARIAÇÕES DE COPY: se o usuário pedir versões pra testar (A/B), use _variacoes no carrossel — mesma foto e design, só troca o que muda (geralmente o hook). Cada versão precisa de um ângulo realmente diferente.',
   '7. No fim, conte ao usuário em 2–3 linhas o que achou na pesquisa e quais ângulos usou.',
 ].join('\n');
 
@@ -466,12 +467,14 @@ const carrosselLote = z
     _fotos: z.record(z.string(), z.union([z.number().int().min(1), z.string()])).optional().describe('Opcional: escolher a foto de outras variáveis ({ foto2: 5 }). Sem isso, cada variável de foto já recebe uma foto diferente da pasta.'),
     _estilo: z.record(z.string(), estiloTexto).optional().describe('Ajuste por campo de copy: { slide2_texto1: { tamanho: 56 } }'),
     _legenda: z.string().optional().describe('Legenda do post (vai para legenda.txt), com hashtags'),
+    _variacoes: z.array(z.record(z.string(), z.any())).max(5).optional()
+      .describe('Variações de copy pro MESMO post (teste A/B): cada item troca só as chaves que mudam, ex.: [{ hook: "outro hook" }, { hook: "...", cta: "..." }]. Gera um carrossel por versão com as mesmas fotos e design (pastas 01-v1, 01-v2...).'),
   })
   .catchall(z.string());
 
 server.tool(
   'previsualizar_lote',
-  'Renderiza até 3 carrosséis com a copy proposta e devolve as imagens de cada slide + problemas (texto passando do fim do slide, palavra maior que a caixa). Use ANTES de gerar_lote para revisar e corrigir.',
+  'Renderiza até 3 carrosséis (até 6 contando _variacoes) com a copy proposta e devolve as imagens de cada slide + problemas (texto passando do fim do slide, palavra maior que a caixa). Use ANTES de gerar_lote para revisar e corrigir.',
   { textos: z.array(carrosselLote).min(1).max(3).describe('1 a 3 carrosséis no mesmo formato de gerar_lote') },
   async ({ textos }) => {
     if (!ponteConectada()) return desconectado();
@@ -479,7 +482,7 @@ server.tool(
       const r = await ponteCmd('lote_previa', { textos }, 120000);
       const conteudo = [];
       r.carrosseis.forEach(c => {
-        conteudo.push({ type: 'text', text: `Carrossel ${c.indice}: ${c.problemas.length ? '⚠️ ' + c.problemas.join(' | ') : '✓ tudo cabe'}` });
+        conteudo.push({ type: 'text', text: `Carrossel ${c.indice}${c.versao ? ' · versão ' + c.versao : ''}: ${c.problemas.length ? '⚠️ ' + c.problemas.join(' | ') : '✓ tudo cabe'}` });
         c.slides.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
       });
       return { content: conteudo };
