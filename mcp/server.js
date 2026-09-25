@@ -27,8 +27,18 @@ const ROOT = path.resolve(__dirname, '..');
 const LOTES_DIR = path.join(ROOT, 'lotes');
 const TEMPLATES_FILE = path.join(ROOT, 'templates-data.js');
 
-/* Mesma chave pública de demo já embutida no unsplash-service.js do app. */
-const UNSPLASH_KEY = 'YhCoNWRqrNCAjMDN0IhFRI8u7lpSW6lLLhUkZRT1rtg';
+/* Chave fora do código: vem de UNSPLASH_ACCESS_KEY no ambiente ou do
+   .env.local da raiz (ignorado pelo git). */
+function lerEnvLocal(nome) {
+  try {
+    const txt = fs.readFileSync(path.join(ROOT, '.env.local'), 'utf8');
+    const m = txt.match(new RegExp(`^\\s*${nome}\\s*=\\s*(.+?)\\s*$`, 'm'));
+    return m ? m[1].replace(/^['"]|['"]$/g, '') : '';
+  } catch (e) {
+    return '';
+  }
+}
+const UNSPLASH_KEY = process.env.UNSPLASH_ACCESS_KEY || lerEnvLocal('UNSPLASH_ACCESS_KEY');
 const UNSPLASH_URL = 'https://api.unsplash.com/search/photos';
 
 /* ---------------------------------------------------------------------------
@@ -333,6 +343,9 @@ server.tool(
     por_pagina: z.number().int().min(1).max(20).default(6),
   },
   async ({ query, por_pagina }) => {
+    if (!UNSPLASH_KEY) {
+      return { content: [{ type: 'text', text: 'Falta a chave do Unsplash: defina UNSPLASH_ACCESS_KEY no .env.local da raiz do projeto.' }], isError: true };
+    }
     const url = `${UNSPLASH_URL}?per_page=${por_pagina}&query=${encodeURIComponent(query)}`;
     let res;
     try {
