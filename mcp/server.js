@@ -355,7 +355,7 @@ function dataUrlParaImagem(url) {
 
 server.tool(
   'ver_pedido_lote',
-  'PRIMEIRO PASSO para gerar carrosséis em lote a partir da tela "Criar em lote" do app. Devolve o pedido do usuário (o que escrever e quantos carrosséis), os carrosséis de RESULTADO DESEJADO (exemplos de como deve ficar), o molde do canvas com as variáveis de texto, as fotos e a pasta de saída — tudo com imagens. Depois escreva exatamente `quantidade` textos seguindo o pedido e o estilo dos exemplos, e chame gerar_lote.',
+  'PRIMEIRO PASSO para gerar carrosséis em lote a partir da tela "Criar em lote" do app. Devolve o pedido do usuário (o que escrever e quantos carrosséis), os carrosséis de RESULTADO DESEJADO (exemplos de como deve ficar), o molde do canvas com as variáveis de texto, as fotos e a pasta de saída — tudo com imagens. Depois escreva a COPY COMPLETA de `quantidade` carrosséis — um objeto por carrossel com todas as chaves de `copys` (um texto por slide/caixa de texto) — seguindo o pedido e o estilo dos exemplos, e chame gerar_lote.',
   {},
   async () => {
     if (!ponteConectada()) return desconectado();
@@ -370,12 +370,16 @@ server.tool(
       ex.slides.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
     });
     if (modelo.length) {
-      conteudo.push({ type: 'text', text: `Molde do canvas (${modelo.length} slide(s)) — é o design que vai montar as imagens. O texto que você escrever entra no lugar de {{${resto.variavel_de_texto || 'texto'}}}:` });
+      conteudo.push({ type: 'text', text: `Molde do canvas (${modelo.length} slide(s)) — é o design que vai montar as imagens. Cada caixa de texto dele é uma chave em "copys" (texto_do_modelo mostra o que está lá hoje; mantenha um tamanho parecido para caber):` });
       modelo.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
     }
     if (fotos.length) {
       conteudo.push({ type: 'text', text: `Fotos do usuário (${fotos.length} de ${resto.fotos ? resto.fotos.total : fotos.length}) — cada carrossel usa uma, na ordem:` });
       fotos.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
+    }
+    if (resto.copys && resto.copys.length) {
+      const exemplo = Object.fromEntries(resto.copys.map(c => [c.chave, '...']));
+      conteudo.push({ type: 'text', text: `Formato para gerar_lote: textos = [ ${JSON.stringify(exemplo)}, ... ] — ${resto.quantidade} objeto(s), um por carrossel.` });
     }
     if (!resto.pedido) {
       conteudo.push({ type: 'text', text: 'O usuário ainda não escreveu um pedido na tela. Pergunte o tema/tom ou peça para ele escrever no passo 2 ("Pedir pra IA escrever").' });
@@ -389,11 +393,11 @@ server.tool(
 
 server.tool(
   'gerar_lote',
-  'Gera os carrosséis da tela "Criar em lote" com os textos que você escreveu (depois de ver_pedido_lote). Cada texto vira um carrossel e usa a próxima foto do usuário. Grava na pasta de saída escolhida no app. Use `textos` como lista de strings quando o modelo tem uma variável de texto; com várias, mande um objeto por carrossel com as variáveis como chaves.',
+  'Gera os carrosséis da tela "Criar em lote" com a copy que você escreveu (depois de ver_pedido_lote). Mande um objeto por carrossel com as chaves de `copys` (slide1_texto1, slide2_texto1, … ou nomes de variáveis) e o texto de cada uma. Cada carrossel usa a próxima foto do usuário e é gravado na pasta de saída escolhida no app.',
   {
     textos: z
       .union([z.array(z.string().min(1)).min(1), z.array(z.record(z.string(), z.string())).min(1)])
-      .describe('Um item por carrossel. Strings para uma variável de texto, ou objetos { variavel: texto } para várias.'),
+      .describe('Um objeto por carrossel: { chave_de_copys: texto }. (Lista de strings também vale: só troca o primeiro texto de cada carrossel.)'),
   },
   async ({ textos }) => {
     if (!ponteConectada()) return desconectado();

@@ -156,6 +156,35 @@
   function imageBinds(m) { return (m ? m.binds : []).filter(function (b) { return b.type === 'image'; }); }
   function textBinds(m) { return (m ? m.binds : []).filter(function (b) { return b.type !== 'image'; }); }
 
+  /* Copy = todo texto do carrossel modelo, slide a slide, de cima pra baixo.
+     Texto com {} usa o nome da variável; sem {}, vira "slideN_textoM". A IA
+     reescreve todos; o export troca pelo id do texto ('#id'). */
+  function copySlots(m) {
+    var out = [];
+    (m ? m.frames : []).forEach(function (f, si) {
+      var texts = (f.children || []).filter(function (c) { return c.type === 'text' && !c.hidden; })
+        .sort(function (a, b) { return a.y - b.y || a.x - b.x; });
+      texts.forEach(function (c, ti) {
+        var exemplo = (c.text || '').trim();
+        if (!exemplo && c.html) { var d = document.createElement('div'); d.innerHTML = c.html; exemplo = d.textContent.trim(); }
+        out.push({
+          key: c.bind || ('slide' + (si + 1) + '_texto' + (ti + 1)),
+          childId: c.id,
+          bind: c.bind || null,
+          slide: si + 1,
+          exemplo: exemplo,
+        });
+      });
+    });
+    return out;
+  }
+
+  function overrideKeyOf(m, key) {
+    var slot = copySlots(m).find(function (s) { return s.key === key; });
+    if (slot) return slot.bind || ('#' + slot.childId);
+    return key; // variável que não está entre os textos (raro): passa direto
+  }
+
   // Cada escolha precisa de uma variável; sem escolha manual, pega a primeira
   function resolveBinds(m) {
     var ib = imageBinds(m).map(function (b) { return b.name; });
@@ -170,7 +199,7 @@
     var list = [];
     if (imageBinds(m).length) list.push('photos');
     list.push('ref');
-    if (textBinds(m).length) list.push('texts');
+    if (copySlots(m).length) list.push('texts');
     list.push('out');
     return list;
   }
@@ -189,6 +218,7 @@
 
   function textCount() {
     if (!state.texts) return 0;
+    if (state.texts.rows) return state.texts.rows.length;
     if (state.texts.columns) {
       var max = 0;
       Object.keys(state.texts.columns).forEach(function (k) { max = Math.max(max, state.texts.columns[k].length); });
@@ -211,7 +241,7 @@
 
   function totalToMake(m) {
     if (waitingAi()) return briefCount();
-    if (textBinds(m).length && state.texts) return textCount();
+    if (copySlots(m).length && state.texts) return textCount();
     if (state.photos) return state.photos.files.length;
     return 0;
   }
@@ -493,7 +523,7 @@
   var STEP_INFO = {
     photos: { n: 'Fotos', title: 'Escolha a pasta com as fotos', sub: 'Cada carrossel vai usar uma foto dessa pasta, na ordem dos nomes.' },
     ref: { n: 'Resultado desejado', title: 'Mostre o resultado que você quer', sub: 'Uma pasta com carrosséis de exemplo (uma subpasta por carrossel) ou algumas fotos em sequência. A IA usa como referência.' },
-    texts: { n: 'Textos', title: 'Agora os textos: peça pra IA ou escolha um arquivo', sub: 'Cada texto vira um carrossel. A IA escreve a partir do seu pedido.' },
+    texts: { n: 'Copy', title: 'Agora a copy: peça pra IA ou escolha um arquivo', sub: 'A IA escreve o texto de todos os slides de cada carrossel, a partir do seu pedido.' },
     out: { n: 'Saída', title: 'Por último, onde salvar os carrosséis', sub: 'Cada carrossel pronto vira uma pasta com os slides em PNG.' },
     ready: { title: 'Tudo pronto', sub: '' },
   };
@@ -688,7 +718,7 @@
         h('p', { class: 'bw-brief-sum__text', text: state.brief.pedido }),
       ]));
       body.push(h('div', { class: 'bw-row' }, [
-        h('span', { class: 'bw-meta', text: plural(briefCount(), 'texto', 'textos') }),
+        h('span', { class: 'bw-meta', text: plural(briefCount(), 'carrossel', 'carrosséis') + ' · ' + plural(copySlots(m).length, 'texto', 'textos') + ' cada' }),
         bindSelect(textBinds(m), state.textBind, function (v) { state.textBind = v; }),
       ]));
     } else if (st === 'done') {
@@ -716,7 +746,7 @@
       });
     }
     return node('texts', {
-      icon: 'type', title: 'Textos', sub: st === 'done' ? null : 'Passo ' + (steps(m).indexOf('texts') + 1),
+      icon: 'type', title: 'Copy', sub: st === 'done' ? null : 'Passo ' + (steps(m).indexOf('texts') + 1),
       state: st, body: body, action: action,
       onDrop: dropTexts,
     });
@@ -726,7 +756,7 @@
   function briefForm(m) {
     var ta = h('textarea', {
       class: 'bw-textarea', rows: '4',
-      placeholder: 'Ex.: hooks curtos sobre produtividade pra quem trabalha em casa. Tom direto, sem emoji, máx. 8 palavras.',
+      placeholder: 'Ex.: carrosséis sobre produtividade pra quem trabalha em casa. Capa com hook curto, slides com uma dica cada, último com CTA pra seguir. Tom direto, sem emoji.',
     });
     ta.value = state.brief.pedido;
     var qty = h('input', { class: 'bw-qty', type: 'number', min: '1', max: '200', placeholder: String(state.photos ? state.photos.files.length : 10) });
@@ -738,7 +768,8 @@
     ok.addEventListener('click', function () { if (state.brief.pedido.trim()) render(); });
     setTimeout(function () { ta.focus(); }, 30);
     return h('div', { class: 'bw-brief' }, [
-      h('label', { class: 'bw-brief__label', text: 'O que a IA deve escrever?' }),
+      h('label', { class: 'bw-brief__label', text: 'Qual copy a IA deve escrever?' }),
+      h('span', { class: 'bw-hint bw-brief__hint', text: 'Ela escreve todos os ' + plural(copySlots(m).length, 'texto', 'textos') + ' do carrossel, slide a slide.' }),
       ta,
       h('label', { class: 'bw-brief__row' }, [h('span', { text: 'Quantos carrosséis' }), qty]),
       ok,
@@ -799,6 +830,8 @@
         }));
       });
       body.push(chips);
+      var nCopy = copySlots(m).length;
+      if (nCopy) body.push(h('span', { class: 'bw-meta', html: icon('type') + '<span>' + plural(nCopy, 'texto de copy', 'textos de copy') + ' em ' + plural(m.frames.length, 'slide', 'slides') + '</span>' }));
     }
     return node('model', {
       icon: 'palette', title: 'Modelo do canvas',
@@ -842,7 +875,7 @@
       btn.addEventListener('click', function () { copyPrompt(m, btn); });
       side.appendChild(h('div', { class: 'bw-ai' }, [
         h('div', { class: 'bw-ai__head', html: icon('bot') + '<span>Agora é com a IA</span>' }),
-        h('p', { class: 'bw-ai__text', text: 'No Claude (com o MCP carousel-maker ligado), mande a frase abaixo. Ela lê seu pedido, olha o modelo e as fotos, escreve ' + plural(briefCount(), 'texto', 'textos') + ' e gera tudo na sua pasta de saída.' }),
+        h('p', { class: 'bw-ai__text', text: 'No Claude (com o MCP carousel-maker ligado), mande a frase abaixo. Ela lê seu pedido, olha os exemplos, o modelo e as fotos, escreve a copy de ' + plural(briefCount(), 'carrossel', 'carrosséis') + ' e gera tudo na sua pasta de saída.' }),
         h('pre', { class: 'bw-ai__prompt', text: aiPrompt(m) }),
         btn,
         state.out ? null : h('p', { class: 'bw-ai__warn', text: 'Escolha a saída (passo 3) antes, pra IA ter onde salvar.' }),
@@ -956,7 +989,20 @@
         fill.style.width = Math.round((i / total) * 100) + '%';
 
         var overrides = {};
-        textBinds(m).forEach(function (b) { var v = textFor(i, b.name); if (v) overrides[b.name] = v; });
+        var hook = '';
+        if (state.texts && state.texts.rows) {
+          var row = state.texts.rows[i] || {};
+          Object.keys(row).forEach(function (k) { if (row[k]) overrides[overrideKeyOf(m, k)] = String(row[k]); });
+          var firstSlot = copySlots(m)[0];
+          hook = firstSlot ? (row[firstSlot.key] || '') : '';
+        } else {
+          textBinds(m).forEach(function (b) { var v = textFor(i, b.name); if (v) overrides[b.name] = v; });
+          // Arquivo de linhas num modelo sem {}: a linha vira o primeiro texto do carrossel
+          var slots = copySlots(m);
+          if (!textBinds(m).length && slots.length && state.texts && state.texts.lines.length) {
+            overrides['#' + slots[0].childId] = state.texts.lines[i % state.texts.lines.length];
+          }
+        }
         if (state.photos && state.photoBind) {
           var item = state.photos.files[i % state.photos.files.length];
           var key = nameOf(item);
@@ -964,7 +1010,7 @@
           overrides[state.photoBind] = imageCache.get(key);
         }
 
-        var hook = state.textBind ? textFor(i, state.textBind) : (state.texts ? state.texts.lines[i] : '');
+        if (!hook) hook = state.textBind ? textFor(i, state.textBind) : (state.texts && state.texts.lines ? state.texts.lines[i] : '');
         var folder = String(i + 1).padStart(2, '0') + (hook ? '-' + fileSlug(hook) : '');
         var dest = zip ? null : await state.out.dir.getDirectoryHandle(folder, { create: true });
         for (var s = 0; s < m.frames.length; s++) {
@@ -1066,6 +1112,7 @@
       quantidade: briefCount(),
       quantidade_origem: parseInt(state.brief.quantidade, 10) > 0 ? 'pedida' : (state.photos ? 'uma por foto' : 'padrão'),
       modelo: m ? { nome: m.nome, slides: m.frames.length, variaveis: m.binds.map(function (b) { return { nome: b.name, tipo: b.type === 'image' ? 'imagem' : 'texto' }; }) } : null,
+      copys: copySlots(m).map(function (c) { return { chave: c.key, slide: c.slide, texto_do_modelo: c.exemplo, caracteres: c.exemplo.length }; }),
       variavel_de_texto: state.textBind,
       variaveis_de_texto: textBinds(m).map(function (b) { return b.name; }),
       fotos: state.photos ? { pasta: state.photos.name, total: state.photos.files.length, nomes: state.photos.files.map(nameOf) } : null,
@@ -1091,13 +1138,15 @@
     if (!state.out) throw new Error(state.pendingOut ? 'a pasta de saída precisa ser reaberta no app (Criar em lote → Reabrir)' : 'escolha a pasta de saída no app (Criar em lote → passo 3)');
     if (imageBinds(m).length && !state.photos) throw new Error('escolha a pasta de fotos no app (Criar em lote → passo 1)');
 
-    var tb = textBinds(m).map(function (b) { return b.name; });
-    var texts = { name: 'textos da IA', fromAi: true, lines: [], columns: null };
+    var texts = { name: 'copy da IA', fromAi: true, lines: [], columns: null };
     if (typeof textos[0] === 'object') {
-      // Um objeto por carrossel: { variavel: texto }
-      texts.columns = {};
-      tb.forEach(function (bn) { texts.columns[bn] = textos.map(function (t) { return String((t && t[bn]) || ''); }); });
-      texts.lines = textos.map(function (t) { return tb.map(function (bn) { return (t && t[bn]) || ''; }).filter(Boolean).join(' · '); });
+      // Um objeto por carrossel com a copy de cada slide: { slide1_texto1: '...', ... }
+      var chaves = copySlots(m).map(function (c) { return c.key; });
+      var desconhecidas = [];
+      textos.forEach(function (t) { Object.keys(t || {}).forEach(function (k) { if (chaves.indexOf(k) === -1 && desconhecidas.indexOf(k) === -1) desconhecidas.push(k); }); });
+      if (desconhecidas.length) throw new Error('chaves que não existem no modelo: ' + desconhecidas.join(', ') + '. Use as chaves de "copys": ' + chaves.join(', '));
+      texts.rows = textos.map(function (t) { return t || {}; });
+      texts.lines = texts.rows.map(function (t) { return chaves.map(function (k) { return t[k] || ''; }).filter(Boolean).join(' · '); });
     } else {
       texts.lines = textos.map(function (t) { return String(t || '').trim(); }).filter(Boolean);
     }

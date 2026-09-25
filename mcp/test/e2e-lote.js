@@ -63,9 +63,15 @@ async function main() {
 
   // Modelo: fundo {{fotos}} + texto {{hooks}}; tela limpa
   await page.evaluate(async () => {
-    const frames = [{ id: 1, name: 'Post 1', format: 'ig-feed', x: 0, y: 0, w: 1080, h: 1350, bg: '#111111', bgBind: 'fotos', children: [
-      { id: 1, type: 'text', x: 90, y: 900, w: 900, text: 'Hook de exemplo', fontSize: 72, color: '#ffffff', bind: 'hooks' }] }];
-    localStorage.setItem('tcm_canvas_v1', JSON.stringify({ cam: { x: 200, y: 100, scale: 0.4 }, frames, links: [] }));
+    // Carrossel de 2 slides: capa com {{hooks}} + slide 2 com texto SEM {} (copy livre)
+    const frames = [
+      { id: 1, name: 'Post 1', format: 'ig-feed', x: 0, y: 0, w: 1080, h: 1350, bg: '#111111', bgBind: 'fotos', children: [
+        { id: 1, type: 'text', x: 90, y: 900, w: 900, text: 'Hook de exemplo', fontSize: 72, color: '#ffffff', bind: 'hooks' }] },
+      { id: 2, name: 'Post 1', format: 'ig-feed', x: 1180, y: 0, w: 1080, h: 1350, bg: '#ffffff', children: [
+        { id: 2, type: 'text', x: 90, y: 200, w: 900, text: 'Título do slide 2', fontSize: 64, color: '#111111' },
+        { id: 3, type: 'text', x: 90, y: 400, w: 900, text: 'Corpo com a dica explicada em duas linhas.', fontSize: 40, color: '#333333' }] },
+    ];
+    localStorage.setItem('tcm_canvas_v1', JSON.stringify({ cam: { x: 200, y: 100, scale: 0.3 }, frames, links: [{ id: 1, from: 1, to: 2 }] }));
     await new Promise(r => { const d = indexedDB.deleteDatabase('tcm-batch-workflow'); d.onsuccess = d.onerror = d.onblocked = r; });
     const opfs = await navigator.storage.getDirectory();
     for (const n of ['e2e-fotos', 'e2e-saida', 'e2e-exemplos']) await opfs.removeEntry(n, { recursive: true }).catch(() => {});
@@ -124,11 +130,18 @@ async function main() {
   if (!/produtividade/.test(info.pedido || '')) fail('pedido não veio: ' + info.pedido);
   if (info.quantidade !== 3) fail('quantidade deveria ser 3, veio ' + info.quantidade);
   if (!info.pronto) fail('deveria estar pronto, falta: ' + info.faltando);
+  const chaves = (info.copys || []).map(c => c.chave).join(',');
+  if (chaves !== 'hooks,slide2_texto1,slide2_texto2') fail('copys deveriam cobrir os 3 textos dos 2 slides, vieram: ' + chaves);
   if (!info.resultado_desejado || info.resultado_desejado.carrosseis.length !== 2) fail('resultado desejado deveria ter 2 carrosséis: ' + JSON.stringify(info.resultado_desejado));
   if (imagens < 10) fail(`esperava 6 slides de exemplo + molde + 3 fotos, vieram ${imagens} imagens`);
   console.log(`✓ ver_pedido_lote: pedido, quantidade ${info.quantidade}, ${info.resultado_desejado.carrosseis.length} exemplos, ${imagens} imagens, variável {{${info.variavel_de_texto}}}`);
 
-  const gerado = await tool('gerar_lote', { textos: ['Trabalhe menos, entregue mais', 'Seu sofá não é escritório', 'O truque dos 25 minutos'] });
+  // Copy completa: um objeto por carrossel, uma chave por texto
+  const gerado = await tool('gerar_lote', { textos: [
+    { hooks: 'Trabalhe menos, entregue mais', slide2_texto1: 'Bloqueie a manhã', slide2_texto2: 'Sem reunião antes das 11h.' },
+    { hooks: 'Seu sofá não é escritório', slide2_texto1: 'Tenha um canto fixo', slide2_texto2: 'O cérebro associa lugar a foco.' },
+    { hooks: 'O truque dos 25 minutos', slide2_texto1: 'Pomodoro de verdade', slide2_texto2: '25 de foco, 5 de pausa, repete.' },
+  ] });
   if (gerado.isError) fail('gerar_lote: ' + gerado.content[0].text);
   console.log('✓ gerar_lote:', gerado.content[0].text);
 
@@ -142,6 +155,16 @@ async function main() {
     return r.sort();
   });
   if (pastas.length !== 3) fail('esperava 3 carrosséis na saída, veio: ' + pastas.join(' | '));
+  if (!pastas.every(p => /slide-1\.png,slide-2\.png|slide-2\.png,slide-1\.png/.test(p))) fail('cada carrossel deveria ter 2 slides: ' + pastas.join(' | '));
+
+  // A copy do slide 2 (texto sem {}) mudou mesmo: imagem com override ≠ imagem do modelo
+  const mudou = await page.evaluate(async () => {
+    const f = window.__tcmBatch.modelo().frames[1];
+    const a = (await window.renderFrameToCanvas(f, { scale: 0.3 })).toDataURL();
+    const b = (await window.renderFrameToCanvas(f, { scale: 0.3, overrides: { '#2': 'Outro título' } })).toDataURL();
+    return a !== b;
+  });
+  if (!mudou) fail('override por id (#2) não mudou o slide 2');
   console.log('✓ saída:', pastas.join(' | '));
 
   await browser.close();

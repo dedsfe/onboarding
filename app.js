@@ -9450,7 +9450,9 @@
           const origH = getExactTextHeight(c);
           
           let overrideText = '';
-          if (c.bind && overrides[c.bind] !== undefined) {
+          if (overrides['#' + c.id] !== undefined) {
+            overrideText = String(overrides['#' + c.id]);
+          } else if (c.bind && overrides[c.bind] !== undefined) {
             overrideText = String(overrides[c.bind]);
           } else if (c.text !== undefined && c.text !== '') {
             overrideText = c.text;
@@ -9703,7 +9705,11 @@
           } else if (child.type === 'text') {
             const tc = effectiveTextChild(child); // estilo de trecho que cobre tudo vale como do nó
             let text = '';
-            if (tc.bind && overrides[tc.bind] !== undefined) {
+            /* '#<id>' troca a copy de um texto específico, mesmo sem {} —
+               é assim que a IA do lote reescreve cada slide do carrossel. */
+            if (overrides['#' + tc.id] !== undefined) {
+              text = String(overrides['#' + tc.id]);
+            } else if (tc.bind && overrides[tc.bind] !== undefined) {
               text = String(overrides[tc.bind]);
             } else if (tc.text !== undefined && tc.text !== '') {
               text = tc.text;
