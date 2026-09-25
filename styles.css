@@ -7064,3 +7064,20 @@ body.is-scrubbing * {
 .pp-align__row { display: flex; gap: 6px; }
 .pp-align__row .pp-seg .pp-btn { width: 24px; flex: none; }
 .pp-align__row .pp-btn:disabled { opacity: 0.35; pointer-events: none; }
+
+/* Elemento solto no canvas: o "post invisível" em volta dele não aparece,
+   não corta e não pega clique — só o elemento é de verdade. */
+.canvas-frame.is-free {
+  background: transparent !important;
+  box-shadow: none !important;
+  pointer-events: none;
+  z-index: 3;
+}
+.canvas-frame.is-free > :not(.canvas-frame__content):not(.canvas-frame__chrome) { display: none !important; }
+.canvas-frame.is-free .canvas-frame__content {
+  overflow: visible;
+  background: none !important;
+  pointer-events: none;
+}
+.canvas-frame.is-free .canvas-text-node,
+.canvas-frame.is-free .canvas-image-node { pointer-events: auto; }

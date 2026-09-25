@@ -1668,6 +1668,8 @@
         if (document.activeElement === input) return;
         const k = input.dataset.geo;
         let v = t ? t.obj[k] : '';
+        const holder = t && t.kind !== 'frame' ? frames.find(f => f.id === selectedTextNode.frameId) : null;
+        if (holder && holder.free && (k === 'x' || k === 'y') && v !== '') v += holder[k];
         if (t && t.kind === 'text' && k === 'h') {
           const el = nodeElement(t.obj.id);
           v = el ? el.offsetHeight : '';
@@ -1681,6 +1683,8 @@
       if (!t || !Number.isFinite(v)) return;
       const o = t.obj;
       v = Math.round(v);
+      const holder = t.kind !== 'frame' ? frames.find(f => f.id === selectedTextNode.frameId) : null;
+      if (holder && holder.free && (k === 'x' || k === 'y')) v -= holder[k];
 
       if (t.kind === 'frame') {
         if (k === 'x' || k === 'y') {
@@ -2102,6 +2106,7 @@
     }
 
     function save(recordHistory = true) {
+      pruneFreeFrames();
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({ cam, frames, links }));
         /* Voltou a salvar depois de uma falha: o aviso na barra do topo precisa
@@ -2682,7 +2687,7 @@
     function makeFrame(formatKey = 'ig-feed', x = 0, y = 0, size = null) {
       const key = (formatKey && FORMATS[formatKey]) ? formatKey : 'ig-feed';
       const fmt = size || FORMATS[key];
-      const defaultName = `Post ${frames.length + 1}`;
+      const defaultName = `Post ${realFrames().length + 1}`;
       return { id: frameSeq++, name: defaultName, format: key, x, y, w: fmt.w, h: fmt.h, bg: '#FFFFFF', children: [] };
     }
 
@@ -3288,9 +3293,44 @@
     }
 
     /* Post mais de cima que contém o ponto (os últimos do array pintam por cima) */
+    /* Elemento solto no canvas (fora de post), como no Figma. Por baixo
+       ele mora num "post invisível" (`free: true`): sem fundo, sem corte,
+       sem nome, fora da contagem, do carrossel e do export. Assim todo o
+       resto do editor (seleção, props, camadas, undo) continua valendo. */
+    function isFreeFrame(f) {
+      return !!(f && f.free);
+    }
+
+    function realFrames() {
+      return frames.filter(f => !f.free);
+    }
+
+    function makeFreeHolder(from, kids) {
+      const minX = Math.min(...kids.map(c => c.x));
+      const minY = Math.min(...kids.map(c => c.y));
+      const holder = { id: frameSeq++, free: true, name: '', format: 'custom', x: Math.round(from.x + minX), y: Math.round(from.y + minY), w: 1, h: 1, bg: 'transparent', children: [] };
+      frames.push(holder);
+      const used = new Set(kids.map(c => c.groupId).filter(Boolean));
+      if (used.size && from.groupNames) {
+        holder.groupNames = {};
+        used.forEach(g => { if (from.groupNames[g]) holder.groupNames[g] = from.groupNames[g]; });
+      }
+      kids.forEach(c => moveChildToFrame(c, from, holder, { keepWorldPos: true }));
+      return holder;
+    }
+
+    // Solto que ficou vazio (apagou, voltou para um post) some junto
+    function pruneFreeFrames() {
+      const empty = frames.filter(f => f.free && !(f.children || []).length);
+      if (!empty.length) return;
+      empty.forEach(f => { const el = frameElOf(f); if (el) el.remove(); });
+      frames = frames.filter(f => !empty.includes(f));
+    }
+
     function frameAtWorldPoint(pt) {
       for (let i = frames.length - 1; i >= 0; i--) {
         const f = frames[i];
+        if (f.free) continue;
         if (pt.x >= f.x && pt.x <= f.x + f.w && pt.y >= f.y && pt.y <= f.y + f.h) return f;
       }
       return null;
@@ -3477,7 +3517,7 @@
           if (snapGuideH) snapGuideH.classList.remove('is-active');
         }
         // Snapping se apenas 1 elemento estiver selecionado
-        if (nodesToMove.length === 1 && snapEnabled && frame && !dropTarget) {
+        if (nodesToMove.length === 1 && snapEnabled && frame && !frame.free && !dropTarget) {
           const orig = origins.get(`${frame.id}_${child.id}`);
           if (orig) {
             let targetX = orig.x + dx;
@@ -3590,7 +3630,7 @@
         updateTextToolbar();
       };
 
-      const onUp = () => {
+      const onUp = (upEv) => {
         nodesToMove.forEach(n => {
           const f = frames.find(fr => fr.id === n.frameId);
           const c = f && (f.children || []).find(ch => ch.id === n.childId);
@@ -3632,6 +3672,25 @@
           }
           refreshBoxClips();
         }
+        /* Soltou no vazio, fora do post de origem: vira elemento solto no
+           canvas (Figma). Tudo que veio do mesmo post vai junto, então grupo
+           e caixa continuam inteiros. */
+        const upPt = upEv ? screenToWorld(upEv.clientX, upEv.clientY) : null;
+        const leftPost = !dropTarget && !frame.free && upPt
+          && nodesToMove.every(n => n.frameId === frame.id)
+          && !(upPt.x >= frame.x && upPt.x <= frame.x + frame.w && upPt.y >= frame.y && upPt.y <= frame.y + frame.h);
+        if (leftPost) {
+          const kids = nodesToMove.map(n => (frame.children || []).find(ch => ch.id === n.childId)).filter(Boolean);
+          const topIds = new Set(kids.map(c => c.id));
+          kids.forEach(c => { if (c.boxId && !topIds.has(c.boxId)) delete c.boxId; });
+          const holder = makeFreeHolder(frame, kids);
+          normalizeBoxOrder(holder);
+          renderAll();
+          selectedChildNodes = [];
+          kids.filter(c => !c.boxId).forEach((c, i) => selectTextNode(holder.id, c.id, i > 0));
+          save();
+          return;
+        }
         /* Soltou em cima de outro post: os elementos passam a ser dele, no
            mesmo lugar da tela. Solto no vazio, continuam no post de origem. */
         if (dropTarget) {
@@ -3662,6 +3721,7 @@
             moves.forEach(({ c, from }) => moveChildToFrame(c, from, dropTarget, { keepWorldPos: true }));
             moves.forEach(({ c }) => { if (!movedIds.has(c.boxId)) assignBox(dropTarget, c); });
             normalizeBoxOrder(dropTarget);
+            pruneFreeFrames();
             renderAll();
             selectedChildNodes = [];
             moves.forEach(({ c }, i) => selectTextNode(dropTarget.id, c.id, i > 0));
@@ -5095,7 +5155,7 @@
     function renderFrame(frame) {
       const fmt = FORMATS[frame.format] || FORMATS['ig-feed'];
       const el = document.createElement('div');
-      el.className = 'canvas-frame';
+      el.className = frame.free ? 'canvas-frame is-free' : 'canvas-frame';
       el.dataset.id = frame.id;
       el.style.left = `${frame.x}px`;
       el.style.top = `${frame.y}px`;
@@ -5201,6 +5261,7 @@
 
         if (e.target.closest('.canvas-text-node, .canvas-image-node')) return;
         if (e.target.closest('.canvas-frame__port')) return;
+        if (frame.free) return; // o invisível em volta de um solto não é post
 
         e.stopPropagation();
         e.preventDefault();
@@ -5336,11 +5397,12 @@
       }
 
       // Habilita/desabilita menus e ações
-      if (btnBatch) btnBatch.disabled = frames.length === 0;
+      const postCount = realFrames().length;
+      if (btnBatch) btnBatch.disabled = postCount === 0;
       const exportBtn = document.getElementById('canvas-export-btn');
-      if (exportBtn) exportBtn.disabled = frames.length === 0;
+      if (exportBtn) exportBtn.disabled = postCount === 0;
       const libBtn = document.getElementById('canvas-library-btn');
-      if (libBtn) libBtn.disabled = frames.length === 0;
+      if (libBtn) libBtn.disabled = postCount === 0;
 
       if (!topLabel) return;
 
@@ -5352,8 +5414,8 @@
         topLabel.textContent = `${selectedFrames.length} posts selecionados`;
       } else {
         const posts = computePosts().length;
-        if (!frames.length) topLabel.textContent = 'Nenhum frame';
-        else topLabel.textContent = `${frames.length} ${frames.length === 1 ? 'post' : 'posts'}`;
+        if (!postCount) topLabel.textContent = 'Nenhum frame';
+        else topLabel.textContent = `${postCount} ${postCount === 1 ? 'post' : 'posts'}`;
       }
     }
 
@@ -5407,8 +5469,9 @@
       const totalW = fmt.w * slices;
 
       let x, y;
-      if (frames.length) {
-        const last = frames[frames.length - 1];
+      const lastPost = realFrames().pop();
+      if (lastPost) {
+        const last = lastPost;
         x = last.x + last.w + FRAME_GAP;
         y = last.y;
       } else {
@@ -5461,9 +5524,10 @@
       const key = (formatKey && FORMATS[formatKey]) ? formatKey : 'ig-feed';
       const fmt = size ? { ...FORMATS[key], ...size } : FORMATS[key];
       let x, y;
-      if (frames.length) {
+      const lastPost = realFrames().pop();
+      if (lastPost) {
         // Novo frame entra à direita do último: a fila natural de um carrossel
-        const last = frames[frames.length - 1];
+        const last = lastPost;
         x = last.x + last.w + FRAME_GAP;
         y = last.y;
       } else {
@@ -5491,7 +5555,7 @@
       const right = Math.max(...framesToDup.map(f => f.x + f.w));
       const shift = right - left + FRAME_GAP;
       framesToDup.forEach(src => {
-        const copyName = src.name ? `${src.name} (Cópia)` : `Post ${frames.length + 1}`;
+        const copyName = src.name ? `${src.name} (Cópia)` : `Post ${realFrames().length + 1}`;
         const copy = {
           ...src,
           id: frameSeq++,
@@ -5631,6 +5695,7 @@
     function frameAtWorld(pt) {
       for (let i = frames.length - 1; i >= 0; i--) {
         const f = frames[i];
+        if (f.free) continue;
         if (pt.x >= f.x && pt.x <= f.x + f.w && pt.y >= f.y && pt.y <= f.y + f.h) return f;
       }
       return null;
@@ -5873,7 +5938,7 @@
 
     /* Cadeias de frames ligados. Índice 0 é a capa do post. */
     function computePosts() {
-      const byId = new Map(frames.map(f => [f.id, f]));
+      const byId = new Map(realFrames().map(f => [f.id, f]));
       const next = new Map();
       const hasIncoming = new Set();
       links.forEach((l) => {
@@ -5885,7 +5950,7 @@
       const visited = new Set();
       const posts = [];
       frames.forEach((f) => {
-        if (hasIncoming.has(f.id) || visited.has(f.id)) return;
+        if (f.free || hasIncoming.has(f.id) || visited.has(f.id)) return;
         const chain = [];
         let cur = f.id;
         // O guard do visited também protege de um ciclo acidental
@@ -6218,10 +6283,12 @@
         chain.forEach((id, idx) => posMap.set(id, { post: i + 1, page: idx + 1, total: chain.length }));
       });
       const rows = [];
-      frames.forEach(f => {
-        const open = layersOpenFrames.has(f.id);
+      // Soltos no topo da lista, sem linha de post (Figma: camada de 1º nível)
+      [...frames.filter(f => f.free).reverse(), ...realFrames()].forEach(f => {
+        const base = f.free ? 0 : 1;
+        const open = f.free || layersOpenFrames.has(f.id);
         const kids = (f.children || []).slice().reverse();
-        rows.push({
+        if (!f.free) rows.push({
           kind: 'frame', f, open, hasKids: kids.length > 0,
           name: formatFrameDisplayName(f, posMap),
           sel: selectedFrameIds.has(f.id) && selectedChildNodes.length === 0,
@@ -6239,12 +6306,12 @@
         kids.forEach(c => {
           if (boxOf(f, c)) return; // aparece dentro da caixa
           if (c.box) {
-            rows.push(childRow(c, 1, false));
-            boxMembers(f, c).reverse().forEach(m => rows.push(childRow(m, 2, false)));
+            rows.push(childRow(c, base, false));
+            boxMembers(f, c).reverse().forEach(m => rows.push(childRow(m, base + 1, false)));
             return;
           }
           const members = groupMembers(f, c.groupId);
-          if (!members.length) { rows.push(childRow(c, 1, false)); return; }
+          if (!members.length) { rows.push(childRow(c, base, false)); return; }
           if (emitted.has(c.groupId)) return;
           emitted.add(c.groupId);
           const selCount = members.filter(m => isChildNodeSelected(f.id, m.id)).length;
@@ -6253,13 +6320,13 @@
           if (selCount > 0 && !groupSel) layersOpenGroups.add(c.groupId);
           const gOpen = layersOpenGroups.has(c.groupId);
           rows.push({
-            kind: 'group', f, gid: c.groupId, depth: 1, open: gOpen,
+            kind: 'group', f, gid: c.groupId, depth: base, open: gOpen,
             name: groupNameOf(f, c.groupId),
             sel: groupSel, inSel: frameSel,
             hidden: members.every(m => m.hidden),
             locked: members.every(m => m.locked),
           });
-          if (gOpen) members.slice().reverse().forEach(m => rows.push(childRow(m, 2, groupSel)));
+          if (gOpen) members.slice().reverse().forEach(m => rows.push(childRow(m, base + 1, groupSel)));
         });
       });
 
@@ -6288,7 +6355,7 @@
           if (r.sel) gcls.push('is-selected');
           else if (r.inSel) gcls.push('is-in-selected');
           if (r.hidden) gcls.push('is-hidden');
-          return `<div class="${gcls.join(' ')}" role="treeitem" aria-expanded="${r.open}" data-frame="${r.f.id}" data-group="${r.gid}" style="--depth:1">
+          return `<div class="${gcls.join(' ')}" role="treeitem" aria-expanded="${r.open}" data-frame="${r.f.id}" data-group="${r.gid}" style="--depth:${r.depth}">
             <span class="ly-row__chev${r.open ? ' is-open' : ''}" data-act="toggle-group">${lyIcon('chev')}</span>
             <span class="ly-row__icon">${lyIcon('group')}</span>
             <span class="ly-row__name">${esc(r.name)}</span>
@@ -6627,6 +6694,7 @@
           // 2. Testa frames
           const hitFrames = [];
           frames.forEach(f => {
+            if (f.free) return;
             const fX1 = f.x;
             const fY1 = f.y;
             const fX2 = f.x + f.w;
@@ -6639,12 +6707,16 @@
 
           prevFrameIds.forEach(id => { if (!hitFrames.includes(id)) hitFrames.push(id); });
           const innerFrame = frameContainingBox(boxX1, boxY1, boxX2, boxY2);
+          // Laço no canvas só pegando soltos: seleciona os soltos
+          const looseHits = hitChildren.filter(n => isFreeFrame(frames.find(f => f.id === n.frameId)));
+          const pickLoose = !innerFrame && hitFrames.length === 0 && looseHits.length > 0;
 
           // Feedback visual em tempo real:
-          if (innerFrame && hitChildren.length > 0) {
+          if ((innerFrame && hitChildren.length > 0) || pickLoose) {
+            const shown = pickLoose ? looseHits : hitChildren;
             world.querySelectorAll('.canvas-text-node, .canvas-image-node').forEach(el => {
               const cId = Number(el.dataset.id);
-              el.classList.toggle('is-selected', hitChildren.some(n => n.childId === cId));
+              el.classList.toggle('is-selected', shown.some(n => n.childId === cId));
             });
             world.querySelectorAll('.canvas-frame').forEach(el => el.classList.remove('is-selected'));
           } else {
@@ -6688,7 +6760,10 @@
             });
 
             const innerFrame = frameContainingBox(boxX1, boxY1, boxX2, boxY2);
-            if (innerFrame && hitChildren.length > 0) {
+            const looseHits = hitChildren.filter(n => isFreeFrame(frames.find(f => f.id === n.frameId)));
+            const anyPostHit = frames.some(f => !f.free && !(f.x + f.w < boxX1 || f.x > boxX2 || f.y + f.h < boxY1 || f.y > boxY2));
+            if (!innerFrame && !anyPostHit && looseHits.length > 0) hitChildren.splice(0, hitChildren.length, ...looseHits);
+            if ((innerFrame || (!anyPostHit && looseHits.length > 0)) && hitChildren.length > 0) {
               selectedFrameIds.clear();
               selectedId = null;
               selectedChildNodes = hitChildren;
@@ -6703,6 +6778,7 @@
             } else {
               const hitFrames = [];
               frames.forEach(f => {
+                if (f.free) return;
                 const fX1 = f.x;
                 const fY1 = f.y;
                 const fX2 = f.x + f.w;
@@ -6924,7 +7000,7 @@
           );
         }
         if (!targetFrame) {
-          targetFrame = frames.find(f => f.id === selectedId) || frames[0];
+          targetFrame = frames.find(f => f.id === selectedId) || realFrames()[0];
         }
         if (!targetFrame) {
           const initX = worldPt ? Math.round(worldPt.x - 540) : 100;
@@ -7151,7 +7227,7 @@
           const frameName = hoveredFrame.name || `Post ${hoveredFrame.id}`;
           dropIndicatorTextEl.textContent = `Solte para adicionar no ${frameName}`;
         } else {
-          const selF = frames.find(f => f.id === selectedId) || frames[0];
+          const selF = frames.find(f => f.id === selectedId) || realFrames()[0];
           if (selF) {
             dropIndicatorTextEl.textContent = `Solte para adicionar ao post selecionado`;
           } else {
@@ -7310,7 +7386,7 @@
         let targetFrame = [...frames].reverse().find(f => 
           worldPt.x >= f.x && worldPt.x <= f.x + f.w &&
           worldPt.y >= f.y && worldPt.y <= f.y + f.h
-        ) || frames.find(f => f.id === selectedId) || frames[0];
+        ) || frames.find(f => f.id === selectedId) || realFrames()[0];
 
         if (!targetFrame) {
           targetFrame = makeFrame('ig-feed', Math.round(worldPt.x - 540), Math.round(worldPt.y - 675));
@@ -8092,8 +8168,8 @@
     // 2. Ferramentas de inserção: data-menu abre um mini menu, data-action insere
     function runInsertAction(action) {
       // Sem post no canvas, cria um primeiro para receber o elemento
-      if (frames.length === 0) addFrame('ig-feed');
-      const targetFrame = frames.find(f => f.id === selectedId) || frames[0];
+      if (realFrames().length === 0) addFrame('ig-feed');
+      const targetFrame = realFrames().find(f => f.id === selectedId) || realFrames()[0];
       if (targetFrame && selectedId !== targetFrame.id) selectFrame(targetFrame.id);
 
       const library = { 'open-photos': 'photos', 'open-mesh': 'gradients', 'open-icons': 'icons' };
@@ -8912,7 +8988,7 @@
 
       // Textos primeiro, na ordem de leitura; depois fotos e fundos com imagem
       function collectSlots() {
-        const anchor = selectedFrame() || frames[0];
+        const anchor = selectedFrame() || realFrames()[0];
         if (!anchor) return [];
         const byId = new Map(frames.map(f => [f.id, f]));
         const chain = (computePosts().find(c => c.includes(anchor.id)) || [anchor.id]).map(id => byId.get(id)).filter(Boolean);
@@ -9741,7 +9817,7 @@
         const format = formatSelect ? formatSelect.value : 'png';
         const ext = format === 'jpeg' ? 'jpg' : 'png';
 
-        const anchor = selectedFrame() || frames[0];
+        const anchor = selectedFrame() || realFrames()[0];
         if (!anchor) return;
 
         /* O template não é o frame solto, é a cadeia inteira em que ele está:
@@ -9888,7 +9964,7 @@
           return;
         }
 
-        const anchor = selectedFrame() || frames[0];
+        const anchor = selectedFrame() || realFrames()[0];
         if (!anchor) {
           toast.error('Nenhum template encontrado no Canvas. Crie pelo menos um post antes de gerar.');
           return;
@@ -10580,7 +10656,7 @@
       }
 
       async function inserirFoto(photo, itemEl) {
-        const frame = selectedFrame() || frames[0];
+        const frame = selectedFrame() || realFrames()[0];
         if (!frame) {
           toast.info('Selecione um frame antes de inserir.');
           return;
@@ -10689,7 +10765,7 @@
       }
 
       async function inserirIcone(iconId, itemEl) {
-        const frame = selectedFrame() || frames[0];
+        const frame = selectedFrame() || realFrames()[0];
         if (!frame) {
           toast.info('Selecione um frame antes de inserir.');
           return;
@@ -11115,7 +11191,7 @@
         const applyBgBtn = document.getElementById('canvas-grad-btn-apply-bg');
         if (applyBgBtn) {
           applyBgBtn.addEventListener('click', async () => {
-            const frame = selectedFrame() || frames[0];
+            const frame = selectedFrame() || realFrames()[0];
             if (!frame) {
               toast.info('Selecione um post no canvas primeiro.');
               return;
@@ -11156,7 +11232,7 @@
         const insertElemBtn = document.getElementById('canvas-grad-btn-insert-elem');
         if (insertElemBtn) {
           insertElemBtn.addEventListener('click', async () => {
-            const frame = selectedFrame() || frames[0];
+            const frame = selectedFrame() || realFrames()[0];
             if (!frame) {
               toast.info('Selecione um post no canvas primeiro.');
               return;
@@ -12888,8 +12964,9 @@
         if (!generated || !generated.length) return;
 
         let startX, startY;
-        if (frames.length > 0) {
-          const last = frames[frames.length - 1];
+        const lastPost = realFrames().pop();
+        if (lastPost) {
+          const last = lastPost;
           startX = last.x + last.w + FRAME_GAP * 2;
           startY = last.y;
         } else {
@@ -13412,6 +13489,7 @@
               w: f.w,
               h: f.h,
               bg: f.bg,
+              free: f.free || undefined,
               isPanoramic: f.isPanoramic || false,
               panoIndex: f.panoIndex || null,
               panoTotal: f.panoTotal || null,
@@ -13534,7 +13612,7 @@
          a coluna de mesmo nome no lote troca o fundo de todos os slides do
          post — é por aqui que as imagens da IA viram fundo. */
       definirFundoBind: (nome) => {
-        const alvo = selectedFrame() || frames[0];
+        const alvo = selectedFrame() || realFrames()[0];
         if (!alvo) return { erro: 'nenhum frame no canvas' };
         const byId = new Map(frames.map(f => [f.id, f]));
         const cadeia = computePosts().find(c => c.includes(alvo.id)) || [alvo.id];
@@ -13547,7 +13625,7 @@
         return { ok: true, bind: nome, slides: cadeia.length };
       },
       info: () => ({
-        frames: frames.map(f => ({
+        frames: realFrames().map(f => ({
           id: f.id,
           nome: f.name,
           formato: f.format,
