@@ -8262,3 +8262,9 @@ body.is-rotating-element * {
 #canvas-insert-menu [data-action="open-templates"] {
   display: none !important;
 }
+
+/* Feedback visual ao arrastar um .csv sobre o modal de lote */
+#canvas-batch-modal.is-csv-dragover .openpanel-modal {
+  outline: 2px dashed #60A5FA;
+  outline-offset: -6px;
+}

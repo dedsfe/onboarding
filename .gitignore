@@ -19,3 +19,6 @@ supabase/.temp/
 *.cert
 client_secret*.json
 credentials*.json
+
+# Lotes gerados via MCP (locais)
+lotes/

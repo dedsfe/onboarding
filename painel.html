@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oração Diária — Painel</title>
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300..800&display=swap">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0d10;
+    --card:      #15151a;
+    --card-hi:   #1a1a20;
+    --line:      #26262e;
+    --line-soft: #1f1f26;
+    --ink:       #f2f2f5;
+    --ink-soft:  #9a9aa6;
+    --ink-faint: #5c5c68;
+    --lime:      #c8f04e;
+    --lime-dim:  rgba(200, 240, 78, .14);
+    --red:       #ff6b6b;
+    --ease:      cubic-bezier(.22, .61, .36, 1);
+  }
+
+  html { color-scheme: dark; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 28px 80px; }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap; margin-bottom: 28px;
+  }
+  .brand h1 { font-size: 22px; font-weight: 700; letter-spacing: -.02em; }
+  .brand p { color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
+
+  .head-right { display: flex; align-items: center; gap: 14px; }
+  .live {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    color: var(--lime); text-transform: uppercase;
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--lime);
+    animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 var(--lime-dim); }
+    70%  { box-shadow: 0 0 0 7px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
+  .updated { color: var(--ink-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+
+  .tabs { display: inline-flex; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 3px; }
+  .tabs button {
+    border: 0; background: transparent; color: var(--ink-soft);
+    font: inherit; font-size: 13px; font-weight: 500;
+    padding: 5px 14px; border-radius: 7px; cursor: pointer;
+    transition: all .18s var(--ease);
+  }
+  .tabs button:hover { color: var(--ink); }
+  .tabs button.on { background: var(--card-hi); color: var(--ink); }
+
+  /* ---------- KPIs ---------- */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px; margin-bottom: 12px;
+  }
+  @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, 1fr); } }
+  .kpi {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 16px 18px 14px;
+    transition: border-color .2s var(--ease), transform .2s var(--ease);
+  }
+  .kpi:hover { border-color: #34343e; transform: translateY(-1px); }
+  .kpi .label {
+    font-size: 11px; font-weight: 600; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .kpi .val {
+    font-size: 30px; font-weight: 700; letter-spacing: -.03em;
+    margin-top: 6px; font-variant-numeric: tabular-nums;
+  }
+  .kpi .sub { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+  .kpi.hero { border-color: #3a4218; background: linear-gradient(160deg, var(--card) 0%, #171a0e 100%); }
+  .kpi.hero .val { color: var(--lime); }
+
+  /* ---------- grid principal ---------- */
+  .grid {
+    display: grid; grid-template-columns: 1fr 340px; gap: 12px;
+    align-items: start; margin-top: 12px;
+  }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 20px;
+  }
+  .card h2 {
+    font-size: 13px; font-weight: 600; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--ink-soft); margin-bottom: 14px;
+  }
+
+  /* ---------- gráfico ---------- */
+  .chart-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .legend { display: flex; gap: 14px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ink-soft); }
+  .legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+  #chart { width: 100%; display: block; }
+  #chart .gridline { stroke: var(--line-soft); stroke-width: 1; }
+  #chart text { fill: var(--ink-faint); font-size: 10px; font-family: inherit; }
+  .tip {
+    position: fixed; pointer-events: none; z-index: 10;
+    background: #1e1e25; border: 1px solid var(--line);
+    border-radius: 9px; padding: 8px 11px; font-size: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.45);
+    opacity: 0; transition: opacity .12s var(--ease);
+    white-space: nowrap;
+  }
+  .tip b { font-variant-numeric: tabular-nums; }
+  .tip .d { color: var(--ink-faint); font-size: 11px; }
+
+  /* ---------- funil ---------- */
+  .funnel { display: flex; flex-direction: column; gap: 3px; }
+  .frow {
+    display: grid; grid-template-columns: 168px 1fr 52px;
+    align-items: center; gap: 12px;
+    padding: 6px 8px; border-radius: 8px;
+    transition: background .15s var(--ease);
+  }
+  .frow:hover { background: var(--card-hi); }
+  .frow .fname { font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .frow .fname small { color: var(--ink-faint); margin-left: 6px; font-size: 11px; }
+  .frow .fbar-wrap { position: relative; height: 22px; }
+  .frow .fbar {
+    position: absolute; inset: 0 auto 0 0; border-radius: 5px;
+    background: var(--lime-dim); border-right: 2px solid var(--lime);
+    min-width: 2px; transition: width .5s var(--ease);
+  }
+  .frow .fpct {
+    font-size: 12px; color: var(--ink-soft); text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .frow.drop .fpct { color: var(--red); }
+  .frow.head { padding-top: 12px; }
+  .frow.head .fname { color: var(--ink-soft); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+
+  /* ---------- feed ---------- */
+  .feed { display: flex; flex-direction: column; }
+  .fitem {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+    padding: 9px 2px; border-bottom: 1px solid var(--line-soft);
+    animation: enter .4s var(--ease);
+  }
+  @keyframes enter { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .fitem:last-child { border-bottom: 0; }
+  .fev { font-size: 13px; font-weight: 500; }
+  .fev small { color: var(--ink-faint); font-weight: 400; margin-left: 6px; }
+  .ftm { font-size: 11px; color: var(--ink-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    margin-right: 8px; vertical-align: 1px;
+  }
+  .dot.g { background: var(--lime); }
+  .dot.n { background: #5c5c68; }
+  .dot.r { background: var(--red); }
+
+  footer { margin-top: 26px; color: var(--ink-faint); font-size: 11.5px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <h1>Oração Diária</h1>
+      <p>Funil de onboarding · leitura direta do Supabase</p>
+    </div>
+    <div class="head-right">
+      <div class="live"><span class="live-dot"></span>ao vivo</div>
+      <div class="tabs" id="tabs">
+        <button data-p="1">Hoje</button>
+        <button data-p="7">7d</button>
+        <button data-p="30" class="on">30d</button>
+        <button data-p="0">Tudo</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="updated" id="updated">carregando…</div>
+
+  <section class="kpis" id="kpis"></section>
+
+  <div class="grid">
+    <div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="chart-head">
+          <h2 style="margin:0">Pessoas por dia</h2>
+          <div class="legend">
+            <span><i style="background:var(--lime)"></i>onboarding iniciado</span>
+            <span><i style="background:#7aa8ff"></i>primeira oração</span>
+          </div>
+        </div>
+        <svg id="chart" height="220"></svg>
+      </div>
+
+      <div class="card">
+        <h2>Funil passo a passo <span style="color:var(--ink-faint);text-transform:none;letter-spacing:0;font-weight:400">— % de quem iniciou</span></h2>
+        <div class="funnel" id="funnel"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Eventos recentes</h2>
+      <div class="feed" id="feed"></div>
+    </div>
+  </div>
+
+  <footer id="foot"></footer>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+'use strict';
+
+/* ── Config: mesmo projeto e a mesma chave publicável que o app iOS já
+   carrega no binário — é pública por design (RLS cuida do resto). ── */
+const SB_URL = 'https://zopgzckurfpvzwzbwudi.supabase.co';
+const SB_KEY = 'sb_publishable_tZ3WnaGMR44xPer1qjB6Cw_02uY7DvW';
+const REFRESH_MS = 10_000;
+
+/* Passos do onboarding, na ordem do enum OnboardingStep do app. */
+const STEPS = [
+  ['flood','O roubo'],['storyPromise','A promessa'],['lock','A ideia'],
+  ['release','Tudo volta'],['plan','O plano'],['name','Nome'],
+  ['phoneUsage','Uso do celular'],['impact','Impacto'],['wakeUp','Acordar'],
+  ['prayerDuration','Duração'],['blockingApps','Apps a bloquear'],['reminder','Lembrete'],
+  ['planReady','Plano pronto'],['prayer','Primeira oração'],['review','Avaliação'],
+  ['paywall','Paywall'],['login','Login'],['oto','OTO'],
+];
+
+const EV_LABEL = {
+  onboarding_started:        ['Onboarding iniciado', 'g'],
+  onboarding_step_viewed:    ['viu o passo', 'n'],
+  screentime_permission_granted: ['ScreenTime concedida', 'g'],
+  screentime_permission_denied:  ['ScreenTime negada', 'r'],
+  notif_permission_granted:  ['Notificação concedida', 'g'],
+  first_prayer_completed:    ['PRIMEIRA ORAÇÃO 🙏', 'g'],
+  paywall_viewed:            ['Paywall visto', 'n'],
+  trial_started:             ['Trial iniciado', 'g'],
+  purchase_completed:        ['COMPRA 🎉', 'g'],
+  onboarding_finished:       ['Onboarding concluído', 'g'],
+  victory_seal_viewed:       ['Vitória: selo visto', 'n'],
+  victory_seal_continued:    ['Vitória: selo seguiu', 'n'],
+  victory_progress_viewed:   ['Vitória: progresso visto', 'n'],
+  victory_progress_continued:['Vitória: progresso seguiu', 'n'],
+  web_pageview:              ['pageview (web)', 'n'],
+};
+
+let period = 30;          // 1 | 7 | 30 | 0 (tudo)
+let lastRows = [];
+const $ = id => document.getElementById(id);
+const fmt = n => n.toLocaleString('pt-BR');
+
+/* ── fetch paginado de TODOS os eventos (campos leves) ── */
+async function fetchAll() {
+  const rows = [];
+  const PAGE = 1000;
+  for (let from = 0; from < 50000; from += PAGE) {
+    const url =
+      `${SB_URL}/rest/v1/analytics_events` +
+      `?select=event,step,created_at,anon_id` +
+      `&order=created_at.desc` +
+      `&limit=${PAGE}&offset=${from}`;
+    const res = await fetch(url, {
+      headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
+    });
+    if (!res.ok) throw new Error('Supabase ' + res.status);
+    const batch = await res.json();
+    rows.push(...batch);
+    if (batch.length < PAGE) break;
+  }
+  return rows;
+}
+
+/* ── janela do período ── */
+function since() {
+  if (period === 0) return new Date(0);
+  const d = new Date();
+  if (period === 1) d.setHours(0, 0, 0, 0);
+  else d.setDate(d.getDate() - (period - 1)), d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+const dayKey = iso => iso.slice(0, 10);
+const dayLabel = key => {
+  const [, m, d] = key.split('-');
+  return `${d}/${m}`;
+};
+
+/* KPIs, funil e gráfico — tudo a partir de rows já filtrados */
+function render(rowsAll) {
+  const cut = since().getTime();
+  const rows = rowsAll.filter(r => new Date(r.created_at).getTime() >= cut);
+
+  // contagem de PESSOAS por evento (anon_id distinto)
+  const people = {};   // event -> Set(anon)
+  const stepPeople = {}; // step -> Set(anon)
+  for (const r of rows) {
+    const a = r.anon_id || '';
+    (people[r.event] ??= new Set()).add(a);
+    if (r.event === 'onboarding_step_viewed' && r.step != null)
+      (stepPeople[r.step] ??= new Set()).add(a);
+  }
+  const n = ev => (people[ev]?.size ?? 0);
+
+  const started = n('onboarding_started');
+  const prayed  = n('first_prayer_completed');
+  const trials  = n('trial_started');
+  const buys    = n('purchase_completed');
+  const conv    = started ? Math.round((prayed / started) * 100) : 0;
+
+  $('kpis').innerHTML = `
+    <div class="kpi hero">
+      <div class="label">Onboarding iniciado</div>
+      <div class="val">${fmt(started)}</div>
+      <div class="sub">pessoas distintas</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Primeira oração (AHA)</div>
+      <div class="val">${fmt(prayed)}</div>
+      <div class="sub">${conv}% de quem iniciou</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Trials</div>
+      <div class="val">${fmt(trials)}</div>
+      <div class="sub">trial_started</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Compras</div>
+      <div class="val">${fmt(buys)}</div>
+      <div class="sub">purchase_completed</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Concluíram onboarding</div>
+      <div class="val">${fmt(n('onboarding_finished'))}</div>
+      <div class="sub">${started ? Math.round((n('onboarding_finished') / started) * 100) : 0}% do total</div>
+    </div>`;
+
+  renderFunnel(started, stepPeople);
+  renderChart(rows);
+  renderFeed(rowsAll);
+  $('foot').textContent =
+    `${fmt(rowsAll.length)} eventos no total · permissões: ScreenTime ` +
+    `${n('screentime_permission_granted')}✓ / ${n('screentime_permission_denied')}✗ · ` +
+    `Notif ${n('notif_permission_granted')}✓`;
+}
+
+/* ── funil por passo ── */
+function renderFunnel(started, stepPeople) {
+  const el = $('funnel');
+  let html = `
+    <div class="frow head">
+      <span class="fname">passo</span>
+      <span class="fname" style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--ink-faint)">pessoas que viram</span>
+      <span class="fpct">%</span>
+    </div>
+    <div class="frow">
+      <span class="fname" style="font-weight:600">▶ Onboarding iniciado</span>
+      <div class="fbar-wrap"><div class="fbar" style="width:100%"></div></div>
+      <span class="fpct">${started ? 100 : 0}%</span>
+    </div>`;
+
+  const max = Math.max(started, 1);
+  STEPS.forEach(([, label], i) => {
+    const v = stepPeople[i]?.size ?? 0;
+    const pct = started ? Math.round((v / started) * 100) : 0;
+    html += `
+      <div class="frow">
+        <span class="fname">${label}<small>${i}</small></span>
+        <div class="fbar-wrap"><div class="fbar" style="width:${(v / max) * 100}%"></div></div>
+        <span class="fpct">${fmt(v)} · ${pct}%</span>
+      </div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+/* ── gráfico spline: pessoas por dia (2 séries) ── */
+function renderChart(rows) {
+  const svg = $('chart');
+  const W = svg.clientWidth || 800, H = 220;
+  const P = { t: 14, r: 10, b: 24, l: 30 };
+  const days = period === 1 ? 1 : period === 0 ? 30 : period;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // série por dia
+  const series = [
+    { ev: 'onboarding_started', color: 'var(--lime)', pts: [] },
+    { ev: 'first_prayer_completed', color: '#7aa8ff', pts: [] },
+  ];
+  const byDay = {};   // 'YYYY-MM-DD' -> [setStarted, setPrayed]
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    byDay[d.toISOString().slice(0, 10)] = [new Set(), new Set()];
+  }
+  for (const r of rows) {
+    const k = dayKey(r.created_at);
+    if (!byDay[k]) continue;
+    if (r.event === 'onboarding_started') byDay[k][0].add(r.anon_id);
+    if (r.event === 'first_prayer_completed') byDay[k][1].add(r.anon_id);
+  }
+  const keys = Object.keys(byDay);
+  const vals = keys.map(k => [byDay[k][0].size, byDay[k][1].size]);
+  const maxV = Math.max(1, ...vals.map(v => Math.max(v[0], v[1])));
+
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  const x = i => P.l + (keys.length === 1 ? iw / 2 : (i / (keys.length - 1)) * iw);
+  const y = v => P.t + ih - (v / maxV) * ih;
+
+  // spline suave (catmull-rom → bezier)
+  function path(idx) {
+    const pts = vals.map((v, i) => [x(i), y(v[idx])]);
+    if (!pts.length) return '';
+    if (pts.length === 1) return `M ${pts[0][0]} ${pts[0][1]}`;
+    let d = `M ${pts[0][0]} ${pts[0][1]}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[Math.max(0, i - 1)], p1 = pts[i], p2 = pts[i + 1],
+            p3 = pts[Math.min(pts.length - 1, i + 2)];
+      const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += ` C ${c1x} ${c1y}, ${c2x} ${c2y}, ${p2[0]} ${p2[1]}`;
+    }
+    return d;
+  }
+
+  let g = '';
+  for (let v = 0; v <= maxV; v += Math.ceil(maxV / 4)) {
+    g += `<line class="gridline" x1="${P.l}" x2="${W - P.r}" y1="${y(v)}" y2="${y(v)}"/>
+          <text x="${P.l - 6}" y="${y(v) + 3}" text-anchor="end">${v}</text>`;
+  }
+  const tickEvery = Math.max(1, Math.round(keys.length / 6));
+  keys.forEach((k, i) => {
+    if (i % tickEvery === 0 || i === keys.length - 1)
+      g += `<text x="${x(i)}" y="${H - 6}" text-anchor="middle">${dayLabel(k)}</text>`;
+  });
+
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.innerHTML = g +
+    `<path d="${path(0)}" fill="none" stroke="var(--lime)" stroke-width="2" stroke-linecap="round"/>
+     <path d="${path(1)}" fill="none" stroke="#7aa8ff" stroke-width="2" stroke-linecap="round"/>` +
+    vals.map((v, i) =>
+      `<circle cx="${x(i)}" cy="${y(v[0])}" r="2.5" fill="var(--lime)"/>
+       <circle cx="${x(i)}" cy="${y(v[1])}" r="2.5" fill="#7aa8ff"/>`).join('') +
+    `<rect id="hover" x="${P.l}" y="0" width="${iw}" height="${H}" fill="transparent"/>`;
+
+  // hover → tooltip
+  const tip = $('tip'), rect = svg.querySelector('#hover');
+  rect.addEventListener('mousemove', e => {
+    const i = Math.round(((e.offsetX - P.l) / iw) * (keys.length - 1));
+    const v = vals[Math.max(0, Math.min(keys.length - 1, i))];
+    tip.innerHTML = `<div class="d">${dayLabel(keys[i])}</div>
+      <b style="color:var(--lime)">●</b> iniciaram: <b>${v[0]}</b><br>
+      <b style="color:#7aa8ff">●</b> oraram: <b>${v[1]}</b>`;
+    tip.style.opacity = 1;
+    tip.style.left = Math.min(e.clientX + 14, innerWidth - 150) + 'px';
+    tip.style.top = (e.clientY - 10) + 'px';
+  });
+  rect.addEventListener('mouseleave', () => tip.style.opacity = 0);
+}
+
+/* ── feed ao vivo (independente do período) ── */
+function renderFeed(rowsAll) {
+  const recentes = rowsAll.slice(0, 30);
+  $('feed').innerHTML = recentes.map(r => {
+    const [label, dot] = EV_LABEL[r.event] || [r.event, 'n'];
+    const extra = r.step != null && r.event === 'onboarding_step_viewed'
+      ? `<small>${STEPS[+r.step]?.[1] ?? r.step}</small>` : '';
+    return `<div class="fitem">
+      <span class="fev"><span class="dot ${dot}"></span>${label}${extra}</span>
+      <span class="ftm">${timeAgo(r.created_at)}</span>
+    </div>`;
+  }).join('');
+}
+
+function timeAgo(iso) {
+  const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60) return 'agora';
+  if (s < 3600) return `${Math.floor(s / 60)} min`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h`;
+  return `${Math.floor(s / 86400)} d`;
+}
+
+/* ── loop: fetch → render → de novo em 10s ── */
+async function tick() {
+  try {
+    lastRows = await fetchAll();
+    render(lastRows);
+    $('updated').textContent =
+      `atualizado às ${new Date().toLocaleTimeString('pt-BR')} · atualiza a cada 10s`;
+  } catch (e) {
+    $('updated').textContent = 'erro ao falar com o Supabase: ' + e.message;
+  }
+}
+
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  period = +b.dataset.p;
+  document.querySelectorAll('#tabs button').forEach(x => x.classList.toggle('on', x === b));
+  if (lastRows.length) render(lastRows);
+});
+
+tick();
+setInterval(tick, REFRESH_MS);
+</script>
+</body>
+</html>

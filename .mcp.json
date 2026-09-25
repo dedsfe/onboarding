@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "carousel-maker": {
+      "command": "node",
+      "args": ["mcp/server.js"]
+    }
+  }
+}

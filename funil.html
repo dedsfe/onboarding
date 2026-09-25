@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Novo post — The Carousel Maker</title>
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@300..700&display=swap">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink:        #16161a;
+    --ink-soft:   #6b6b74;
+    --ink-faint:  #b4b4bd;
+    --line:       #ececef;
+    --paper:      #ffffff;
+    --accent:     #16161a;
+    --ease:       cubic-bezier(.22,.61,.36,1);
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Inter Tight", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 17px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+
+  /* ---------- layout ---------- */
+  .stage {
+    height: 100dvh;
+    display: grid;
+    grid-template-columns: 1fr;
+    transition: grid-template-columns .9s var(--ease);
+  }
+  .stage.has-preview { grid-template-columns: 1fr 420px; }
+
+  /* ---------- coluna da conversa ---------- */
+  .talk {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 0 clamp(24px, 7vw, 96px) 0;
+    overflow: hidden;
+  }
+
+  /* fade no topo pra mensagem antiga "sumir" subindo */
+  .talk::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 34%;
+    background: linear-gradient(var(--paper) 30%, transparent);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .thread {
+    display: flex;
+    flex-direction: column;
+    gap: 26px;
+    padding-bottom: 34vh;
+    max-width: 620px;
+    width: 100%;
+    margin-inline: auto;
+    transition: transform .75s var(--ease);
+  }
+
+  .line { opacity: 0; transform: translateY(14px); animation: rise .6s var(--ease) forwards; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+
+  /* mensagens antigas desbotam */
+  .line.past { opacity: .22; transition: opacity .6s var(--ease); }
+
+  .ask {
+    font-size: clamp(24px, 3.1vw, 34px);
+    font-weight: 400;
+    letter-spacing: -.022em;
+    line-height: 1.28;
+    text-wrap: balance;
+  }
+
+  .said {
+    font-size: clamp(20px, 2.4vw, 26px);
+    font-weight: 500;
+    letter-spacing: -.02em;
+    color: var(--ink-soft);
+    padding-left: 2px;
+  }
+  .said::before {
+    content: "";
+    display: inline-block;
+    width: 16px;
+    height: 1px;
+    background: var(--ink-faint);
+    vertical-align: middle;
+    margin-right: 12px;
+  }
+
+  .caret {
+    display: inline-block;
+    width: 2px;
+    height: .95em;
+    background: var(--ink);
+    vertical-align: -2px;
+    margin-left: 3px;
+    animation: blink 1.05s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---------- zona de resposta ---------- */
+  .answer {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    padding: 0 clamp(24px, 7vw, 96px) clamp(32px, 6vh, 56px);
+    z-index: 3;
+    background: linear-gradient(transparent, var(--paper) 22%);
+    pointer-events: none;
+  }
+  .answer-inner {
+    max-width: 620px;
+    margin-inline: auto;
+    pointer-events: auto;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity .45s var(--ease), transform .45s var(--ease);
+  }
+  .answer-inner.on { opacity: 1; transform: none; }
+
+  /* input livre — só uma linha, zero caixa */
+  .field {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-bottom: 1.5px solid var(--line);
+    padding-bottom: 12px;
+    transition: border-color .3s var(--ease);
+  }
+  .field:focus-within { border-color: var(--ink); }
+  .field input {
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: none;
+    font: inherit;
+    font-size: clamp(20px, 2.4vw, 26px);
+    font-weight: 500;
+    letter-spacing: -.02em;
+    color: var(--ink);
+  }
+  .field input::placeholder { color: var(--ink-faint); font-weight: 400; }
+
+  .send {
+    border: 0;
+    background: var(--ink);
+    color: #fff;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: grid; place-items: center;
+    cursor: pointer;
+    opacity: 0;
+    transform: scale(.8);
+    transition: opacity .25s var(--ease), transform .25s var(--ease);
+  }
+  .send.on { opacity: 1; transform: none; }
+  .send:hover { transform: scale(1.08); }
+
+  /* chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 9px; }
+  .chip {
+    border: 1.5px solid var(--line);
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: -.01em;
+    padding: 11px 19px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: border-color .2s var(--ease), background .2s var(--ease), color .2s var(--ease), transform .2s var(--ease);
+  }
+  .chip:hover { border-color: var(--ink); transform: translateY(-1px); }
+  .chip:active { transform: translateY(0); }
+  .chip.sel { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  .go {
+    border: 0;
+    background: var(--ink);
+    color: #fff;
+    font: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    padding: 15px 30px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: transform .2s var(--ease), opacity .2s var(--ease);
+  }
+  .go:hover { transform: translateY(-2px); }
+
+  .hint {
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--ink-faint);
+    letter-spacing: -.005em;
+  }
+  .hint b { font-weight: 600; color: var(--ink-soft); }
+
+  /* ---------- preview do modelo ---------- */
+  .preview {
+    border-left: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    padding: 40px 32px;
+    opacity: 0;
+    transition: opacity .8s var(--ease);
+    overflow: hidden;
+  }
+  .stage.has-preview .preview { opacity: 1; }
+
+  .deck {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    max-width: 340px;
+  }
+
+  .slide {
+    width: 68px;
+    aspect-ratio: 4 / 5;
+    border-radius: 7px;
+    background: #f4f4f6;
+    border: 1px solid var(--line);
+    position: relative;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(10px) scale(.94);
+    animation: pop .5s var(--ease) forwards;
+    transition: background .5s var(--ease), border-color .5s var(--ease);
+  }
+  @keyframes pop { to { opacity: 1; transform: none; } }
+
+  .slide::after {
+    content: "";
+    position: absolute;
+    left: 9px; right: 16px; bottom: 11px;
+    height: 3px;
+    border-radius: 2px;
+    background: currentColor;
+    opacity: .3;
+  }
+  .slide::before {
+    content: "";
+    position: absolute;
+    left: 9px; right: 26px; top: 12px;
+    height: 5px;
+    border-radius: 2px;
+    background: currentColor;
+    opacity: .55;
+  }
+
+  .preview-note {
+    font-size: 12.5px;
+    color: var(--ink-faint);
+    letter-spacing: .01em;
+    text-align: center;
+  }
+
+  /* progresso — 6 tracinhos, nada mais */
+  .steps {
+    position: fixed;
+    top: 26px; left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 5px;
+    z-index: 5;
+  }
+  .stage.has-preview ~ .steps { left: calc(50% - 210px); }
+  .steps i {
+    width: 16px; height: 2px;
+    border-radius: 2px;
+    background: var(--line);
+    transition: background .4s var(--ease), width .4s var(--ease);
+  }
+  .steps i.done { background: var(--ink-faint); }
+  .steps i.now  { background: var(--ink); width: 26px; }
+
+  @media (max-width: 900px) {
+    .stage.has-preview { grid-template-columns: 1fr; }
+    .preview { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<div class="steps" id="steps"></div>
+
+<div class="stage" id="stage">
+  <section class="talk">
+    <div class="thread" id="thread"></div>
+    <div class="answer">
+      <div class="answer-inner" id="answerBox"></div>
+    </div>
+  </section>
+
+  <aside class="preview">
+    <div class="deck" id="deck"></div>
+    <div class="preview-note" id="previewNote"></div>
+  </aside>
+</div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- o funil ----------
+  const STEPS = [
+    {
+      key: 'tema',
+      ask: 'Oi. Sobre o que é o seu post?',
+      type: 'text',
+      placeholder: 'ex: 5 erros que travam sua produtividade',
+      echo: v => v
+    },
+    {
+      key: 'formato',
+      ask: v => `Boa. E como você quer contar isso?`,
+      type: 'chips',
+      options: ['Lista de dicas', 'Passo a passo', 'História', 'Mito x verdade', 'Antes e depois']
+    },
+    {
+      key: 'paginas',
+      ask: 'Quantas páginas?',
+      type: 'chips',
+      options: ['3', '5', '7', '10'],
+      echo: v => `${v} páginas`
+    },
+    {
+      key: 'vibe',
+      ask: 'Que cara você quer que tenha?',
+      type: 'chips',
+      options: ['Claro e limpo', 'Escuro e forte', 'Colorido']
+    },
+    {
+      key: 'fundo',
+      ask: 'Fundo com foto ou só cor?',
+      type: 'chips',
+      options: ['Foto', 'Só cor']
+    },
+    {
+      key: 'quantos',
+      ask: 'Por último: quantos posts assim eu já deixo prontos?',
+      type: 'chips',
+      options: ['1', '3', '5', '10'],
+      echo: v => v === '1' ? 'só 1' : `${v} posts`
+    }
+  ];
+
+  const VIBE = {
+    'Claro e limpo':  { bg: '#ffffff', ink: '#16161a', line: '#e6e6ea' },
+    'Escuro e forte': { bg: '#16161a', ink: '#ffffff', line: '#16161a' },
+    'Colorido':       { bg: '#ff5a3c', ink: '#ffffff', line: '#ff5a3c' }
+  };
+
+  const answers = {};
+  let i = 0;
+
+  const thread     = document.getElementById('thread');
+  const answerBox  = document.getElementById('answerBox');
+  const stage      = document.getElementById('stage');
+  const deck       = document.getElementById('deck');
+  const note       = document.getElementById('previewNote');
+  const stepsEl    = document.getElementById('steps');
+
+  STEPS.forEach(() => stepsEl.insertAdjacentHTML('beforeend', '<i></i>'));
+
+  const paintSteps = () => {
+    [...stepsEl.children].forEach((el, n) => {
+      el.className = n < i ? 'done' : n === i ? 'now' : '';
+    });
+  };
+
+  const dim = () => thread.querySelectorAll('.line').forEach(el => el.classList.add('past'));
+
+  // digita a pergunta letra por letra
+  function stream(text, done) {
+    const el = document.createElement('div');
+    el.className = 'line ask';
+    const span = document.createElement('span');
+    const caret = document.createElement('span');
+    caret.className = 'caret';
+    el.append(span, caret);
+    thread.append(el);
+
+    let n = 0;
+    const tick = () => {
+      span.textContent = text.slice(0, ++n);
+      if (n < text.length) {
+        // ritmo humano: pausa maior em vírgula e ponto
+        const ch = text[n - 1];
+        setTimeout(tick, /[,.?!]/.test(ch) ? 190 : 18 + Math.random() * 22);
+      } else {
+        caret.remove();
+        setTimeout(done, 260);
+      }
+    };
+    setTimeout(tick, 340);
+  }
+
+  function echo(text) {
+    const el = document.createElement('div');
+    el.className = 'line said';
+    el.textContent = text;
+    thread.append(el);
+  }
+
+  function showAnswer(html) {
+    answerBox.innerHTML = html;
+    requestAnimationFrame(() => answerBox.classList.add('on'));
+  }
+
+  function hideAnswer() {
+    answerBox.classList.remove('on');
+  }
+
+  function commit(step, raw) {
+    answers[step.key] = raw;
+    hideAnswer();
+    echo(step.echo ? step.echo(raw) : raw);
+    drawPreview();
+    i++;
+    paintSteps();
+    setTimeout(next, 420);
+  }
+
+  function next() {
+    if (i >= STEPS.length) return finish();
+    dim();
+
+    const step = STEPS[i];
+    const ask = typeof step.ask === 'function' ? step.ask(answers) : step.ask;
+
+    stream(ask, () => {
+      if (step.type === 'text') {
+        showAnswer(`
+          <div class="field">
+            <input id="inp" type="text" autocomplete="off" placeholder="${step.placeholder || ''}">
+            <button class="send" id="send" aria-label="Continuar">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+            </button>
+          </div>`);
+        const inp = document.getElementById('inp');
+        const send = document.getElementById('send');
+        inp.focus();
+        const sync = () => send.classList.toggle('on', inp.value.trim().length > 1);
+        const fire = () => { if (inp.value.trim().length > 1) commit(step, inp.value.trim()); };
+        inp.addEventListener('input', sync);
+        inp.addEventListener('keydown', e => { if (e.key === 'Enter') fire(); });
+        send.addEventListener('click', fire);
+      } else {
+        showAnswer(`<div class="chips">${
+          step.options.map(o => `<button class="chip" data-v="${o}">${o}</button>`).join('')
+        }</div>`);
+        answerBox.querySelectorAll('.chip').forEach(c => {
+          c.addEventListener('click', () => {
+            c.classList.add('sel');
+            setTimeout(() => commit(step, c.dataset.v), 180);
+          });
+        });
+      }
+    });
+  }
+
+  // o modelo aparecendo conforme ele responde
+  function drawPreview() {
+    const n = parseInt(answers.paginas, 10);
+    if (!n) return;
+
+    stage.classList.add('has-preview');
+
+    if (deck.children.length !== n) {
+      deck.innerHTML = '';
+      for (let s = 0; s < n; s++) {
+        const el = document.createElement('div');
+        el.className = 'slide';
+        el.style.animationDelay = (s * 55) + 'ms';
+        deck.append(el);
+      }
+    }
+
+    const v = VIBE[answers.vibe];
+    if (v) {
+      [...deck.children].forEach(el => {
+        el.style.background = v.bg;
+        el.style.borderColor = v.line;
+        el.style.color = v.ink;
+      });
+    }
+
+    if (answers.fundo === 'Foto') {
+      [...deck.children].forEach(el => {
+        el.style.backgroundImage = 'linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.42)), repeating-linear-gradient(135deg, #d8d8de 0 8px, #cfcfd6 8px 16px)';
+        el.style.color = '#fff';
+      });
+    }
+
+    const bits = [`${n} páginas`];
+    if (answers.formato) bits.unshift(answers.formato);
+    if (answers.quantos && answers.quantos !== '1') bits.push(`× ${answers.quantos} posts`);
+    note.textContent = bits.join(' · ');
+  }
+
+  function finish() {
+    dim();
+    const q = parseInt(answers.quantos, 10) || 1;
+    const p = parseInt(answers.paginas, 10) || 5;
+    const total = q * p;
+    const frase = q === 1
+      ? `Fechado. Montei um carrossel de ${p} páginas sobre "${answers.tema}".`
+      : `Fechado. Montei ${q} carrosséis de ${p} páginas sobre "${answers.tema}".`;
+
+    stream(frase, () => {
+      showAnswer(`
+        <button class="go" id="go">Abrir no editor</button>
+        <div class="hint"><b>${total}</b> páginas geradas · ${answers.vibe || '—'} · fundo ${(answers.fundo || '—').toLowerCase()}</div>
+      `);
+      document.getElementById('go').addEventListener('click', () => {
+        sessionStorage.setItem('funil', JSON.stringify(answers));
+        console.log('[funil] respostas →', answers);
+        alert('Aqui entra a geração real no editor.\n\n' + JSON.stringify(answers, null, 2));
+      });
+    });
+  }
+
+  paintSteps();
+  next();
+})();
+</script>
+</body>
+</html>
