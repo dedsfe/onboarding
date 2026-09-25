@@ -1521,6 +1521,12 @@
        posto pelo JS não dispara 'input', então o painel ressincroniza tudo
        depois de preencher, e o 'input' cobre o que o usuário escolhe. */
     const propsPanel = document.getElementById('canvas-props');
+    if (propsPanel) propsPanel.addEventListener('click', (e) => {
+      const alignBtn = e.target.closest('[data-align-sel]');
+      if (alignBtn) { alignSelectionToEachOther(alignBtn.dataset.alignSel); return; }
+      const distBtn = e.target.closest('[data-distribute]');
+      if (distBtn) distributeSelection(distBtn.dataset.distribute);
+    });
     function syncPropsColors(scope = propsPanel) {
       if (!scope) return;
       scope.querySelectorAll('.pp-color').forEach(label => {
@@ -1625,6 +1631,12 @@
     });
 
     function updateTextToolbar() {
+      const props = document.getElementById('canvas-props');
+      if (props) {
+        const n = selectedChildNodes.length;
+        props.classList.toggle('is-multi', n >= 2);
+        props.querySelectorAll('[data-distribute]').forEach(b => { b.disabled = n < 3; });
+      }
       fillPropsPanel();
       syncPropsColors();
       syncGeoFields();
@@ -2219,6 +2231,95 @@
         const sufixo = (panoLabel && nodes.length === 1) ? ` (post ${panoLabel})` : '';
         toast.success(labels[alignment].replace(/!$/, '') + sufixo + '!');
       }
+    }
+
+    /* --------------------------------------------------
+       Alinhar entre si e distribuir (2+ elementos, estilo Figma)
+       A referência é a caixa que envolve a seleção dentro de cada post —
+       não o post, que é o que alignSelectedNodes faz.
+       -------------------------------------------------- */
+    function selectionBoxesByFrame() {
+      const byFrame = new Map();
+      selectedChildNodes.forEach(n => {
+        const frame = frames.find(f => f.id === n.frameId);
+        const c = frame && (frame.children || []).find(ch => ch.id === n.childId);
+        const el = c && nodeElement(c.id);
+        if (!c || !el) return;
+        // offsetWidth/Height ignoram o zoom da câmera: já estão em px do post
+        const w = c.w || el.offsetWidth || 100;
+        const h = c.type === 'image' ? (c.h || el.offsetHeight) : (el.offsetHeight || c.h || 40);
+        if (!byFrame.has(frame.id)) byFrame.set(frame.id, []);
+        byFrame.get(frame.id).push({ c, el, x: c.x || 0, y: c.y || 0, w, h });
+      });
+      return byFrame;
+    }
+
+    function placeNode(item) {
+      item.el.style.left = `${item.c.x}px`;
+      item.el.style.top = `${item.c.y}px`;
+      if (item.c.type === 'image') {
+        const chromeDom = imageChromeOf(item.c);
+        if (chromeDom) positionImageChrome(chromeDom, item.c);
+      }
+    }
+
+    function alignSelectionToEachOther(mode) {
+      let changed = false;
+      selectionBoxesByFrame().forEach(items => {
+        if (items.length < 2) return;
+        const L = Math.min(...items.map(i => i.x));
+        const R = Math.max(...items.map(i => i.x + i.w));
+        const T = Math.min(...items.map(i => i.y));
+        const B = Math.max(...items.map(i => i.y + i.h));
+        items.forEach(i => {
+          if (mode === 'left') i.c.x = L;
+          else if (mode === 'right') i.c.x = R - i.w;
+          else if (mode === 'center-x') i.c.x = Math.round((L + R) / 2 - i.w / 2);
+          else if (mode === 'top') i.c.y = T;
+          else if (mode === 'bottom') i.c.y = B - i.h;
+          else if (mode === 'center-y') i.c.y = Math.round((T + B) / 2 - i.h / 2);
+          placeNode(i);
+        });
+        changed = true;
+      });
+      if (!changed) return false;
+      updateTextToolbar();
+      save();
+      return true;
+    }
+
+    /* Espaço igual entre vizinhos; o primeiro e o último ficam onde estão */
+    function distributeSelection(axis) {
+      let changed = false;
+      selectionBoxesByFrame().forEach(items => {
+        if (items.length < 3) return;
+        const pos = axis === 'x' ? 'x' : 'y';
+        const size = axis === 'x' ? 'w' : 'h';
+        items.sort((a, b) => a[pos] - b[pos]);
+        const first = items[0];
+        const last = items.reduce((m, i) => (i[pos] + i[size] > m[pos] + m[size] ? i : m), items[0]);
+        const span = (last[pos] + last[size]) - first[pos];
+        const total = items.reduce((sum, i) => sum + i[size], 0);
+        const gap = (span - total) / (items.length - 1);
+        let cursor = first[pos];
+        items.forEach(i => {
+          i.c[pos] = Math.round(cursor);
+          cursor += i[size] + gap;
+          placeNode(i);
+        });
+        changed = true;
+      });
+      if (!changed) {
+        toast.info('Selecione 3 ou mais elementos do mesmo post para distribuir');
+        return;
+      }
+      updateTextToolbar();
+      save();
+    }
+
+    /* Com 2+ no mesmo post o Figma alinha entre si; com 1, ao post */
+    function hasMultiInOneFrame() {
+      return [...selectionBoxesByFrame().values()].some(items => items.length >= 2);
     }
 
     function rotateSelectedNodes(val) {
@@ -7983,8 +8084,22 @@
       /* Atalhos de Alinhamento & Rotação: ⌥H (Centro H), ⌥V (Centro V), ⌥C (Centro Total), ⌥R (Girar 90°) */
       if (e.altKey && !e.metaKey && !e.ctrlKey && selectedChildNodes.length > 0) {
         const k = e.key.toLowerCase();
-        if (k === 'h' || e.code === 'KeyH') { e.preventDefault(); e.stopPropagation(); alignSelectedNodes('center-h'); return; }
-        if (k === 'v' || e.code === 'KeyV') { e.preventDefault(); e.stopPropagation(); alignSelectedNodes('center-v'); return; }
+        const kc = e.code;
+        // ⌥⇧H / ⌥⇧V distribuem; ⌥A ⌥D ⌥W ⌥S alinham entre si (Figma)
+        if (e.shiftKey && kc === 'KeyH') { e.preventDefault(); e.stopPropagation(); distributeSelection('x'); return; }
+        if (e.shiftKey && kc === 'KeyV') { e.preventDefault(); e.stopPropagation(); distributeSelection('y'); return; }
+        const edge = { KeyA: 'left', KeyD: 'right', KeyW: 'top', KeyS: 'bottom' }[kc];
+        if (edge) { e.preventDefault(); e.stopPropagation(); alignSelectionToEachOther(edge); return; }
+        if (k === 'h' || kc === 'KeyH') {
+          e.preventDefault(); e.stopPropagation();
+          if (!hasMultiInOneFrame() || !alignSelectionToEachOther('center-x')) alignSelectedNodes('center-h');
+          return;
+        }
+        if (k === 'v' || kc === 'KeyV') {
+          e.preventDefault(); e.stopPropagation();
+          if (!hasMultiInOneFrame() || !alignSelectionToEachOther('center-y')) alignSelectedNodes('center-v');
+          return;
+        }
         if (k === 'c' || e.code === 'KeyC') { e.preventDefault(); e.stopPropagation(); alignSelectedNodes('center-both'); return; }
         if (k === 'r' || e.code === 'KeyR') {
           e.preventDefault();

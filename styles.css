@@ -7057,3 +7057,10 @@ body.is-scrubbing * {
 .canvas-frame.is-drag-source .canvas-frame__content { overflow: visible; }
 .ly-row.drop-into { box-shadow: inset 0 0 0 2px var(--ly-accent); }
 .ly-row--group .ly-row__name { font-weight: 500; }
+
+/* Seção Alinhar: só com 2+ elementos selecionados */
+.canvas-props .pp-align { display: none; }
+.canvas-props.is-multi .pp-align { display: flex; }
+.pp-align__row { display: flex; gap: 6px; }
+.pp-align__row .pp-seg .pp-btn { width: 24px; flex: none; }
+.pp-align__row .pp-btn:disabled { opacity: 0.35; pointer-events: none; }
