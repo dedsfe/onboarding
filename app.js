@@ -4986,6 +4986,99 @@
       });
     }
 
+    /* ---------- Revisão do molde criado pela IA ----------
+       Conserta o que dá pra medir (contraste, fonte pequena, texto fora do
+       frame ou atrás da barra do story) e devolve o que mudou, pra IA saber. */
+    let lastAiMold = [];
+
+    function hexRgb(c) {
+      const m = /#([0-9a-f]{3}|[0-9a-f]{6})\b/i.exec(String(c || ''));
+      if (!m) return null;
+      const h = m[1].length === 3 ? m[1].split('').map(ch => ch + ch).join('') : m[1];
+      return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
+    }
+
+    function relLum(rgb) {
+      const [r, g, b] = rgb.map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    }
+
+    function contrastRatio(a, b) {
+      const [l1, l2] = [relLum(a), relLum(b)].sort((x, y) => y - x);
+      return (l1 + 0.05) / (l2 + 0.05);
+    }
+
+    function revisarMolde(made, fmt, key) {
+      const avisos = [];
+      const k = fmt.w / 1080;
+      const minTexto = Math.round(28 * k);
+      const minHook = Math.round(64 * k);
+      const isStory = fmt.h / fmt.w > 1.6;
+      // Story: a barra de progresso e o perfil cobrem ~14% de cima
+      const topoSeguro = Math.round(fmt.h * (isStory ? 0.13 : 0.04));
+      const branco = [255, 255, 255];
+      const preto = [17, 17, 17];
+
+      made.forEach((f, si) => {
+        const texts = (f.children || []).filter(c => c.type === 'text');
+        const onde = (c) => `slide ${si + 1}, "${String(c.text).slice(0, 24)}"`;
+
+        // Hook: maior texto da capa
+        if (si === 0 && texts.length) {
+          const hook = texts.reduce((a, b) => (b.fontSize > a.fontSize ? b : a));
+          if (hook.fontSize < minHook) {
+            avisos.push(`${onde(hook)}: hook com ${hook.fontSize}px é pequeno pra capa — subi pra ${minHook}px.`);
+            hook.fontSize = minHook;
+          }
+        }
+
+        texts.forEach((c) => {
+          if (c.fontSize < minTexto) {
+            avisos.push(`${onde(c)}: ${c.fontSize}px ilegível no celular — subi pra ${minTexto}px.`);
+            c.fontSize = minTexto;
+          }
+          if (c.x < 0 || c.x + c.w > fmt.w) {
+            const nx = Math.max(0, Math.min(c.x, fmt.w - 40));
+            c.w = Math.min(c.w, fmt.w - nx);
+            avisos.push(`${onde(c)}: saía pela lateral — ajustei x/largura.`);
+            c.x = nx;
+          }
+          if (c.y < topoSeguro) {
+            avisos.push(`${onde(c)}: colado no topo (y=${c.y})${isStory ? ', atrás da barra do story' : ''} — desci pra y=${topoSeguro}.`);
+            c.y = topoSeguro;
+          }
+          if (c.y > fmt.h - c.fontSize * 1.2) {
+            const ny = Math.round(fmt.h - c.fontSize * 2.4);
+            avisos.push(`${onde(c)}: começava fora do slide — subi pra y=${ny}.`);
+            c.y = ny;
+          }
+
+          // Contraste: com foto de fundo o texto precisa ser claro e ter película
+          const cor = hexRgb(c.color);
+          if (!cor) return;
+          if (f.bgBind) {
+            if (relLum(cor) < 0.5) {
+              avisos.push(`${onde(c)}: texto escuro em cima de foto some — troquei pra branco.`);
+              c.color = '#FFFFFF';
+            }
+            if ((f.bgOverlay || 0) < 30) {
+              avisos.push(`slide ${si + 1}: película de ${f.bgOverlay || 0}% deixa texto branco ilegível em foto clara — subi pra 35%.`);
+              f.bgOverlay = 35;
+            }
+            return;
+          }
+          const fundo = hexRgb(f.bg) || branco;
+          const ratio = contrastRatio(cor, fundo);
+          if (ratio < 3) {
+            const melhor = contrastRatio(branco, fundo) >= contrastRatio(preto, fundo) ? '#FFFFFF' : '#111111';
+            avisos.push(`${onde(c)}: contraste ${ratio.toFixed(1)}:1 com o fundo ${f.bg} — troquei a cor pra ${melhor}.`);
+            c.color = melhor;
+          }
+        });
+      });
+      return [...new Set(avisos)];
+    }
+
     const BG_BIND_PLACEHOLDER_COLOR = '#3F3F46';
     const BG_BIND_PLACEHOLDER_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>';
     const BG_BIND_PLACEHOLDER_ICON = `url("data:image/svg+xml,${encodeURIComponent(BG_BIND_PLACEHOLDER_SVG)}")`;
@@ -10340,9 +10433,17 @@
           if (!slides.length) throw new Error('molde sem slides');
           const key = FORMATS[spec.formato] && spec.formato !== 'custom' ? spec.formato : 'ig-feed';
           const fmt = FORMATS[key];
+          // Refazer o molde troca o anterior da IA no mesmo lugar, sem empilhar
+          const anterior = spec.substituir === false ? [] : lastAiMold.filter(id => frames.some(f => f.id === id));
+          const ancora = anterior.length ? frames.find(f => f.id === anterior[0]) : null;
+          if (anterior.length) {
+            links = links.filter(l => !anterior.includes(l.from) && !anterior.includes(l.to));
+            frames = frames.filter(f => !anterior.includes(f.id));
+            anterior.forEach(id => { const el = world.querySelector(`.canvas-frame[data-id="${id}"]`); if (el) el.remove(); });
+          }
           const last = realFrames().pop();
-          let x = last ? last.x + last.w + FRAME_GAP * 2 : 0;
-          const y = last ? last.y : 0;
+          let x = ancora ? ancora.x : (last ? last.x + last.w + FRAME_GAP * 2 : 0);
+          const y = ancora ? ancora.y : (last ? last.y : 0);
           const made = [];
           slides.forEach((sl, si) => {
             const f = makeFrame(key, x, y);
@@ -10378,10 +10479,12 @@
             if (si > 0) links.push({ id: linkSeq++, from: made[si - 1].id, to: f.id });
             x += fmt.w + FRAME_GAP;
           });
+          const avisos = revisarMolde(made, fmt, key);
+          lastAiMold = made.map(f => f.id);
           renderAll();
           selectFrame(made[0].id);
           save();
-          return { ok: true, slides: made.length, formato: key, frames: made.map(f => f.id) };
+          return { ok: true, slides: made.length, formato: key, frames: made.map(f => f.id), avisos };
         },
         /* Carrossel modelo do lote: a cadeia do post selecionado (ou do
            primeiro) e as variáveis que moram nela. */

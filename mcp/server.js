@@ -366,7 +366,7 @@ const PLAYBOOK = [
   '3. VEJA AS FOTOS com ver_fotos_lote e case cada foto com o ângulo que ela sugere (campo _foto = índice da foto).',
   '4. ESCREVA as variações com ângulos realmente diferentes (nunca a mesma frase trocando palavras): hook forte na capa, uma ideia por slide, CTA no último. Em cada carrossel inclua _legenda (2–4 linhas + 3–5 hashtags do nicho).',
   '5. REVISE com previsualizar_lote (2–3 carrosséis): leia as imagens e os "problemas"; encurte o que estourar ou use _estilo { chave: { tamanho } } para diminuir a fonte. Só então chame gerar_lote com TODAS as variações.',
-  '6. SEM MOLDE (molde: null): crie um com criar_molde reproduzindo o layout dos exemplos (posições em px no formato 1080×1350), com "chave" em cada texto e fundo.foto quando a foto do usuário for o fundo.',
+  '6. SEM MOLDE (molde: null): ANTES de criar, abra 2–3 slides dos exemplos com ver_exemplo_lote e meça posições e tamanhos reais (hook costuma ter 80–120px, texto de apoio 36–48px). Crie com criar_molde reproduzindo esse layout, com "chave" em cada texto e fundo.foto quando a foto do usuário for o fundo (texto claro + escurecer ≥ 30). Olhe as imagens que o criar_molde devolve e refaça até ficar no nível dos exemplos.',
   '7. No fim, conte ao usuário em 2–3 linhas o que achou na pesquisa e quais ângulos usou.',
 ].join('\n');
 
@@ -491,9 +491,10 @@ server.tool(
 
 server.tool(
   'criar_molde',
-  'Cria o molde (design) do carrossel no app quando o usuário não tem post no canvas: descreva cada slide — fundo (cor e/ou foto do usuário) e os textos com posição, tamanho e cor — reproduzindo o layout dos exemplos de resultado desejado. Coordenadas em px no formato escolhido (ig-feed = 1080×1350). Cada texto com "chave" vira um campo de copy.',
+  'Cria o molde (design) do carrossel no app quando o usuário não tem post no canvas: descreva cada slide — fundo (cor e/ou foto do usuário) e os textos com posição, tamanho e cor — reproduzindo o layout dos exemplos de resultado desejado. ANTES, abra os exemplos com ver_exemplo_lote e copie posições e tamanhos reais. Coordenadas em px no formato escolhido (ig-feed = 1080×1350, ig-story = 1080×1920). Cada texto com "chave" vira um campo de copy. Devolve a imagem de cada slide e corrige sozinho contraste ruim, fonte pequena (hook ≥ 64px, texto ≥ 28px) e texto colado no topo. Chamar de novo substitui o molde anterior da IA.',
   {
     nome: z.string().optional(),
+    substituir: z.boolean().default(true).describe('true = troca o último molde criado pela IA (padrão); false = cria outro ao lado'),
     formato: z.enum(['ig-feed', 'ig-square', 'ig-story', 'reels', 'story', 'pinterest']).default('ig-feed'),
     slides: z.array(z.object({
       fundo: z.object({
@@ -514,8 +515,17 @@ server.tool(
   async (spec) => {
     if (!ponteConectada()) return desconectado();
     try {
-      const r = await ponteCmd('lote_criar_molde', spec, 30000);
-      return { content: [{ type: 'text', text: `✅ Molde criado: ${r.slides} slide(s) em ${r.formato}. Chame ver_pedido_lote de novo para ver os campos de copy e a imagem do molde.` }] };
+      const r = await ponteCmd('lote_criar_molde', spec, 60000);
+      const conteudo = [{ type: 'text', text: `✅ Molde criado: ${r.slides} slide(s) em ${r.formato}. Veja abaixo como ficou.` }];
+      if (r.avisos && r.avisos.length) {
+        conteudo.push({ type: 'text', text: `Revisão automática — corrigi isto no molde:\n- ${r.avisos.join('\n- ')}` });
+      }
+      (r.imagens || []).map(dataUrlParaImagem).filter(Boolean).forEach((img, i) => {
+        conteudo.push({ type: 'text', text: `Slide ${i + 1}:` });
+        conteudo.push(img);
+      });
+      conteudo.push({ type: 'text', text: 'COMPARE com os exemplos de resultado desejado (ver_exemplo_lote): tamanho do hook, posição dos textos, contraste, respiro. Se não estiver no mesmo nível, chame criar_molde de novo com os ajustes — ele SUBSTITUI este molde. Quando estiver bom, chame ver_pedido_lote para ver os campos de copy.' });
+      return { content: conteudo };
     } catch (e) {
       return { content: [{ type: 'text', text: `Não criou o molde: ${e.message}` }], isError: true };
     }

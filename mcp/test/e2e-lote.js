@@ -121,6 +121,23 @@ async function main() {
   let info = JSON.parse(pedido.content[0].text);
   if (info.molde !== null) fail('canvas vazio deveria dar molde null');
   if (!textoDe(pedido).includes('criar_molde')) fail('o playbook deveria mandar criar o molde');
+  // Molde ruim de propósito (o caso da issue #19): story, texto branco sem
+  // película, fonte minúscula colada no topo, texto preto em fundo preto
+  const ruim = await tool('criar_molde', {
+    nome: 'OD - Chorando POV', formato: 'ig-story',
+    slides: [
+      { fundo: { foto: 'foto', escurecer: 0 }, textos: [{ chave: 'hook', texto: 'POV', x: 80, y: 20, w: 920, tamanho: 30, cor: '#FFFFFF' }] },
+      { fundo: { cor: '#000000' }, textos: [{ chave: 'corpo', texto: 'texto', x: 80, y: 900, w: 920, tamanho: 12, cor: '#111111' }] },
+    ],
+  });
+  if (ruim.isError) fail('criar_molde (ruim): ' + textoDe(ruim));
+  const revisao = textoDe(ruim);
+  for (const esperado of ['hook com 30px', 'colado no topo', 'película de 0%', '12px ilegível', 'contraste']) {
+    if (!revisao.includes(esperado)) fail(`revisão do molde deveria acusar "${esperado}" — veio:\n${revisao}`);
+  }
+  if (imagensDe(ruim) !== 2) fail('criar_molde deveria devolver 2 imagens, veio ' + imagensDe(ruim));
+  console.log('✓ criar_molde (story ruim): revisão acusou contraste/tamanho/topo + 2 imagens');
+
   const molde = await tool('criar_molde', {
     nome: 'Molde da IA', formato: 'ig-feed',
     slides: [
@@ -132,6 +149,8 @@ async function main() {
   });
   if (molde.isError) fail('criar_molde: ' + textoDe(molde));
   console.log('✓ criar_molde:', textoDe(molde).split('.')[0]);
+  const totalFrames = await page.evaluate(() => JSON.parse(localStorage.getItem('tcm_canvas_v1')).frames.length);
+  if (totalFrames !== 2) fail('criar_molde de novo deveria substituir o molde anterior — canvas tem ' + totalFrames + ' frames');
 
   pedido = await tool('ver_pedido_lote');
   info = JSON.parse(pedido.content[0].text);

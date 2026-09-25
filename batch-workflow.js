@@ -1466,9 +1466,22 @@
     return { carrossel: c.name, slide: Number(args && args.slide) || 1, de: c.files.length, img: await fileJpeg(f, 1080) };
   }
 
+  /* Cria o molde e devolve como ele ficou (com as fotos do usuário no
+     fundo, uma por slide) pra IA revisar antes de escrever a copy. */
   async function loteCriarMolde(spec) {
     var res = window.__tcmBatch.criarMolde(spec || {});
     if (el.overlay) render();
+    var m = model();
+    var files = state.photos ? state.photos.files : [];
+    var imagens = [];
+    var cache = new Map();
+    for (var i = 0; m && i < m.frames.length; i++) {
+      var f = m.frames[i];
+      var overrides = {};
+      if (f.bgBind && files.length) overrides[f.bgBind] = await photoData(files[i % files.length], cache);
+      imagens.push(await frameJpeg(f, 720, overrides));
+    }
+    res.imagens = imagens;
     return res;
   }
 
