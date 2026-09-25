@@ -199,14 +199,14 @@
     var list = [];
     if (imageBinds(m).length) list.push('photos');
     list.push('ref');
-    if (copySlots(m).length) list.push('texts');
+    list.push('texts'); // sempre à vista: sem texto no modelo, o passo explica o que fazer
     list.push('out');
     return list;
   }
   function isDone(step) {
     if (step === 'photos') return !!(state.photos && state.photos.files.length);
     if (step === 'ref') return !!(state.ref && state.ref.carousels.length) || state.refSkipped;
-    if (step === 'texts') return !!(state.texts && textCount() > 0) || hasBrief();
+    if (step === 'texts') return !!(state.texts && textCount() > 0) || hasBrief() || (state.copySkipped && !copySlots(model()).length);
     if (step === 'out') return !!state.out;
     return false;
   }
@@ -241,6 +241,7 @@
 
   function totalToMake(m) {
     if (waitingAi()) return briefCount();
+    if (!copySlots(m).length) return state.photos ? state.photos.files.length : 0;
     if (copySlots(m).length && state.texts) return textCount();
     if (state.photos) return state.photos.files.length;
     return 0;
@@ -747,7 +748,17 @@
   function textsNode(m, cur) {
     var st = stateOf('texts', cur);
     var body = [];
-    if (st === 'done' && waitingAi()) {
+    var semTexto = m && !copySlots(m).length;
+    if (semTexto && st === 'done') {
+      body.push(h('span', { class: 'bw-hint', text: 'Sem copy: os carrosséis mudam só as fotos.' }));
+    } else if (semTexto && st === 'active') {
+      body.push(h('div', { class: 'bw-warn' }, [
+        h('span', { class: 'bw-warn__title', html: icon('type') + '<span>Seu modelo não tem textos</span>' }),
+        h('span', { class: 'bw-warn__text', text: 'Feche, aperte T no canvas e crie os textos em cada slide. Eles viram a copy que a IA escreve.' }),
+      ]));
+      body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('pencil') + '<span>Adicionar textos no canvas</span>', onclick: close }));
+      body.push(h('button', { class: 'bw-link', text: 'seguir só com fotos', onclick: function () { state.copySkipped = true; render(); } }));
+    } else if (st === 'done' && waitingAi()) {
       body.push(h('div', { class: 'bw-brief-sum' }, [
         h('span', { class: 'bw-brief-sum__tag', html: icon('sparkles') + '<span>A IA decide</span>' }),
         h('p', { class: 'bw-brief-sum__text', text: state.brief.pedido.trim() || 'Vai pesquisar o que está funcionando no seu nicho e escrever a copy.' }),
@@ -783,7 +794,7 @@
     var action = null;
     if (st === 'done') {
       action = swapBtn(function () {
-        state.texts = null; state.briefMode = false; state.brief.ok = false;
+        state.texts = null; state.briefMode = false; state.brief.ok = false; state.copySkipped = false;
         idbSet('texts', null); saveBrief(); render();
       });
     }

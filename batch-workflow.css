@@ -458,3 +458,9 @@
 
 /* Wires redesenham ao rolar o palco */
 .bw-stage { scroll-behavior: auto; }
+
+/* Aviso dentro do passo (ex.: modelo sem textos) */
+.bw-warn { display: flex; flex-direction: column; gap: 4px; padding: 10px; border-radius: 8px; background: rgba(245, 166, 35, 0.1); text-align: left; }
+.bw-warn__title { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--bw-amber); }
+.bw-warn__title svg { width: 13px !important; height: 13px !important; }
+.bw-warn__text { font-size: 11px; line-height: 1.45; color: var(--bw-muted); }
