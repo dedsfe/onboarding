@@ -3072,6 +3072,100 @@
       else to.children.splice(Math.max(0, index), 0, child);
     }
 
+    /* --------------------------------------------------
+       Grupos (Cmd+G / Cmd+Shift+G)
+       Um grupo é só uma marca `groupId` nos textos/imagens de um mesmo post.
+       Vale enquanto tiver 2+ membros no post; sobrou 1, ele volta a ser solto.
+       O nome fica em frame.groupNames[groupId].
+       -------------------------------------------------- */
+    function newGroupId() {
+      return 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
+
+    function groupMembers(frame, groupId) {
+      if (!frame || !groupId) return [];
+      const members = (frame.children || []).filter(c => c.groupId === groupId);
+      return members.length >= 2 ? members : [];
+    }
+
+    function groupNameOf(frame, groupId) {
+      return (frame.groupNames && frame.groupNames[groupId]) || 'Grupo';
+    }
+
+    /* Cópias (duplicar, colar) formam grupos novos, senão entrariam no do original */
+    function remapGroupIds(frame, copies) {
+      const map = new Map();
+      copies.forEach(c => {
+        if (!c || !c.groupId) return;
+        if (!map.has(c.groupId)) {
+          const nid = newGroupId();
+          map.set(c.groupId, nid);
+          const name = frame && frame.groupNames && frame.groupNames[c.groupId];
+          if (name) frame.groupNames[nid] = name;
+        }
+        c.groupId = map.get(c.groupId);
+      });
+    }
+
+    function selectGroup(frame, groupId, addToSelection = false) {
+      const members = groupMembers(frame, groupId);
+      members.forEach((m, i) => {
+        if (addToSelection || i > 0) {
+          if (!isChildNodeSelected(frame.id, m.id)) selectTextNode(frame.id, m.id, true);
+        } else {
+          selectTextNode(frame.id, m.id, false);
+        }
+      });
+    }
+
+    function groupSelection() {
+      const byFrame = new Map();
+      selectedChildNodes.forEach(n => {
+        if (!byFrame.has(n.frameId)) byFrame.set(n.frameId, []);
+        byFrame.get(n.frameId).push(n.childId);
+      });
+      const made = [];
+      byFrame.forEach((ids, frameId) => {
+        const frame = frames.find(f => f.id === frameId);
+        if (!frame || ids.length < 2) return;
+        const kids = frame.children || [];
+        const members = kids.filter(c => ids.includes(c.id));
+        // O grupo entra na altura do membro mais de cima, com todos juntos
+        const top = Math.max(...members.map(c => kids.indexOf(c)));
+        const others = kids.filter(c => !ids.includes(c.id));
+        const pos = kids.slice(0, top).filter(c => !ids.includes(c.id)).length;
+        frame.children = [...others.slice(0, pos), ...members, ...others.slice(pos)];
+        const gid = newGroupId();
+        if (!frame.groupNames) frame.groupNames = {};
+        const used = new Set((frame.children || []).map(c => c.groupId).filter(Boolean));
+        frame.groupNames[gid] = `Grupo ${used.size + 1}`;
+        members.forEach(c => { c.groupId = gid; });
+        reorderChildDOM(frame);
+        made.push({ frame, gid });
+      });
+      if (made.length === 0) {
+        toast.info('Selecione 2 ou mais elementos do mesmo post para agrupar');
+        return;
+      }
+      if (!layersOpenFrames) layersOpenFrames = new Set();
+      made.forEach(({ frame }) => layersOpenFrames.add(frame.id));
+      save();
+    }
+
+    function ungroupSelection() {
+      let changed = false;
+      selectedChildNodes.forEach(n => {
+        const frame = frames.find(f => f.id === n.frameId);
+        const c = frame && (frame.children || []).find(ch => ch.id === n.childId);
+        if (!c || !c.groupId) return;
+        const gid = c.groupId;
+        (frame.children || []).forEach(ch => { if (ch.groupId === gid) delete ch.groupId; });
+        if (frame.groupNames) delete frame.groupNames[gid];
+        changed = true;
+      });
+      if (changed) save();
+    }
+
     function startChildNodeDrag(e, child, frame, el) {
       const isMultiKey = e.shiftKey || e.metaKey || e.ctrlKey;
       const alreadySelected = isChildNodeSelected(frame.id, child.id);
@@ -3081,8 +3175,15 @@
         return;
       }
 
+      /* Clicar num membro pega o grupo todo. Com o grupo já selecionado,
+         um clique sem arrastar "entra" nele e fica só com aquele elemento. */
+      const members = groupMembers(frame, child.groupId);
+      const enterGroup = alreadySelected && members.length > 0
+        && selectedChildNodes.length === members.length
+        && members.every(m => isChildNodeSelected(frame.id, m.id));
       if (!alreadySelected) {
-        selectTextNode(frame.id, child.id, false);
+        if (members.length) selectGroup(frame, child.groupId);
+        else selectTextNode(frame.id, child.id, false);
       }
 
       const startX = e.clientX;
@@ -3269,7 +3370,10 @@
           .forEach(fEl => fEl.classList.remove('is-drag-source', 'is-drop-target'));
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        if (!moved) return;
+        if (!moved) {
+          if (enterGroup) selectTextNode(frame.id, child.id, false);
+          return;
+        }
         /* Soltou em cima de outro post: os elementos passam a ser dele, no
            mesmo lugar da tela. Solto no vazio, continuam no post de origem. */
         if (dropTarget) {
@@ -3279,6 +3383,24 @@
             return c && from.id !== dropTarget.id ? { c, from } : null;
           }).filter(Boolean);
           if (moves.length) {
+            // Grupo inteiro vai junto e continua grupo; pedaço de grupo sai solto
+            const movedIds = new Set(moves.map(m => m.c.id));
+            const gmap = new Map();
+            moves.forEach(({ c, from }) => {
+              if (!c.groupId || gmap.has(c.groupId)) return;
+              const all = groupMembers(from, c.groupId);
+              if (all.length && all.every(m => movedIds.has(m.id))) {
+                const nid = newGroupId();
+                gmap.set(c.groupId, nid);
+                if (!dropTarget.groupNames) dropTarget.groupNames = {};
+                dropTarget.groupNames[nid] = groupNameOf(from, c.groupId);
+              }
+            });
+            moves.forEach(({ c }) => {
+              if (!c.groupId) return;
+              if (gmap.has(c.groupId)) c.groupId = gmap.get(c.groupId);
+              else delete c.groupId;
+            });
             moves.forEach(({ c, from }) => moveChildToFrame(c, from, dropTarget, { keepWorldPos: true }));
             renderAll();
             selectedChildNodes = [];
@@ -4195,6 +4317,8 @@
         renderChildNode(copy, frame, frameEl);
         newSelections.push({ frameId: frame.id, childId: copy.id });
       });
+      frames.forEach(f => remapGroupIds(f, (f.children || []).filter(c =>
+        newSelections.some(n => n.frameId === f.id && n.childId === c.id))));
       selectedChildNodes = newSelections;
       selectedTextNode = newSelections.length > 0 ? newSelections[0] : { frameId: null, childId: null };
       world.querySelectorAll('.canvas-text-node, .canvas-image-node').forEach(el => {
@@ -5631,6 +5755,7 @@
     var layersSig = '';
     var layersOpenFrames = null; // Set de frame ids abertos na árvore
     var layersDrag = null; // { frameId, childId }
+    var layersOpenGroups = null; // Set de groupIds abertos
 
     const LY_ICONS = {
       chev: '<path d="m9 18 6-6-6-6"/>',
@@ -5640,6 +5765,7 @@
       eye: '<path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
       eyeOff: '<path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/>',
       lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+      group: '<rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/>',
       unlock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
     };
 
@@ -5678,6 +5804,7 @@
       if (!list) return;
       syncLayerFlags();
       if (!layersOpenFrames) layersOpenFrames = new Set();
+      if (!layersOpenGroups) layersOpenGroups = new Set();
       // Seleção dentro de um post fechado abre o post, como no Figma
       selectedChildNodes.forEach(n => layersOpenFrames.add(n.frameId));
 
@@ -5695,16 +5822,39 @@
           name: formatFrameDisplayName(f, posMap),
           sel: selectedFrameIds.has(f.id) && selectedChildNodes.length === 0,
         });
-        if (open) kids.forEach(c => rows.push({
-          kind: 'child', f, c,
+        if (!open) return;
+        const frameSel = selectedFrameIds.has(f.id) && selectedChildNodes.length === 0;
+        const childRow = (c, depth, groupSel) => ({
+          kind: 'child', f, c, depth,
           name: layerChildName(c),
-          sel: isChildNodeSelected(f.id, c.id),
-          inSel: selectedFrameIds.has(f.id) && selectedChildNodes.length === 0,
-        }));
+          sel: isChildNodeSelected(f.id, c.id) && !groupSel,
+          inSel: frameSel || groupSel,
+        });
+        // Grupo aparece na altura do membro mais de cima, com os membros dentro
+        const emitted = new Set();
+        kids.forEach(c => {
+          const members = groupMembers(f, c.groupId);
+          if (!members.length) { rows.push(childRow(c, 1, false)); return; }
+          if (emitted.has(c.groupId)) return;
+          emitted.add(c.groupId);
+          const selCount = members.filter(m => isChildNodeSelected(f.id, m.id)).length;
+          const groupSel = selCount === members.length;
+          // Membro solto selecionado dentro do grupo: abre o grupo, como no Figma
+          if (selCount > 0 && !groupSel) layersOpenGroups.add(c.groupId);
+          const gOpen = layersOpenGroups.has(c.groupId);
+          rows.push({
+            kind: 'group', f, gid: c.groupId, depth: 1, open: gOpen,
+            name: groupNameOf(f, c.groupId),
+            sel: groupSel, inSel: frameSel,
+            hidden: members.every(m => m.hidden),
+            locked: members.every(m => m.locked),
+          });
+          if (gOpen) members.slice().reverse().forEach(m => rows.push(childRow(m, 2, groupSel)));
+        });
       });
 
       // Pan e zoom também salvam: não refaz a lista se nada visível mudou
-      const sig = JSON.stringify(rows.map(r => [r.kind, r.f.id, r.c && r.c.id, r.name, r.sel, r.inSel, r.open, r.hasKids, r.c && r.c.hidden, r.c && r.c.locked]));
+      const sig = JSON.stringify(rows.map(r => [r.kind, r.f.id, r.c && r.c.id, r.gid, r.depth, r.name, r.sel, r.inSel, r.open, r.hasKids, r.c ? r.c.hidden : r.hidden, r.c ? r.c.locked : r.locked]));
       if (!force && sig === layersSig) return;
       if (list.querySelector('.ly-row__rename')) return; // não atropela quem está renomeando
       layersSig = sig;
@@ -5723,12 +5873,25 @@
             <span class="ly-row__name">${esc(r.name)}</span>
           </div>`;
         }
+        if (r.kind === 'group') {
+          const gcls = ['ly-row', 'ly-row--group'];
+          if (r.sel) gcls.push('is-selected');
+          else if (r.inSel) gcls.push('is-in-selected');
+          if (r.hidden) gcls.push('is-hidden');
+          return `<div class="${gcls.join(' ')}" role="treeitem" aria-expanded="${r.open}" data-frame="${r.f.id}" data-group="${r.gid}" style="--depth:1">
+            <span class="ly-row__chev${r.open ? ' is-open' : ''}" data-act="toggle-group">${lyIcon('chev')}</span>
+            <span class="ly-row__icon">${lyIcon('group')}</span>
+            <span class="ly-row__name">${esc(r.name)}</span>
+            <button type="button" class="ly-row__btn${r.locked ? ' is-on' : ''}" data-act="lock" title="${r.locked ? 'Destravar' : 'Travar'}">${lyIcon(r.locked ? 'lock' : 'unlock')}</button>
+            <button type="button" class="ly-row__btn${r.hidden ? ' is-on' : ''}" data-act="hide" title="${r.hidden ? 'Mostrar' : 'Esconder'}">${lyIcon(r.hidden ? 'eyeOff' : 'eye')}</button>
+          </div>`;
+        }
         const c = r.c;
         const cls = ['ly-row', 'ly-row--child'];
         if (r.sel) cls.push('is-selected');
         else if (r.inSel) cls.push('is-in-selected');
         if (c.hidden) cls.push('is-hidden');
-        return `<div class="${cls.join(' ')}" role="treeitem" draggable="true" data-frame="${r.f.id}" data-child="${c.id}" style="--depth:1">
+        return `<div class="${cls.join(' ')}" role="treeitem" draggable="true" data-frame="${r.f.id}" data-child="${c.id}" style="--depth:${r.depth}">
           <span class="ly-row__chev is-blank"></span>
           <span class="ly-row__icon">${lyIcon(c.type === 'image' ? 'image' : 'text')}</span>
           <span class="ly-row__name">${esc(r.name)}</span>
@@ -5753,7 +5916,8 @@
       const nameEl = row.querySelector('.ly-row__name');
       const input = document.createElement('input');
       input.className = 'ly-row__rename';
-      input.value = c ? layerChildName(c) : formatFrameDisplayName(f);
+      const gid = row.dataset.group;
+      input.value = gid ? groupNameOf(f, gid) : c ? layerChildName(c) : formatFrameDisplayName(f);
       nameEl.replaceWith(input);
       input.focus();
       input.select();
@@ -5764,9 +5928,11 @@
         done = true;
         const val = input.value.trim();
         if (commit) {
-          if (c) c.name = val || undefined; // vazio volta ao nome automático
+          if (gid) {
+            if (val) { f.groupNames = f.groupNames || {}; f.groupNames[gid] = val; }
+          } else if (c) c.name = val || undefined; // vazio volta ao nome automático
           else if (val) f.name = val;
-          if (!c) updateFrameMeta();
+          if (!c && !gid) updateFrameMeta();
           input.remove();
           save();
         } else {
@@ -5807,6 +5973,27 @@
         const act = e.target.closest('[data-act]')?.dataset.act;
         const multi = e.shiftKey || e.metaKey || e.ctrlKey;
 
+        const gid = row.dataset.group;
+        if (gid) {
+          const members = groupMembers(f, gid);
+          if (act === 'toggle-group') {
+            if (layersOpenGroups.has(gid)) layersOpenGroups.delete(gid);
+            else layersOpenGroups.add(gid);
+            renderLayers(true);
+          } else if (act === 'hide') {
+            const hide = !members.every(m => m.hidden);
+            members.forEach(m => { m.hidden = hide; });
+            if (hide && members.some(m => isChildNodeSelected(f.id, m.id))) selectTextNode(null, null);
+            save();
+          } else if (act === 'lock') {
+            const lock = !members.every(m => m.locked);
+            members.forEach(m => { m.locked = lock; });
+            save();
+          } else {
+            selectGroup(f, gid, multi);
+          }
+          return;
+        }
         if (act === 'toggle') {
           if (layersOpenFrames.has(f.id)) layersOpenFrames.delete(f.id);
           else layersOpenFrames.add(f.id);
@@ -5860,7 +6047,7 @@
         clearDropMarks();
         // Não deixa o soltar-imagem do canvas ver este arrasto (ele força "copy")
         e.stopPropagation();
-        if (!row || row.dataset.child === String(layersDrag.childId)) return;
+        if (!row || row.dataset.group || row.dataset.child === String(layersDrag.childId)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         // Em cima de um post: entra nele (por cima de tudo)
@@ -5884,10 +6071,15 @@
         const from = frames.find(f => f.id === layersDrag.frameId);
         const to = frames.find(f => f.id === Number(row.dataset.frame));
         const moved = from && (from.children || []).find(ch => ch.id === layersDrag.childId);
-        if (!from || !to || !moved) return;
+        if (!from || !to || !moved || (from === to && into)) return;
+
+        /* Soltou entre membros de um grupo: entra nele. Fora de grupo: sai. */
+        const targetChild = !into && (to.children || []).find(ch => ch.id === Number(row.dataset.child));
+        const joinGid = targetChild && groupMembers(to, targetChild.groupId).length ? targetChild.groupId : null;
+        if (joinGid) moved.groupId = joinGid;
+        else delete moved.groupId;
 
         if (from === to) {
-          if (into) return;
           const kids = from.children;
           kids.splice(kids.indexOf(moved), 1);
           const at = kids.findIndex(ch => ch.id === Number(row.dataset.child));
@@ -6755,6 +6947,7 @@
           renderChildNode(copy, targetFrame, frameEl);
           newSelections.push({ frameId: targetFrame.id, childId: copy.id });
         }
+        remapGroupIds(targetFrame, targetFrame.children.filter(c => newSelections.some(n => n.childId === c.id)));
 
         selectedFrameIds.clear();
         selectedId = null;
@@ -7914,6 +8107,13 @@
         e.stopPropagation();
         if (hasChildren) duplicateTextNode();
         else if (hasFrames) duplicateFrame(selectedId);
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'g') {
+        // Cmd+G agrupa, Cmd+Shift+G desagrupa (e o "buscar" do navegador não abre)
+        e.preventDefault();
+        e.stopPropagation();
+        if (!hasChildren) return;
+        if (e.shiftKey) ungroupSelection();
+        else groupSelection();
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
         /* Movimentação precisa por pixel (Nudge) com as setas do teclado:
            Seta pura move 1px. Shift + Seta move 10px (Super Nudge).

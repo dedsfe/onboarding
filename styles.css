@@ -7056,3 +7056,4 @@ body.is-scrubbing * {
 .canvas-frame.is-drag-source { z-index: 40; }
 .canvas-frame.is-drag-source .canvas-frame__content { overflow: visible; }
 .ly-row.drop-into { box-shadow: inset 0 0 0 2px var(--ly-accent); }
+.ly-row--group .ly-row__name { font-weight: 500; }
