@@ -11,7 +11,6 @@ Expõe o app para qualquer cliente IA (Claude Code, Claude Desktop, Cursor) via
 | `status_ponte` | App conectado? Frames, binds e cadeias do canvas atual |
 | `listar_templates` / `detalhar_template` | Catálogo de templates e estilo de cada um |
 | `criar_lote` / `listar_lotes` | CSV de lote pronto pra arrastar no menu ⚡ Lote do app |
-| `buscar_fotos_unsplash` | Busca de fotos (mesma API key do app) |
 | `guia_uso` | Explica o fluxo binds `{{}}` + CSV + fotos |
 
 ## Ponte com o navegador (ws://localhost:8765)

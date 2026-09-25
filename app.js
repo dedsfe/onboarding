@@ -8218,7 +8218,7 @@
       const targetFrame = realFrames().find(f => f.id === selectedId) || realFrames()[0];
       if (targetFrame && selectedId !== targetFrame.id) selectFrame(targetFrame.id);
 
-      const library = { 'open-photos': 'photos', 'open-mesh': 'gradients', 'open-icons': 'icons' };
+      const library = { 'open-mesh': 'gradients', 'open-icons': 'icons' };
       if (action === 'tool-rect' || action === 'tool-ellipse') { setShapeTool(action === 'tool-rect' ? 'rect' : 'ellipse'); return; }
       if (action === 'add-text') addTextToSelectedFrame();
       else if (action === 'add-image') { if (imageUpload) imageUpload.click(); }
@@ -10602,133 +10602,8 @@
 
       if (!modal || !openBtn || !grid) return;
 
-      let tab = 'photos';
+      let tab = 'icons';
       let buscaSeq = 0;
-
-      // Estado do Unsplash
-      let photosState = {
-        query: '',
-        page: 1,
-        totalPages: 1,
-        loading: false,
-        hasMore: true
-      };
-      let photosBuscaSeq = 0;
-
-      function renderResultadosFotos(photos, append = false) {
-        if (!append) {
-          grid.innerHTML = '';
-        }
-        if (!photos || !photos.length) {
-          if (!append) {
-            grid.innerHTML = '<div class="canvas-lib-empty-oa">Nenhuma foto encontrada. Tente outro termo (ex: <strong>minimalista</strong>, <strong>café</strong>, <strong>arquitetura</strong>).</div>';
-          }
-          return;
-        }
-
-        photos.forEach(photo => {
-          if (!photo || !photo.urls) return;
-          const item = document.createElement('button');
-          item.type = 'button';
-          item.className = 'canvas-photo-card-oa';
-          item.title = photo.description || 'Inserir foto no post';
-          if (photo.color) item.style.backgroundColor = photo.color;
-
-          const img = document.createElement('img');
-          img.src = photo.urls.small || photo.urls.regular;
-          img.alt = photo.description || 'Unsplash photo';
-          img.loading = 'lazy';
-          img.onerror = () => { item.style.display = 'none'; };
-
-          item.appendChild(img);
-          item.addEventListener('click', () => inserirFoto(photo, item));
-          grid.appendChild(item);
-        });
-      }
-
-      async function buscarFotos(termo, page = 1, append = false) {
-        if (photosState.loading && append) return;
-        const seq = ++photosBuscaSeq;
-        const q = (termo !== undefined ? termo : (searchInput ? searchInput.value : '')).trim();
-
-        photosState.loading = true;
-        photosState.query = q;
-        photosState.page = page;
-
-        if (!append) {
-          grid.innerHTML = '<div class="canvas-photos-loading-oa">Carregando fotos…</div>';
-        }
-
-        try {
-          if (!window.UnsplashService) {
-            throw new Error('Serviço Unsplash não inicializado.');
-          }
-
-          let res;
-          if (q) {
-            res = await window.UnsplashService.searchPhotos(q, { page, perPage: 24 });
-          } else {
-            res = await window.UnsplashService.getEditorialPhotos({ page, perPage: 24 });
-          }
-
-          if (seq !== photosBuscaSeq) return;
-
-          photosState.totalPages = res.totalPages || 1;
-          photosState.hasMore = page < photosState.totalPages;
-
-          const loader = grid.querySelector('.canvas-photos-loading-oa');
-          if (loader) loader.remove();
-
-          renderResultadosFotos(res.results || [], append);
-
-          if (hint) {
-            hint.textContent = '';
-          }
-        } catch (err) {
-          if (seq !== photosBuscaSeq) return;
-          console.error('[unsplash] erro na busca:', err);
-          if (!append) {
-            if (err.message === 'UNSPLASH_KEY_MISSING' || err.message === 'UNSPLASH_UNAUTHORIZED') {
-              grid.innerHTML = '<div class="canvas-lib-empty-oa">Chave do Unsplash inválida ou ausente.</div>';
-            } else if (err.message === 'UNSPLASH_RATE_LIMIT') {
-              grid.innerHTML = '<div class="canvas-lib-empty-oa">Limite de requisições por hora do Unsplash atingido. Tente novamente mais tarde.</div>';
-            } else {
-              grid.innerHTML = '<div class="canvas-lib-empty-oa">Não foi possível carregar as fotos. Verifique sua conexão.</div>';
-            }
-          }
-        } finally {
-          photosState.loading = false;
-        }
-      }
-
-      async function inserirFoto(photo, itemEl) {
-        const frame = selectedFrame() || realFrames()[0];
-        if (!frame) {
-          toast.info('Selecione um frame antes de inserir.');
-          return;
-        }
-        itemEl.classList.add('is-busy');
-        try {
-          const photoData = await window.UnsplashService.downloadPhotoAsDataUrl(photo, 'regular', 1080);
-          const aspect = photoData.aspectRatio || (photoData.width / photoData.height) || 0.8;
-          const MAX_W = Math.min(800, Math.round(frame.w * 0.75));
-          let w = MAX_W;
-          let h = Math.round(w / aspect);
-          if (h > frame.h * 0.85) {
-            h = Math.round(frame.h * 0.85);
-            w = Math.round(h * aspect);
-          }
-
-          await addImageNode(frame, photoData.dataUrl, w, h);
-          toast.success('Foto adicionada ao post!');
-          closeLibrary();
-        } catch (e) {
-          console.error('[unsplash] falha ao inserir foto:', photo.id, e);
-          toast.error('Não foi possível inserir a imagem. Tente novamente.');
-        } finally {
-          itemEl.classList.remove('is-busy');
-        }
-      }
 
       // Estado do Mesh Gradient
       let currentMeshColors = [...MESH_PRESETS[0].colors];
@@ -11876,20 +11751,7 @@
         tab = newTab;
         tabs.forEach(o => o.classList.toggle('is-active', o.dataset.tab === tab));
 
-        if (tab === 'photos') {
-          if (colorWrap) colorWrap.style.display = 'none';
-          if (searchInput) {
-            searchInput.style.display = 'block';
-            searchInput.placeholder = 'Buscar fotos… (ex: minimalista, café, arquitetura)';
-          }
-          if (grid) {
-            grid.style.display = 'grid';
-            grid.className = 'canvas-photos-grid-oa';
-          }
-          if (viewContainer) viewContainer.style.display = 'none';
-          if (hint) hint.textContent = '';
-          buscarFotos(searchInput ? searchInput.value : '');
-        } else if (tab === 'icons' || tab === 'stickers') {
+        if (tab === 'icons' || tab === 'stickers') {
           if (colorWrap) colorWrap.style.display = tab === 'icons' ? 'block' : 'none';
           if (searchInput) {
             searchInput.style.display = 'block';
@@ -11926,25 +11788,12 @@
         t.addEventListener('click', () => switchTab(t.dataset.tab));
       });
 
-      // Scroll infinito para a aba de Fotos
-      if (grid) {
-        grid.addEventListener('scroll', () => {
-          if (tab !== 'photos' || photosState.loading || !photosState.hasMore) return;
-          const scrollBottom = grid.scrollHeight - grid.scrollTop - grid.clientHeight;
-          if (scrollBottom < 220) {
-            buscarFotos(photosState.query, photosState.page + 1, true);
-          }
-        });
-      }
-
       let debounce = null;
       if (searchInput) {
         searchInput.addEventListener('input', () => {
           clearTimeout(debounce);
           debounce = setTimeout(() => {
-            if (tab === 'photos') {
-              buscarFotos(searchInput.value);
-            } else if (tab === 'fonts') {
+            if (tab === 'fonts') {
               filterAndRenderFontList();
             } else {
               buscarIcones(searchInput.value);

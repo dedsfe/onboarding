@@ -8,7 +8,6 @@
  * - listar_templates / detalhar_template: catálogo de templates do app
  * - criar_lote / listar_lotes: gera CSVs de automação em lote prontos para
  *   soltar na tabela de lote do app (Modal Lote → arrastar o .csv)
- * - buscar_fotos_unsplash: busca de fotos com a mesma API key do app
  * - guia_uso: como o fluxo lote + binds {{}} funciona no app
  *
  * Zero estado no servidor: tudo é arquivo (lotes/ na raiz do projeto).
@@ -27,19 +26,6 @@ const ROOT = path.resolve(__dirname, '..');
 const LOTES_DIR = path.join(ROOT, 'lotes');
 const TEMPLATES_FILE = path.join(ROOT, 'templates-data.js');
 
-/* Chave fora do código: vem de UNSPLASH_ACCESS_KEY no ambiente ou do
-   .env.local da raiz (ignorado pelo git). */
-function lerEnvLocal(nome) {
-  try {
-    const txt = fs.readFileSync(path.join(ROOT, '.env.local'), 'utf8');
-    const m = txt.match(new RegExp(`^\\s*${nome}\\s*=\\s*(.+?)\\s*$`, 'm'));
-    return m ? m[1].replace(/^['"]|['"]$/g, '') : '';
-  } catch (e) {
-    return '';
-  }
-}
-const UNSPLASH_KEY = process.env.UNSPLASH_ACCESS_KEY || lerEnvLocal('UNSPLASH_ACCESS_KEY');
-const UNSPLASH_URL = 'https://api.unsplash.com/search/photos';
 
 /* ---------------------------------------------------------------------------
  * Carrega o catálogo de templates (script de browser) num sandbox do Node.
@@ -336,38 +322,6 @@ server.tool(
 );
 
 server.tool(
-  'buscar_fotos_unsplash',
-  'Busca fotos no Unsplash (mesma API do app). Pesquise em INGLÊS para melhores resultados. Devolve URLs para usar como referência de foto no conteúdo.',
-  {
-    query: z.string().describe('Termo de busca em inglês, ex.: "nature landscape serene"'),
-    por_pagina: z.number().int().min(1).max(20).default(6),
-  },
-  async ({ query, por_pagina }) => {
-    if (!UNSPLASH_KEY) {
-      return { content: [{ type: 'text', text: 'Falta a chave do Unsplash: defina UNSPLASH_ACCESS_KEY no .env.local da raiz do projeto.' }], isError: true };
-    }
-    const url = `${UNSPLASH_URL}?per_page=${por_pagina}&query=${encodeURIComponent(query)}`;
-    let res;
-    try {
-      res = await fetch(url, { headers: { Authorization: `Client-ID ${UNSPLASH_KEY}` } });
-    } catch (e) {
-      return { content: [{ type: 'text', text: `Falha de rede ao consultar o Unsplash: ${e.message}` }], isError: true };
-    }
-    if (!res.ok) {
-      return { content: [{ type: 'text', text: `Unsplash respondeu ${res.status} para "${query}".` }], isError: true };
-    }
-    const data = await res.json();
-    const fotos = (data.results || []).slice(0, por_pagina).map((p) => ({
-      descricao: p.alt_description || p.description || null,
-      regular: p.urls?.regular || null,
-      download: p.links?.download_location || null,
-      credito: p.user?.name ? `${p.user.name} (@${p.user.username})` : null,
-    }));
-    return { content: [{ type: 'text', text: JSON.stringify({ query, total: data.total, fotos }, null, 2) }] };
-  }
-);
-
-server.tool(
   'status_ponte',
   'Verifica se o app está aberto no navegador e conectado à ponte. Devolve frames, binds e cadeias do canvas atual. Se desconectado, instrua o usuário a abrir o app (npm run dev → http://localhost:3000).',
   {},
@@ -498,7 +452,7 @@ server.tool(
           '1. No app, o design usa variáveis {{titulo}}, {{mensagem}} etc. (binds). Cada bind vira uma coluna do CSV.',
           '2. Gere o conteúdo com criar_lote (ou escreva o CSV à mão) — as chaves dos posts devem bater com os binds do design.',
           '3. No app: menu ⚡ Lote → arraste o lote.csv para a tabela → as colunas casam pelos nomes (exato antes de parcial).',
-          '4. Fotos: no modal do lote há preenchimento em lote pelo Unsplash; ou inclua uma coluna de foto no CSV.',
+          '4. Fotos: inclua uma coluna de foto no CSV (caminho local ou URL).',
           '5. Exportar: o app gera uma pasta por post com as imagens finais.',
           '',
           'DICAS: veja os templates com listar_templates e o estilo com detalhar_template antes de escrever o conteúdo.',
