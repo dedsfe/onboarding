@@ -6,7 +6,8 @@
     "dev": "npx serve -l 3000 .",
     "start": "npx serve -l 3000 .",
     "mcp": "node mcp/server.js",
-    "test:ponte": "node mcp/test/e2e-ponte.js"
+    "test:ponte": "node mcp/test/e2e-ponte.js",
+    "test:lote": "node mcp/test/e2e-lote.js"
   },
   "keywords": [
     "analytics",

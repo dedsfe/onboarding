@@ -29,6 +29,9 @@
     pendingPhotos: null, // pasta lembrada que precisa de um clique pra liberar
     pendingOut: null,
     running: false,
+    // Pedido pra IA: o que escrever e quantos carrosséis. A IA lê pelo MCP.
+    brief: { pedido: '', quantidade: '' },
+    briefMode: false,
   };
   var el = {};
   var thumbUrls = [];
@@ -168,7 +171,7 @@
   }
   function isDone(step) {
     if (step === 'photos') return !!(state.photos && state.photos.files.length);
-    if (step === 'texts') return !!(state.texts && textCount() > 0);
+    if (step === 'texts') return !!(state.texts && textCount() > 0) || hasBrief();
     if (step === 'out') return !!state.out;
     return false;
   }
@@ -188,7 +191,20 @@
     return state.texts.lines.length;
   }
 
+  function hasBrief() { return !state.texts && state.briefMode && !!state.brief.pedido.trim(); }
+  function waitingAi() { return hasBrief(); }
+
+  // Quantos carrosséis o pedido quer: o número digitado ou um por foto
+  function briefCount() {
+    var q = parseInt(state.brief.quantidade, 10);
+    if (q > 0) return Math.min(q, 200);
+    return state.photos ? state.photos.files.length : 10;
+  }
+
+  function saveBrief() { idbSet('brief', { pedido: state.brief.pedido, quantidade: state.brief.quantidade, on: state.briefMode }); }
+
   function totalToMake(m) {
+    if (waitingAi()) return briefCount();
     if (textBinds(m).length && state.texts) return textCount();
     if (state.photos) return state.photos.files.length;
     return 0;
@@ -308,23 +324,15 @@
     if (f) setTextsFromString(f.name, await f.text());
   }
 
-  function aiPrompt(m) {
-    var tb = textBinds(m).map(function (b) { return '{{' + b.name + '}}'; }).join(', ');
-    var n = state.photos ? state.photos.files.length : 20;
-    return [
-      'Estou criando carrosséis em lote no The Carousel Maker (servidor MCP "carousel-maker").',
-      'O carrossel modelo "' + (m ? m.nome : 'Post') + '" tem ' + (m ? plural(m.frames.length, 'slide', 'slides') : '') + ' e o texto que muda é ' + (tb || '{{hooks}}') + '.',
-      'Use status_ponte para ver o modelo aberto no app e escreva ' + n + ' textos curtos, um por linha, no mesmo estilo.',
-      'Tema: [descreva aqui o assunto e o público].',
-      'Salve tudo num arquivo hooks.txt (um texto por linha, sem numeração) para eu escolher no passo 2.',
-    ].join('\n');
+  function aiPrompt() {
+    return 'Veja meu pedido de lote no Carousel Maker e gere os carrosséis.';
   }
 
   async function copyPrompt(m, btn) {
     try {
       await navigator.clipboard.writeText(aiPrompt(m));
       btn.querySelector('span').textContent = 'Copiado!';
-      setTimeout(function () { btn.querySelector('span').textContent = 'Copiar pedido'; }, 1600);
+      setTimeout(function () { btn.querySelector('span').textContent = 'Copiar frase'; }, 1600);
     } catch (e) {
       toast('error', 'Não consegui copiar. Selecione o texto e copie à mão.');
     }
@@ -357,7 +365,13 @@
     }
   }
 
+  // Lê as escolhas guardadas uma vez por sessão: depois o estado em memória manda
+  var restored = false;
   async function restore() {
+    if (restored) return;
+    restored = true;
+    var br = await idbGet('brief');
+    if (br) { state.brief = { pedido: br.pedido || '', quantidade: br.quantidade || '' }; state.briefMode = !!br.on; }
     if (!canWriteDisk) return;
     var p = await idbGet('photos');
     if (p && p.queryPermission && !state.photos) {
@@ -377,7 +391,7 @@
   /* --------------------------------------------------------------- UI */
   var STEP_INFO = {
     photos: { n: 'Fotos', title: 'Escolha a pasta com as fotos', sub: 'Cada carrossel vai usar uma foto dessa pasta, na ordem dos nomes.' },
-    texts: { n: 'Textos', title: 'Agora escolha o arquivo com os textos', sub: 'Um .txt com um texto por linha. Cada linha vira um carrossel.' },
+    texts: { n: 'Textos', title: 'Agora os textos: peça pra IA ou escolha um arquivo', sub: 'Cada texto vira um carrossel. A IA escreve a partir do seu pedido.' },
     out: { n: 'Saída', title: 'Por último, onde salvar os carrosséis', sub: 'Cada carrossel pronto vira uma pasta com os slides em PNG.' },
     ready: { title: 'Tudo pronto', sub: '' },
   };
@@ -427,7 +441,9 @@
     } else if (!m.binds.length) {
       guide.appendChild(guideText('Antes: marque o que muda no design', 'Selecione o texto e a foto que trocam em cada carrossel e clique em {} no painel da direita.', 0, 0));
     } else if (cur === 'ready') {
-      guide.appendChild(guideText('Tudo pronto: ' + plural(total, 'carrossel', 'carrosséis') + ' pra gerar', 'Confira à direita e clique em Gerar.', 0, 0, true));
+      guide.appendChild(waitingAi()
+        ? guideText('Tudo pronto pra IA: ' + plural(total, 'carrossel', 'carrosséis'), 'Mande a frase da direita no Claude. Os carrosséis caem na sua pasta de saída.', 0, 0, true)
+        : guideText('Tudo pronto: ' + plural(total, 'carrossel', 'carrosséis') + ' pra gerar', 'Confira à direita e clique em Gerar.', 0, 0, true));
     } else {
       guide.appendChild(guideText(STEP_INFO[cur].title, STEP_INFO[cur].sub, list.indexOf(cur) + 1, list.length));
     }
@@ -461,9 +477,10 @@
       html: icon('sparkles') + '<span>' + (cur === 'ready' && total ? 'Gerar ' + plural(total, 'carrossel', 'carrosséis') : 'Gerar') + '</span>',
       onclick: generate,
     });
-    el.go.disabled = !m || !m.binds.length || cur !== 'ready' || !total;
+    el.go.disabled = !m || !m.binds.length || cur !== 'ready' || !total || waitingAi();
+    if (cur === 'ready' && waitingAi()) el.go.querySelector('span').textContent = 'Esperando a IA…';
     el.shell.appendChild(h('footer', { class: 'bw-foot' }, [
-      h('div', { class: 'bw-foot__status', text: cur === 'ready' ? '' : 'Complete os passos para gerar.' }),
+      h('div', { class: 'bw-foot__status', text: cur !== 'ready' ? 'Complete os passos para gerar.' : (waitingAi() ? 'A IA gera pelo MCP: mande a frase da direita no Claude.' : '') }),
       el.progress,
       el.go,
     ]));
@@ -562,27 +579,68 @@
   function textsNode(m, cur) {
     var st = stateOf('texts', cur);
     var body = [];
-    if (st === 'done') {
+    if (st === 'done' && waitingAi()) {
+      body.push(h('div', { class: 'bw-brief-sum' }, [
+        h('span', { class: 'bw-brief-sum__tag', html: icon('bot') + '<span>A IA vai escrever</span>' }),
+        h('p', { class: 'bw-brief-sum__text', text: state.brief.pedido }),
+      ]));
+      body.push(h('div', { class: 'bw-row' }, [
+        h('span', { class: 'bw-meta', text: plural(briefCount(), 'texto', 'textos') }),
+        bindSelect(textBinds(m), state.textBind, function (v) { state.textBind = v; }),
+      ]));
+    } else if (st === 'done') {
       var list = h('ol', { class: 'bw-mini-lines' });
       state.texts.lines.slice(0, 3).forEach(function (l) { list.appendChild(h('li', { text: l })); });
       body.push(list);
       body.push(h('div', { class: 'bw-row' }, [
-        h('span', { class: 'bw-meta', html: icon('file-text') + '<span>' + escapeHtml(state.texts.name) + ' · ' + plural(textCount(), 'linha', 'linhas') + '</span>' }),
+        h('span', { class: 'bw-meta', html: icon(state.texts.fromAi ? 'bot' : 'file-text') + '<span>' + escapeHtml(state.texts.name) + ' · ' + plural(textCount(), 'linha', 'linhas') + '</span>' }),
         state.texts.columns ? h('span', { class: 'bw-pill', text: Object.keys(state.texts.columns).map(function (k) { return '{{' + k + '}}'; }).join(' ') })
           : bindSelect(textBinds(m), state.textBind, function (v) { state.textBind = v; }),
       ]));
+    } else if (st === 'active' && state.briefMode) {
+      body.push(briefForm(m));
     } else if (st === 'active') {
-      body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('file-search') + '<span>Escolher textos</span>', onclick: pickTexts }));
-      body.push(h('span', { class: 'bw-hint', text: '.txt (um por linha) ou .csv' }));
+      body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('bot') + '<span>Pedir pra IA escrever</span>', onclick: function () { state.briefMode = true; saveBrief(); render(); } }));
+      body.push(h('button', { class: 'bw-btn bw-cta', html: icon('file-search') + '<span>Já tenho os textos</span>', onclick: pickTexts }));
     } else {
-      body.push(h('span', { class: 'bw-hint', text: 'Um .txt com um texto por linha' }));
+      body.push(h('span', { class: 'bw-hint', text: 'Um arquivo de textos ou um pedido pra IA' }));
+    }
+    var action = null;
+    if (st === 'done') {
+      action = swapBtn(function () {
+        state.texts = null; state.briefMode = false;
+        idbSet('texts', null); saveBrief(); render();
+      });
     }
     return node('texts', {
       icon: 'type', title: 'Textos', sub: st === 'done' ? null : 'Passo ' + (steps(m).indexOf('texts') + 1),
-      state: st, body: body,
-      action: st === 'done' ? swapBtn(pickTexts) : null,
+      state: st, body: body, action: action,
       onDrop: dropTexts,
     });
+  }
+
+  // Pedido pra IA: o que escrever + quantos carrosséis
+  function briefForm(m) {
+    var ta = h('textarea', {
+      class: 'bw-textarea', rows: '4',
+      placeholder: 'Ex.: hooks curtos sobre produtividade pra quem trabalha em casa. Tom direto, sem emoji, máx. 8 palavras.',
+    });
+    ta.value = state.brief.pedido;
+    var qty = h('input', { class: 'bw-qty', type: 'number', min: '1', max: '200', placeholder: String(state.photos ? state.photos.files.length : 10) });
+    qty.value = state.brief.quantidade;
+    var ok = h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('check') + '<span>Pronto</span>' });
+    ok.disabled = !state.brief.pedido.trim();
+    ta.addEventListener('input', function () { state.brief.pedido = ta.value; ok.disabled = !ta.value.trim(); saveBrief(); });
+    qty.addEventListener('input', function () { state.brief.quantidade = qty.value; saveBrief(); });
+    ok.addEventListener('click', function () { if (state.brief.pedido.trim()) render(); });
+    setTimeout(function () { ta.focus(); }, 30);
+    return h('div', { class: 'bw-brief' }, [
+      h('label', { class: 'bw-brief__label', text: 'O que a IA deve escrever?' }),
+      ta,
+      h('label', { class: 'bw-brief__row' }, [h('span', { text: 'Quantos carrosséis' }), qty]),
+      ok,
+      h('button', { class: 'bw-link', text: 'ou escolher um arquivo de textos', onclick: function () { state.briefMode = false; saveBrief(); pickTexts(); } }),
+    ]);
   }
 
   function modelNode(m) {
@@ -626,7 +684,7 @@
       } else {
         body.push(h('button', {
           class: 'bw-btn bw-btn--primary bw-cta',
-          html: icon(canWriteDisk ? 'folder-output' : 'file-archive') + '<span>' + (canWriteDisk ? 'Escolher pasta de saída' : 'Baixar como .zip') + '</span>',
+          html: icon(canWriteDisk ? 'folder-output' : 'file-archive') + '<span>' + (canWriteDisk ? 'Escolher saída' : 'Baixar como .zip') + '</span>',
           onclick: pickOut,
         }));
       }
@@ -643,14 +701,15 @@
   // Painel da direita: mostra o que está escolhido e a ajuda da vez
   function sidePanel(m, cur) {
     var side = h('aside', { class: 'bw-side' });
-    if (m && textBinds(m).length && (cur === 'texts' || !state.texts)) {
-      var btn = h('button', { class: 'bw-btn bw-copy', html: icon('copy') + '<span>Copiar pedido</span>' });
+    if (waitingAi()) {
+      var btn = h('button', { class: 'bw-btn bw-copy', html: icon('copy') + '<span>Copiar frase</span>' });
       btn.addEventListener('click', function () { copyPrompt(m, btn); });
       side.appendChild(h('div', { class: 'bw-ai' }, [
-        h('div', { class: 'bw-ai__head', html: icon('bot') + '<span>Não tem os textos? Peça pra uma IA</span>' }),
-        h('p', { class: 'bw-ai__text', text: 'Copie o pedido e cole no Claude (com o MCP carousel-maker ligado). Ele olha o seu modelo, escreve os textos no mesmo estilo e salva um hooks.txt pra você escolher aqui.' }),
+        h('div', { class: 'bw-ai__head', html: icon('bot') + '<span>Agora é com a IA</span>' }),
+        h('p', { class: 'bw-ai__text', text: 'No Claude (com o MCP carousel-maker ligado), mande a frase abaixo. Ela lê seu pedido, olha o modelo e as fotos, escreve ' + plural(briefCount(), 'texto', 'textos') + ' e gera tudo na sua pasta de saída.' }),
         h('pre', { class: 'bw-ai__prompt', text: aiPrompt(m) }),
         btn,
+        state.out ? null : h('p', { class: 'bw-ai__warn', text: 'Escolha a saída (passo 3) antes, pra IA ter onde salvar.' }),
       ]));
     }
     if (state.photos) {
@@ -732,9 +791,10 @@
 
   async function generate() {
     var m = model();
-    if (!m || state.running) return;
+    if (!m || state.running) return null;
     var total = totalToMake(m);
-    if (!total) return;
+    if (!total) return null;
+    var result = null;
 
     state.running = true;
     el.overlay.classList.add('is-running');
@@ -779,18 +839,115 @@
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
         toast('success', plural(total, 'carrossel pronto', 'carrosséis prontos') + ' no .zip baixado');
+        result = { gerados: total, slides: m.frames.length, destino: 'zip baixado no navegador' };
       } else {
         toast('success', plural(total, 'carrossel pronto', 'carrosséis prontos') + ' em ' + state.out.name);
+        result = { gerados: total, slides: m.frames.length, destino: 'pasta ' + state.out.name };
       }
     } catch (e) {
       console.error('[lote] falha ao gerar', e);
       toast('error', 'O lote parou no meio: ' + (e && e.message ? e.message : 'erro desconhecido'));
+      result = { erro: e && e.message ? e.message : 'erro desconhecido' };
     } finally {
       state.running = false;
       el.overlay.classList.remove('is-running');
       render();
     }
+    return result;
   }
+
+  /* ----------------------------------------------- ponte com a IA (MCP)
+     mcp-bridge.js chama isto: a IA lê o pedido (com o modelo e as fotos em
+     miniatura) e depois devolve os textos para gerar. */
+  function smallJpeg(source, maxSide) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      img.onload = function () {
+        var k = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL('image/jpeg', 0.75));
+      };
+      img.onerror = function () { resolve(null); };
+      img.src = source;
+    });
+  }
+
+  async function lotePedido() {
+    if (!el.overlay) build();
+    await restore();
+    var m = model();
+    resolveBinds(m);
+    var faltando = [];
+    if (!m) faltando.push('carrossel modelo no canvas');
+    else if (!m.binds.length) faltando.push('variáveis {} no modelo');
+    if (imageBinds(m).length && !state.photos) faltando.push(state.pendingPhotos ? 'reabrir a pasta de fotos no app (um clique)' : 'pasta de fotos (passo 1)');
+    if (!state.out) faltando.push(state.pendingOut ? 'reabrir a pasta de saída no app (um clique)' : 'pasta de saída (passo 3)');
+
+    var modeloImgs = [];
+    if (m) {
+      for (var i = 0; i < Math.min(m.frames.length, 4); i++) {
+        var c = await window.renderFrameToCanvas(m.frames[i], { scale: Math.min(1, 512 / Math.max(m.frames[i].w, m.frames[i].h)), format: 'jpeg' });
+        modeloImgs.push(c.toDataURL('image/jpeg', 0.8));
+      }
+    }
+    var fotoImgs = [];
+    if (state.photos) {
+      var files = state.photos.files.slice(0, 8);
+      for (var j = 0; j < files.length; j++) {
+        var url = URL.createObjectURL(await fileOf(files[j]));
+        fotoImgs.push(await smallJpeg(url, 320));
+        URL.revokeObjectURL(url);
+      }
+    }
+    return {
+      pedido: state.brief.pedido.trim() || null,
+      quantidade: briefCount(),
+      quantidade_origem: parseInt(state.brief.quantidade, 10) > 0 ? 'pedida' : (state.photos ? 'uma por foto' : 'padrão'),
+      modelo: m ? { nome: m.nome, slides: m.frames.length, variaveis: m.binds.map(function (b) { return { nome: b.name, tipo: b.type === 'image' ? 'imagem' : 'texto' }; }) } : null,
+      variavel_de_texto: state.textBind,
+      variaveis_de_texto: textBinds(m).map(function (b) { return b.name; }),
+      fotos: state.photos ? { pasta: state.photos.name, total: state.photos.files.length, nomes: state.photos.files.map(nameOf) } : null,
+      saida: state.out ? (state.out.zip ? '.zip baixado no navegador' : 'pasta ' + state.out.name) : null,
+      textos_ja_escolhidos: state.texts && !state.texts.fromAi ? textCount() : 0,
+      pronto: !faltando.length,
+      faltando: faltando,
+      imagens: { modelo: modeloImgs, fotos: fotoImgs.filter(Boolean) },
+    };
+  }
+
+  async function loteGerar(args) {
+    var textos = (args && args.textos) || [];
+    if (!textos.length) throw new Error('mande ao menos um texto em "textos"');
+    if (!el.overlay) build();
+    await restore();
+    var m = model();
+    if (!m) throw new Error('não há carrossel modelo no canvas');
+    resolveBinds(m);
+    if (!state.out) throw new Error(state.pendingOut ? 'a pasta de saída precisa ser reaberta no app (Criar em lote → Reabrir)' : 'escolha a pasta de saída no app (Criar em lote → passo 3)');
+    if (imageBinds(m).length && !state.photos) throw new Error('escolha a pasta de fotos no app (Criar em lote → passo 1)');
+
+    var tb = textBinds(m).map(function (b) { return b.name; });
+    var texts = { name: 'textos da IA', fromAi: true, lines: [], columns: null };
+    if (typeof textos[0] === 'object') {
+      // Um objeto por carrossel: { variavel: texto }
+      texts.columns = {};
+      tb.forEach(function (bn) { texts.columns[bn] = textos.map(function (t) { return String((t && t[bn]) || ''); }); });
+      texts.lines = textos.map(function (t) { return tb.map(function (bn) { return (t && t[bn]) || ''; }).filter(Boolean).join(' · '); });
+    } else {
+      texts.lines = textos.map(function (t) { return String(t || '').trim(); }).filter(Boolean);
+    }
+    state.texts = texts;
+    el.overlay.classList.add('is-open');
+    render();
+    var res = await generate();
+    if (!res) throw new Error('nada para gerar');
+    if (res.erro) throw new Error(res.erro);
+    return res;
+  }
+
+  window.__tcmLote = { pedido: lotePedido, gerar: loteGerar };
 
   /* ------------------------------------------------------ abrir/fechar */
   async function open() {

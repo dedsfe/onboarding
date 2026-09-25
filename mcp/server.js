@@ -337,6 +337,70 @@ server.tool(
   }
 );
 
+/* ---------------------------------------------------------------------------
+ * Criar em lote (tela passo a passo do app): o usuário escolhe fotos, escreve
+ * o pedido e a pasta de saída; a IA lê tudo e devolve os textos.
+ * ------------------------------------------------------------------------- */
+function desconectado() {
+  return {
+    content: [{ type: 'text', text: 'Ponte DESCONECTADA. O app precisa estar aberto no navegador: rode `npm run dev` e abra http://localhost:3000 (a ponte conecta sozinha em ~2s).' }],
+    isError: true,
+  };
+}
+
+function dataUrlParaImagem(url) {
+  const m = /^data:([^;]+);base64,(.+)$/.exec(url || '');
+  return m ? { type: 'image', mimeType: m[1], data: m[2] } : null;
+}
+
+server.tool(
+  'ver_pedido_lote',
+  'PRIMEIRO PASSO para gerar carrosséis em lote a partir da tela "Criar em lote" do app. Devolve o pedido do usuário (o que escrever e quantos carrosséis), as variáveis de texto do carrossel modelo, a pasta de fotos e a pasta de saída — mais as imagens do modelo e das fotos para você ver o estilo. Depois escreva exatamente `quantidade` textos seguindo o pedido e o visual, e chame gerar_lote.',
+  {},
+  async () => {
+    if (!ponteConectada()) return desconectado();
+    const info = await ponteCmd('lote_pedido', {}, 60000);
+    const { imagens, ...resto } = info || {};
+    const conteudo = [{ type: 'text', text: JSON.stringify(resto, null, 2) }];
+    const modelo = (imagens && imagens.modelo) || [];
+    const fotos = (imagens && imagens.fotos) || [];
+    if (modelo.length) {
+      conteudo.push({ type: 'text', text: `Carrossel modelo (${modelo.length} slide(s)) — o texto que você escrever entra no lugar de {{${resto.variavel_de_texto || 'texto'}}}:` });
+      modelo.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
+    }
+    if (fotos.length) {
+      conteudo.push({ type: 'text', text: `Fotos do usuário (${fotos.length} de ${resto.fotos ? resto.fotos.total : fotos.length}) — cada carrossel usa uma, na ordem:` });
+      fotos.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
+    }
+    if (!resto.pedido) {
+      conteudo.push({ type: 'text', text: 'O usuário ainda não escreveu um pedido na tela. Pergunte o tema/tom ou peça para ele escrever no passo 2 ("Pedir pra IA escrever").' });
+    }
+    if (resto.faltando && resto.faltando.length) {
+      conteudo.push({ type: 'text', text: `Antes de gerar, falta no app: ${resto.faltando.join('; ')}. Peça para o usuário resolver e tente de novo.` });
+    }
+    return { content: conteudo };
+  }
+);
+
+server.tool(
+  'gerar_lote',
+  'Gera os carrosséis da tela "Criar em lote" com os textos que você escreveu (depois de ver_pedido_lote). Cada texto vira um carrossel e usa a próxima foto do usuário. Grava na pasta de saída escolhida no app. Use `textos` como lista de strings quando o modelo tem uma variável de texto; com várias, mande um objeto por carrossel com as variáveis como chaves.',
+  {
+    textos: z
+      .union([z.array(z.string().min(1)).min(1), z.array(z.record(z.string(), z.string())).min(1)])
+      .describe('Um item por carrossel. Strings para uma variável de texto, ou objetos { variavel: texto } para várias.'),
+  },
+  async ({ textos }) => {
+    if (!ponteConectada()) return desconectado();
+    try {
+      const r = await ponteCmd('lote_gerar', { textos }, EXPORT_TIMEOUT_MS);
+      return { content: [{ type: 'text', text: `✅ ${r.gerados} carrossel(éis) de ${r.slides} slide(s) gerado(s) → ${r.destino}.` }] };
+    } catch (e) {
+      return { content: [{ type: 'text', text: `Não gerou: ${e.message}` }], isError: true };
+    }
+  }
+);
+
 server.tool(
   'criar_posts',
   'PIPELINE COMPLETO: aplica um template no app aberto no navegador, injeta os textos nos binds, troca o fundo pelas imagens fornecidas, renderiza e devolve o .zip dos posts prontos em lotes/<nome>/. Requer o app aberto (ponte). Posts = array de objetos cujas chaves são os binds do template (confira com listar_templates/detalhar_template ou status_ponte).',

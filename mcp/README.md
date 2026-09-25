@@ -7,6 +7,8 @@ Expõe o app para qualquer cliente IA (Claude Code, Claude Desktop, Cursor) via
 
 | Ferramenta | O que faz |
 |---|---|
+| `ver_pedido_lote` ⭐ | Lê o pedido da tela **Criar em lote** (o que escrever, quantos, fotos, saída) + imagens do modelo e das fotos |
+| `gerar_lote` ⭐ | Recebe os textos da IA e gera os carrosséis na pasta de saída escolhida no app |
 | `criar_posts` ⭐ | **Pipeline completo**: aplica template, injeta textos nos binds, troca o fundo por imagens, renderiza e salva o `.zip` pronto em `lotes/` |
 | `status_ponte` | App conectado? Frames, binds e cadeias do canvas atual |
 | `listar_templates` / `detalhar_template` | Catálogo de templates e estilo de cada um |

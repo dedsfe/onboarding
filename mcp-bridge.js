@@ -91,6 +91,16 @@
       return { posts: exigirBatch().definirLote(registros) };
     },
 
+    /* Criar em lote (batch-workflow.js): a IA lê o pedido e devolve os
+       textos; o app gera na pasta de saída que o usuário escolheu. */
+    lote_pedido: function () {
+      return exigirLote().pedido();
+    },
+
+    lote_gerar: function (args) {
+      return exigirLote().gerar(args || {});
+    },
+
     gerar_no_canvas: function () {
       return { ok: exigirBatch().gerarNoCanvas() };
     },
@@ -132,6 +142,11 @@
   function exigirCanvas() {
     if (!window.__tcmCanvas) throw new Error('app ainda não inicializou o canvas');
     return window.__tcmCanvas;
+  }
+
+  function exigirLote() {
+    if (!window.__tcmLote) throw new Error('tela de Criar em lote indisponível');
+    return window.__tcmLote;
   }
 
   function exigirBatch() {
