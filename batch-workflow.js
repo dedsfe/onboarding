@@ -580,7 +580,99 @@
     });
   }
 
+  /* ------------------------------------------------ conectar a IA (MCP)
+     Antes do fluxo: um comando pra copiar e o status ao vivo da ponte.
+     A bolinha fica verde sozinha quando o servidor MCP sobe. */
+  var CONNECT = {
+    code: { nome: 'Claude Code', cmd: 'claude mcp add carousel-maker -- node "$(pwd)/mcp/server.js"', depois: 'Abra o Claude Code' },
+    desktop: { nome: 'Claude Desktop', cmd: 'npm run mcp:desktop', depois: 'Reabra o Claude Desktop' },
+    cursor: { nome: 'Cursor', cmd: 'npm run mcp:cursor', depois: 'Reabra o Cursor' },
+  };
+
+  function bridgeOk() {
+    try { return !!(window.__tcmPonteStatus && window.__tcmPonteStatus().conectada); } catch (e) { return false; }
+  }
+
+  function connectSkipped() {
+    try { return sessionStorage.getItem('tcm-lote-sem-ia') === '1'; } catch (e) { return !!state.skipAi; }
+  }
+
+  function skipConnect() {
+    state.skipAi = true;
+    try { sessionStorage.setItem('tcm-lote-sem-ia', '1'); } catch (e) {}
+    state.showConnect = false;
+    render();
+  }
+
+  async function copyText(text, btn) {
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.classList.add('is-copied');
+      btn.innerHTML = icon('check');
+      paintIcons();
+      setTimeout(function () { btn.classList.remove('is-copied'); btn.innerHTML = icon('copy'); paintIcons(); }, 1400);
+    } catch (e) { toast('error', 'Não consegui copiar.'); }
+  }
+
+  function renderConnect() {
+    state.onConnect = true;
+    var ok = bridgeOk();
+    var tab = state.connectTab || 'code';
+    var cfg = CONNECT[tab];
+    el.shell.innerHTML = '';
+    el.shell.appendChild(h('header', { class: 'bw-head' }, [
+      h('span', { class: 'bw-head__name', text: 'Criar em lote' }),
+      h('span'),
+      h('div', { class: 'bw-head__actions' }, [
+        h('button', { class: 'bw-icon-btn', title: 'Fechar (Esc)', html: icon('x'), onclick: close }),
+      ]),
+    ]));
+
+    var tabs = h('div', { class: 'bw-tabs' });
+    Object.keys(CONNECT).forEach(function (k) {
+      tabs.appendChild(h('button', { class: 'bw-tab' + (k === tab ? ' is-on' : ''), text: CONNECT[k].nome, onclick: function () { state.connectTab = k; renderConnect(); } }));
+    });
+
+    var copyBtn = h('button', { class: 'bw-cmd__copy', title: 'Copiar', html: icon('copy') });
+    copyBtn.addEventListener('click', function () { copyText(cfg.cmd, copyBtn); });
+
+    var steps = h('div', { class: 'bw-cx-steps' }, [
+      h('div', { class: 'bw-cx-step' }, [
+        h('span', { class: 'bw-cx-step__n', text: '1' }),
+        h('span', { class: 'bw-cx-step__icon', html: icon('terminal') }),
+        h('span', { class: 'bw-chip-dir', html: icon('folder') + '<span>pasta do app</span>' }),
+        h('div', { class: 'bw-cmd' }, [h('code', { text: cfg.cmd }), copyBtn]),
+      ]),
+      h('span', { class: 'bw-cx-arrow', html: icon('arrow-right') }),
+      h('div', { class: 'bw-cx-step' }, [
+        h('span', { class: 'bw-cx-step__n', text: '2' }),
+        h('span', { class: 'bw-cx-step__icon', html: icon('rotate-cw') }),
+        h('span', { class: 'bw-cx-step__label', text: cfg.depois }),
+      ]),
+      h('span', { class: 'bw-cx-arrow', html: icon('arrow-right') }),
+      h('div', { class: 'bw-cx-step' + (ok ? ' is-ok' : ' is-wait') }, [
+        h('span', { class: 'bw-cx-step__n', text: '3' }),
+        h('span', { class: 'bw-cx-dot' }, [h('span', { class: 'bw-cx-dot__core', html: ok ? icon('check') : '' })]),
+        h('span', { class: 'bw-cx-step__label', text: ok ? 'Conectado' : 'Aguardando' }),
+      ]),
+    ]);
+
+    var body = h('div', { class: 'bw-connect' }, [
+      h('div', { class: 'bw-connect__hero' + (ok ? ' is-ok' : '') , html: icon(ok ? 'plug-zap' : 'plug') }),
+      h('h3', { class: 'bw-connect__title', text: ok ? 'IA conectada' : 'Conecte sua IA' }),
+      tabs,
+      steps,
+      ok
+        ? h('button', { class: 'bw-btn bw-btn--primary', html: icon('arrow-right') + '<span>Continuar</span>', onclick: function () { state.showConnect = false; render(); } })
+        : h('button', { class: 'bw-link', text: 'Sem IA', onclick: skipConnect }),
+    ]);
+    el.shell.appendChild(body);
+    paintIcons();
+  }
+
   function render() {
+    if (state.showConnect || (!bridgeOk() && !connectSkipped())) { renderConnect(); return; }
+    state.onConnect = false;
     var m = model();
     resolveBinds(m);
     var list = steps(m);
@@ -602,6 +694,12 @@
       h('span', { class: 'bw-head__name', text: 'Criar em lote' }),
       stepper,
       h('div', { class: 'bw-head__actions' }, [
+        h('button', {
+          class: 'bw-ai-pill' + (bridgeOk() ? ' is-ok' : ''),
+          title: bridgeOk() ? 'IA conectada pelo MCP' : 'Conectar IA',
+          html: '<span class="bw-ai-pill__dot"></span>' + icon('bot'),
+          onclick: function () { state.showConnect = true; render(); },
+        }),
         h('button', { class: 'bw-link', text: 'Preencher à mão', title: 'Preencher post por post, sem pastas', onclick: function () { close(); if (window.openBatchModal) window.openBatchModal(); } }),
         h('button', { class: 'bw-icon-btn', title: 'Fechar (Esc)', html: icon('x'), onclick: close }),
       ]),
@@ -1391,10 +1489,28 @@
     el.overlay.classList.add('is-open');
     await restore();
     render();
+    // Ponte cai/volta: a tela reage sozinha (bolinha verde e segue pro fluxo)
+    state.lastOk = bridgeOk();
+    clearInterval(state.poll);
+    state.poll = setInterval(function () {
+      var ok = bridgeOk();
+      if (ok === state.lastOk || state.running) return;
+      state.lastOk = ok;
+      // Acabou de conectar na tela de conexão: mostra o verde e segue sozinho
+      if (ok && state.onConnect && !state.showConnect) {
+        state.showConnect = true;
+        render();
+        setTimeout(function () { if (state.showConnect) { state.showConnect = false; render(); } }, 1400);
+        return;
+      }
+      render();
+    }, 1200);
   }
 
   function close() {
     if (!el.overlay) return;
+    clearInterval(state.poll);
+    state.showConnect = false;
     el.overlay.classList.remove('is-open');
     thumbUrls.forEach(function (u) { URL.revokeObjectURL(u); });
     thumbUrls = [];

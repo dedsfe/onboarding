@@ -536,3 +536,62 @@
 .bw-node--model { width: 236px; }
 .bw-node--qty { width: 184px; }
 .bw-node--out { width: 184px; }
+
+/* Conectar a IA (antes do fluxo) */
+.bw-connect {
+  grid-row: 2 / 4;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 18px; padding: 32px 24px;
+}
+.bw-connect__hero {
+  display: grid; place-items: center; width: 72px; height: 72px; border-radius: 20px;
+  background: rgba(239, 68, 68, 0.12); color: #F87171;
+}
+.bw-connect__hero svg { width: 34px !important; height: 34px !important; }
+.bw-connect__hero.is-ok { background: rgba(20, 174, 92, 0.14); color: var(--bw-green); }
+.bw-connect__title { margin: 0; font-size: 20px; font-weight: 600; }
+.bw-tabs { display: flex; gap: 4px; padding: 4px; border-radius: 10px; background: var(--bw-panel); border: 1px solid var(--bw-line); }
+.bw-tab { height: 30px; padding: 0 14px; border: 0; border-radius: 7px; background: transparent; color: var(--bw-muted); font: 500 12px Inter, system-ui, sans-serif; cursor: pointer; }
+.bw-tab:hover { color: var(--bw-text); }
+.bw-tab.is-on { background: var(--bw-card); color: var(--bw-text); box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.bw-cx-steps { display: flex; align-items: stretch; gap: 10px; max-width: 100%; }
+.bw-cx-arrow { display: grid; place-items: center; color: #555; }
+.bw-cx-step {
+  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+  min-width: 170px; padding: 22px 16px 16px; border: 1px solid var(--bw-line); border-radius: 12px; background: var(--bw-panel);
+}
+.bw-cx-step:first-child { min-width: 0; width: 460px; max-width: 46vw; }
+.bw-cx-step__n {
+  position: absolute; top: -10px; left: 14px; display: grid; place-items: center; width: 20px; height: 20px;
+  border-radius: 50%; background: var(--bw-accent); color: #fff; font: 700 11px Inter, system-ui, sans-serif;
+}
+.bw-cx-step__icon { color: var(--bw-muted); display: grid; }
+.bw-cx-step__icon svg { width: 24px !important; height: 24px !important; }
+.bw-cx-step__label { font-size: 13px; font-weight: 500; color: var(--bw-text); }
+.bw-chip-dir { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; background: rgba(245,166,35,.12); color: var(--bw-amber); font-size: 11px; }
+.bw-chip-dir svg { width: 12px !important; height: 12px !important; }
+.bw-cmd { display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 6px 6px 12px; border-radius: 8px; background: #111; border: 1px solid #333; box-sizing: border-box; }
+.bw-cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; font: 12px/1.6 'JetBrains Mono', ui-monospace, monospace; color: #E5E7EB; user-select: all; }
+.bw-cmd__copy { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border: 0; border-radius: 6px; background: var(--bw-accent); color: #fff; cursor: pointer; }
+.bw-cmd__copy.is-copied { background: var(--bw-green); }
+.bw-cx-dot { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: rgba(239, 68, 68, 0.15); }
+.bw-cx-dot__core { display: grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; background: #EF4444; color: #fff; }
+.bw-cx-dot__core svg { width: 11px !important; height: 11px !important; stroke-width: 3; }
+.bw-cx-step.is-wait .bw-cx-dot { animation: bw-pulse 1.4s ease-in-out infinite; }
+.bw-cx-step.is-ok { border-color: rgba(20, 174, 92, 0.5); }
+.bw-cx-step.is-ok .bw-cx-dot { background: rgba(20, 174, 92, 0.18); }
+.bw-cx-step.is-ok .bw-cx-dot__core { width: 22px; height: 22px; background: var(--bw-green); }
+.bw-cx-step.is-ok .bw-cx-step__n { background: var(--bw-green); }
+@keyframes bw-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,.35); } 50% { box-shadow: 0 0 0 10px rgba(239,68,68,0); } }
+
+/* Selo da IA no cabeçalho do fluxo */
+.bw-ai-pill {
+  display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px;
+  border: 1px solid var(--bw-line); border-radius: 999px; background: transparent; color: var(--bw-muted); cursor: pointer;
+}
+.bw-ai-pill svg { width: 14px !important; height: 14px !important; }
+.bw-ai-pill__dot { width: 7px; height: 7px; border-radius: 50%; background: #EF4444; }
+.bw-ai-pill.is-ok .bw-ai-pill__dot { background: var(--bw-green); }
+.bw-ai-pill:hover { color: var(--bw-text); background: var(--bw-hover); }
+
+.bw-body { grid-template-columns: 1fr 300px; }

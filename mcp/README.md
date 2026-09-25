@@ -32,6 +32,16 @@ Fluxo: `criar_posts` → limpa canvas → aplica template → amarra `{{fundo}}`
 carrega os posts → exporta → grava `lotes/<nome>/<nome>.zip` (+ `lote.csv`).
 Imagens de fundo: caminhos locais (jpg/png/webp), ciclando `fundos[i % n]`.
 
+## Conectar (um comando, rodado na pasta do app)
+
+| Cliente | Comando |
+|---|---|
+| Claude Code | `claude mcp add carousel-maker -- node "$(pwd)/mcp/server.js"` |
+| Claude Desktop | `npm run mcp:desktop` (escreve no `claude_desktop_config.json`, guarda `.bak`) |
+| Cursor | `npm run mcp:cursor` (escreve no `~/.cursor/mcp.json`, guarda `.bak`) |
+
+Depois reabra o cliente. A tela **Criar em lote** mostra a conexão ao vivo (bolinha verde).
+
 ## Claude Code (neste repo)
 
 O `.mcp.json` da raiz já registra o servidor. Ao abrir o Claude Code no projeto,

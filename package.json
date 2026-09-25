@@ -7,7 +7,9 @@
     "start": "npx serve -l 3000 .",
     "mcp": "node mcp/server.js",
     "test:ponte": "node mcp/test/e2e-ponte.js",
-    "test:lote": "node mcp/test/e2e-lote.js"
+    "test:lote": "node mcp/test/e2e-lote.js",
+    "mcp:desktop": "node mcp/instalar.js desktop",
+    "mcp:cursor": "node mcp/instalar.js cursor"
   },
   "keywords": [
     "analytics",
