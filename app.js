@@ -9012,6 +9012,9 @@
       openBtn.addEventListener('click', () => {
         if (modal.classList.contains('open')) {
           closeBatchModal();
+        } else if (window.openBatchWorkflow) {
+          // Fluxo de pasta (inputs → DesiredOutput → out) é a porta de entrada
+          window.openBatchWorkflow();
         } else {
           openBatchModal();
         }
@@ -10245,7 +10248,19 @@
         },
         exportar: () => runBatchExport(),
         gerarNoCanvas: () => generateBatchOnCanvas(),
-        abrirModal: openBatchModal
+        abrirModal: openBatchModal,
+        /* Carrossel modelo do lote: a cadeia do post selecionado (ou do
+           primeiro) e as variáveis que moram nela. */
+        modelo: () => {
+          const anchor = selectedFrame() || realFrames()[0];
+          if (!anchor) return null;
+          const byId = new Map(frames.map(f => [f.id, f]));
+          const chain = (computePosts().find(c => c.includes(anchor.id)) || [anchor.id])
+            .map(id => byId.get(id)).filter(Boolean);
+          const ids = new Set(chain.map(f => f.id));
+          const binds = getCanvasBinds().filter(b => ids.has(b.frameId));
+          return { frames: chain, binds, nome: chain[0].name || 'Post' };
+        }
       };
     }
 
