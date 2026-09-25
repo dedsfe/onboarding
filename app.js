@@ -923,7 +923,87 @@
     }
 
     function shapeLabel(child) {
+      if (child.box) return 'Caixa';
       return child.shape === 'ellipse' ? 'Elipse' : 'Retângulo';
+    }
+
+    /* Caixa = o F do Figma dentro de um post. É um retângulo com `box: true`;
+       quem mora dentro dela leva `boxId`, anda junto, é cortado pela borda
+       dela e fica sempre logo acima dela na pilha de camadas. */
+    function boxOf(frame, child) {
+      if (!frame || !child || !child.boxId) return null;
+      return (frame.children || []).find(c => c.id === child.boxId && c.box) || null;
+    }
+
+    function boxMembers(frame, box) {
+      if (!frame || !box || !box.box) return [];
+      return (frame.children || []).filter(c => c.boxId === box.id);
+    }
+
+    // Seleção + conteúdo de toda caixa selecionada (arrastar, apagar, duplicar)
+    function withBoxMembers(sels) {
+      const out = [...sels];
+      const has = (fid, cid) => out.some(n => n.frameId === fid && n.childId === cid);
+      sels.forEach(n => {
+        const f = frames.find(fr => fr.id === n.frameId);
+        const c = f && (f.children || []).find(ch => ch.id === n.childId);
+        boxMembers(f, c).forEach(m => { if (!has(f.id, m.id)) out.push({ frameId: f.id, childId: m.id }); });
+      });
+      return out;
+    }
+
+    function childBoxHeight(c) {
+      if (c.type !== 'text') return c.h || 0;
+      const el = nodeElement(c.id);
+      return (el && el.offsetHeight) || c.h || 40;
+    }
+
+    // Mantém cada conteúdo logo acima da sua caixa, na ordem relativa que já tinha
+    function normalizeBoxOrder(frame) {
+      const kids = frame.children || [];
+      if (!kids.some(c => c.box)) return;
+      kids.forEach(c => { if (c.boxId && !boxOf(frame, c)) delete c.boxId; });
+      const loose = kids.filter(c => !c.boxId);
+      const out = [];
+      loose.forEach(c => {
+        out.push(c);
+        if (c.box) kids.filter(m => m.boxId === c.id).forEach(m => out.push(m));
+      });
+      frame.children = out;
+    }
+
+    /* Soltou um elemento: se o centro dele cai numa caixa, passa a morar
+       nela (a de cima vence); fora de todas, sai. Igual ao Figma. */
+    function assignBox(frame, child) {
+      if (!frame || !child || child.box) return false;
+      const cx = child.x + (child.w || 0) / 2;
+      const cy = child.y + childBoxHeight(child) / 2;
+      const boxes = (frame.children || []).filter(c => c.box && !c.hidden);
+      let host = null;
+      for (let i = boxes.length - 1; i >= 0; i--) {
+        const b = boxes[i];
+        if (cx >= b.x && cx <= b.x + b.w && cy >= b.y && cy <= b.y + b.h) { host = b; break; }
+      }
+      const before = child.boxId || null;
+      if (host) child.boxId = host.id;
+      else delete child.boxId;
+      return before !== (child.boxId || null);
+    }
+
+    function refreshBoxClips() {
+      frames.forEach(f => (f.children || []).forEach(c => {
+        const el = nodeElement(c.id);
+        if (!el || el.classList.contains('is-dragging')) return;
+        const b = boxOf(f, c);
+        // Girado, o recorte ficaria no eixo errado: deixa inteiro
+        if (!b || c.rotation || b.rotation) { if (el.style.clipPath) el.style.clipPath = ''; return; }
+        const top = b.y - c.y;
+        const left = b.x - c.x;
+        const right = (c.x + (c.w || el.offsetWidth)) - (b.x + b.w);
+        const bottom = (c.y + (el.offsetHeight || c.h || 0)) - (b.y + b.h);
+        const r = b.borderRadius ? ` round ${b.borderRadius}px` : '';
+        el.style.clipPath = `inset(${top}px ${right}px ${bottom}px ${left}px${r})`;
+      }));
     }
 
     function ensureImageProps(child) {
@@ -1621,6 +1701,24 @@
           wakeRopes();
           updateFrameMeta();
         }
+      } else if (t.kind === 'shape') {
+        if (k === 'x' || k === 'y') {
+          const d = v - o[k];
+          o[k] = v;
+          // Caixa leva o conteúdo junto
+          const frame = frames.find(f => f.id === selectedTextNode.frameId);
+          boxMembers(frame, o).forEach(m => {
+            m[k] += d;
+            const mEl = nodeElement(m.id);
+            if (mEl) { mEl.style.left = `${m.x}px`; mEl.style.top = `${m.y}px`; }
+          });
+        } else {
+          o[k] = Math.max(1, v);
+        }
+        const el = nodeElement(o.id);
+        if (el) updateImageNodeDOM(o, el);
+        syncImageChrome();
+        refreshBoxClips();
       } else if (t.kind === 'image') {
         if (k === 'x' || k === 'y') {
           o[k] = v;
@@ -1657,6 +1755,7 @@
     });
 
     function updateTextToolbar() {
+      refreshBoxClips();
       const props = document.getElementById('canvas-props');
       if (props) {
         const n = selectedChildNodes.length;
@@ -2135,6 +2234,7 @@
     function reorderChildDOM(frame) {
       const frameEl = frameElOf(frame);
       if (!frameEl || !frame.children) return;
+      normalizeBoxOrder(frame);
       const contentMask = frameEl.querySelector('.canvas-frame__content');
       if (!contentMask) return;
       frame.children.forEach(child => {
@@ -3330,7 +3430,7 @@
 
       const startX = e.clientX;
       const startY = e.clientY;
-      const nodesToMove = [...selectedChildNodes];
+      const nodesToMove = withBoxMembers(selectedChildNodes);
       const origins = new Map();
       nodesToMove.forEach(n => {
         const f = frames.find(fr => fr.id === n.frameId);
@@ -3479,8 +3579,10 @@
           const giro = c.rotation ? ` rotate(${c.rotation}deg)` : '';
           const passo = `translate3d(${c.x - orig.x}px, ${c.y - orig.y}px, 0)${giro}`;
           if (cEl) cEl.style.transform = passo;
+          // Solto da caixa durante o arrasto, o recorte velho cortaria errado
+          if (cEl && c.boxId && !nodesToMove.some(m => m.childId === c.boxId)) cEl.style.clipPath = '';
           // As alças vivem noutra camada: sem isto ficavam paradas no lugar antigo
-          if (c.type === 'image') {
+          if (isBoxNode(c)) {
             const chromeDom = imageChromeOf(c);
             if (chromeDom) chromeDom.style.transform = passo;
           }
@@ -3499,7 +3601,7 @@
           if (c) {
             cEl.style.left = `${c.x}px`;
             cEl.style.top = `${c.y}px`;
-            if (c.type === 'image') {
+            if (isBoxNode(c)) {
               const chromeDom = imageChromeOf(c);
               if (chromeDom) positionImageChrome(chromeDom, c);
             }
@@ -3515,6 +3617,20 @@
         if (!moved) {
           if (enterGroup) selectTextNode(frame.id, child.id, false);
           return;
+        }
+        // Entrou ou saiu de uma caixa? Quem foi arrastado junto com a caixa fica nela
+        if (!dropTarget) {
+          const movingIds = new Set(nodesToMove.map(n => n.childId));
+          let changed = false;
+          nodesToMove.forEach(n => {
+            const c = (frame.children || []).find(ch => ch.id === n.childId);
+            if (c && !(c.boxId && movingIds.has(c.boxId))) changed = assignBox(frame, c) || changed;
+          });
+          if (changed) {
+            reorderChildDOM(frame);
+            scheduleLayersRefresh();
+          }
+          refreshBoxClips();
         }
         /* Soltou em cima de outro post: os elementos passam a ser dele, no
            mesmo lugar da tela. Solto no vazio, continuam no post de origem. */
@@ -3544,6 +3660,8 @@
               else delete c.groupId;
             });
             moves.forEach(({ c, from }) => moveChildToFrame(c, from, dropTarget, { keepWorldPos: true }));
+            moves.forEach(({ c }) => { if (!movedIds.has(c.boxId)) assignBox(dropTarget, c); });
+            normalizeBoxOrder(dropTarget);
             renderAll();
             selectedChildNodes = [];
             moves.forEach(({ c }, i) => selectTextNode(dropTarget.id, c.id, i > 0));
@@ -4111,9 +4229,27 @@
       const frameEl = frameElOf(frame);
       if (!frameEl) return null;
       if (!frame.children) frame.children = [];
-      const child = { ...SHAPE_DEFAULTS, id: childSeq++, type: 'shape', shape: kind, x, y, w, h };
-      frame.children.push(child);
+      const isBox = kind === 'box';
+      const child = { ...SHAPE_DEFAULTS, id: childSeq++, type: 'shape', shape: isBox ? 'rect' : kind, x, y, w, h };
+      if (isBox) {
+        child.box = true;
+        child.fill = '#FFFFFF';
+        /* Desenhou a caixa por cima de coisas que já existiam: elas entram
+           nela (inteiras lá dentro) e a caixa vai para trás delas. */
+        const inside = frame.children.filter(c => !c.box && !c.boxId && c.x >= x && c.y >= y
+          && c.x + (c.w || 0) <= x + w && c.y + childBoxHeight(c) <= y + h);
+        if (inside.length) {
+          const at = frame.children.indexOf(inside[0]);
+          frame.children.splice(at, 0, child);
+          inside.forEach(c => { c.boxId = child.id; });
+        } else {
+          frame.children.push(child);
+        }
+      } else {
+        frame.children.push(child);
+      }
       renderChildNode(child, frame, frameEl);
+      if (isBox) { reorderChildDOM(frame); refreshBoxClips(); }
       selectTextNode(frame.id, child.id);
       save();
       return child;
@@ -4475,7 +4611,9 @@
     function duplicateTextNode() {
       if (selectedChildNodes.length === 0) return;
       const newSelections = [];
-      selectedChildNodes.forEach(sel => {
+      const topLevel = new Set(selectedChildNodes.map(n => n.childId));
+      const idMap = new Map();
+      withBoxMembers(selectedChildNodes).forEach(sel => {
         const frame = frames.find(f => f.id === sel.frameId);
         if (!frame) return;
         const src = (frame.children || []).find(c => c.id === sel.childId);
@@ -4491,10 +4629,13 @@
         if (src.type === 'image') {
           ensureImageProps(copy);
         }
+        idMap.set(src.id, copy.id);
+        if (copy.boxId && idMap.has(copy.boxId)) copy.boxId = idMap.get(copy.boxId);
         frame.children.push(copy);
         renderChildNode(copy, frame, frameEl);
-        newSelections.push({ frameId: frame.id, childId: copy.id });
+        if (topLevel.has(src.id)) newSelections.push({ frameId: frame.id, childId: copy.id });
       });
+      frames.forEach(f => { if (newSelections.some(n => n.frameId === f.id)) reorderChildDOM(f); });
       frames.forEach(f => remapGroupIds(f, (f.children || []).filter(c =>
         newSelections.some(n => n.frameId === f.id && n.childId === c.id))));
       selectedChildNodes = newSelections;
@@ -4510,7 +4651,7 @@
     function deleteTextNode() {
       if (croppingImage) exitCropMode();
       if (selectedChildNodes.length === 0) return;
-      selectedChildNodes.forEach(sel => {
+      withBoxMembers(selectedChildNodes).forEach(sel => {
         const frame = frames.find(f => f.id === sel.frameId);
         if (!frame) return;
         const elText = world.querySelector(`.canvas-text-node[data-id="${sel.childId}"]`);
@@ -5389,11 +5530,12 @@
        Shift deixa quadrado; perto de um formato conhecido, encaixa nele.
        -------------------------------------------------- */
     let frameToolOn = false;
+    let shapeTool = null; // 'rect' | 'ellipse' | 'box' (F dentro de um post)
 
     function setFrameTool(on) {
       frameToolOn = on;
       view.classList.toggle('is-frame-tool', on);
-      if (on) toast.info('Arraste para desenhar a página · Esc cancela');
+      if (on) toast.info('Arraste fora para criar um post, ou dentro de um post para criar uma caixa · Esc cancela');
     }
 
     // Encaixa no formato conhecido quando a proporção fica a menos de 2%
@@ -5410,6 +5552,15 @@
     view.addEventListener('mousedown', (e) => {
       if (!frameToolOn || e.button !== 0) return;
       if (e.target.closest('.canvas-topbar, .canvas-hud, .canvas-props, .canvas-layers, .canvas-dropdown-card')) return;
+
+      /* Como no Figma: F fora de tudo cria página; começando dentro de um
+         post, cria uma caixa nele. A ferramenta de forma (registrada logo
+         abaixo) pega este mesmo clique. */
+      if (frameAtWorld(screenToWorld(e.clientX, e.clientY))) {
+        frameToolOn = false;
+        shapeTool = 'box';
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
 
@@ -5469,7 +5620,6 @@
     /* Ferramentas de forma: R (retângulo) e O (elipse), como no Figma.
        Arraste dentro de um post para desenhar; clique simples cria 100×100.
        Shift deixa quadrado/círculo. */
-    let shapeTool = null;
 
     function setShapeTool(kind) {
       shapeTool = kind;
@@ -5499,6 +5649,7 @@
         return;
       }
       const kind = shapeTool;
+      if (kind === 'box') view.classList.remove('is-frame-tool');
       const ghost = document.createElement('div');
       ghost.className = 'canvas-frame-ghost';
       if (kind === 'ellipse') ghost.style.borderRadius = '50%';
@@ -5988,6 +6139,7 @@
       updateFrameMeta();
       applyCamera();
       syncImageChrome();
+      refreshBoxClips();
       scheduleLayersRefresh();
     }
 
@@ -6085,6 +6237,12 @@
         // Grupo aparece na altura do membro mais de cima, com os membros dentro
         const emitted = new Set();
         kids.forEach(c => {
+          if (boxOf(f, c)) return; // aparece dentro da caixa
+          if (c.box) {
+            rows.push(childRow(c, 1, false));
+            boxMembers(f, c).reverse().forEach(m => rows.push(childRow(m, 2, false)));
+            return;
+          }
           const members = groupMembers(f, c.groupId);
           if (!members.length) { rows.push(childRow(c, 1, false)); return; }
           if (emitted.has(c.groupId)) return;
@@ -6145,7 +6303,7 @@
         if (c.hidden) cls.push('is-hidden');
         return `<div class="${cls.join(' ')}" role="treeitem" draggable="true" data-frame="${r.f.id}" data-child="${c.id}" style="--depth:${r.depth}">
           <span class="ly-row__chev is-blank"></span>
-          <span class="ly-row__icon">${lyIcon(c.type === 'shape' ? (c.shape === 'ellipse' ? 'ellipse' : 'rect') : (c.type === 'image' ? 'image' : 'text'))}</span>
+          <span class="ly-row__icon">${lyIcon(c.box ? 'frame' : c.type === 'shape' ? (c.shape === 'ellipse' ? 'ellipse' : 'rect') : (c.type === 'image' ? 'image' : 'text'))}</span>
           <span class="ly-row__name">${esc(r.name)}</span>
           <button type="button" class="ly-row__btn${c.locked ? ' is-on' : ''}" data-act="lock" title="${c.locked ? 'Destravar' : 'Travar'}">${lyIcon(c.locked ? 'lock' : 'unlock')}</button>
           <button type="button" class="ly-row__btn${c.hidden ? ' is-on' : ''}" data-act="hide" title="${c.hidden ? 'Mostrar' : 'Esconder'}">${lyIcon(c.hidden ? 'eyeOff' : 'eye')}</button>
@@ -9299,6 +9457,15 @@
         const adjustedTextYMap = computeAdjustedTextPositions(frame, overrides, ctx);
         const children = frame.children || [];
         for (const child of children) {
+          const clipBox = boxOf(frame, child);
+          if (clipBox) {
+            ctx.save();
+            ctx.beginPath();
+            if (clipBox.borderRadius && ctx.roundRect) ctx.roundRect(clipBox.x, clipBox.y, clipBox.w, clipBox.h, clipBox.borderRadius);
+            else ctx.rect(clipBox.x, clipBox.y, clipBox.w, clipBox.h);
+            ctx.clip();
+          }
+          try {
           if (child.hidden) continue; // olho fechado no painel de camadas
           if (child.type === 'shape') {
             ctx.save();
@@ -9511,6 +9678,9 @@
             });
 
             ctx.restore();
+          }
+          } finally {
+            if (clipBox) ctx.restore();
           }
         }
 
