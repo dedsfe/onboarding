@@ -108,12 +108,12 @@
 
 /* Guia: o que fazer agora */
 .bw-guide {
-  padding: 16px 22px;
+  padding: 12px 22px;
   border-bottom: 1px solid var(--bw-line);
   background: linear-gradient(180deg, rgba(13, 153, 255, 0.08), transparent);
 }
 .bw-guide__count { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--bw-accent); }
-.bw-guide__title { margin-top: 2px; font-size: 18px; font-weight: 600; }
+.bw-guide__title { margin-top: 2px; font-size: 16px; font-weight: 600; }
 .bw-guide__sub { margin-top: 2px; font-size: 13px; color: var(--bw-muted); }
 .bw-guide__inner.is-ok .bw-guide__title { color: var(--bw-green); }
 
@@ -149,7 +149,7 @@
   padding: 28px;
   box-sizing: border-box;
 }
-.bw-col { display: flex; flex-direction: column; gap: 22px; }
+.bw-col { display: flex; flex-direction: column; gap: 16px; }
 
 /* Nós */
 .bw-node {
@@ -430,3 +430,31 @@
 
 .bw-ai { flex: none; }
 .bw-thumb:not([src]) { visibility: hidden; }
+
+/* Copy: A IA decide × Arrastar CSV */
+.bw-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--bw-line);
+  border-radius: 10px;
+  background: var(--bw-card);
+  color: var(--bw-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.bw-choice:hover { border-color: var(--bw-accent); background: #2f3844; }
+.bw-choice__icon { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 8px; background: rgba(13, 153, 255, 0.14); color: var(--bw-accent); }
+.bw-choice + .bw-choice .bw-choice__icon { background: rgba(20, 174, 92, 0.14); color: var(--bw-green); }
+.bw-choice__txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.bw-choice__txt strong { font-size: 13px; font-weight: 600; }
+.bw-choice__txt span { font-size: 11px; color: var(--bw-faint); }
+.bw-link { display: inline-flex; align-items: center; gap: 5px; }
+.bw-link svg { width: 13px !important; height: 13px !important; }
+.bw-brief__hint { line-height: 1.4; }
+
+/* Wires redesenham ao rolar o palco */
+.bw-stage { scroll-behavior: auto; }

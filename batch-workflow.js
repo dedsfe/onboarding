@@ -227,7 +227,7 @@
     return state.texts.lines.length;
   }
 
-  function hasBrief() { return !state.texts && state.briefMode && !!state.brief.pedido.trim(); }
+  function hasBrief() { return !state.texts && state.briefMode && !!state.brief.ok; }
   function waitingAi() { return hasBrief(); }
 
   // Quantos carrosséis o pedido quer: o número digitado ou um por foto
@@ -237,7 +237,7 @@
     return state.photos ? state.photos.files.length : 10;
   }
 
-  function saveBrief() { idbSet('brief', { pedido: state.brief.pedido, quantidade: state.brief.quantidade, on: state.briefMode }); }
+  function saveBrief() { idbSet('brief', { pedido: state.brief.pedido, quantidade: state.brief.quantidade, on: state.briefMode, ok: !!state.brief.ok }); }
 
   function totalToMake(m) {
     if (waitingAi()) return briefCount();
@@ -404,12 +404,22 @@
   function setTextsFromString(name, text) {
     var m = model();
     var tb = textBinds(m).map(function (b) { return b.name; });
+    var slotKeys = copySlots(m).map(function (c) { return c.key; });
     var texts = { name: name, lines: [], columns: null };
     if (CSV_RE.test(name)) {
       var rows = parseCsv(text);
       var header = (rows[0] || []).map(slug);
+      var slotHits = header.filter(function (c) { return slotKeys.indexOf(c) !== -1; });
       var hits = header.filter(function (c) { return tb.indexOf(c) !== -1; });
-      if (hits.length) {
+      if (slotHits.length) {
+        // CSV modelo: uma linha por carrossel, uma coluna por texto do carrossel
+        texts.rows = rows.slice(1).map(function (r) {
+          var o = {};
+          header.forEach(function (col, ci) { if (slotKeys.indexOf(col) !== -1 && r[ci]) o[col] = r[ci]; });
+          return o;
+        }).filter(function (o) { return Object.keys(o).length; });
+        texts.lines = texts.rows.map(function (o) { return slotKeys.map(function (k) { return o[k] || ''; }).filter(Boolean).join(' · '); });
+      } else if (hits.length) {
         // Cabeçalho com nomes de variáveis: cada coluna alimenta a sua
         texts.columns = {};
         header.forEach(function (col, ci) {
@@ -427,6 +437,23 @@
     state.texts = texts;
     idbSet('texts', { name: name, text: text });
     render();
+  }
+
+  function csvCell(v) {
+    v = String(v == null ? '' : v);
+    return /[",;\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+
+  // Cabeçalho = campos de copy; primeira linha = o texto que o modelo tem hoje
+  function downloadCsvTemplate() {
+    var m = model();
+    var slots = copySlots(m);
+    if (!slots.length) { toast('info', 'O modelo não tem textos.'); return; }
+    var csv = '\uFEFF' + slots.map(function (c) { return csvCell(c.key); }).join(',') + '\n'
+      + slots.map(function (c) { return csvCell(c.exemplo); }).join(',') + '\n';
+    var a = h('a', { href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), download: fileSlug(m.nome) + '-copy.csv' });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
 
   function pickTexts() {
@@ -496,7 +523,7 @@
     if (restored) return;
     restored = true;
     var br = await idbGet('brief');
-    if (br) { state.brief = { pedido: br.pedido || '', quantidade: br.quantidade || '' }; state.briefMode = !!br.on; }
+    if (br) { state.brief = { pedido: br.pedido || '', quantidade: br.quantidade || '', ok: !!br.ok }; state.briefMode = !!br.on; }
     if (!canWriteDisk) return;
     var p = await idbGet('photos');
     if (p && p.queryPermission && !state.photos) {
@@ -523,7 +550,7 @@
   var STEP_INFO = {
     photos: { n: 'Fotos', title: 'Escolha a pasta com as fotos', sub: 'Cada carrossel vai usar uma foto dessa pasta, na ordem dos nomes.' },
     ref: { n: 'Resultado desejado', title: 'Mostre o resultado que você quer', sub: 'Uma pasta com carrosséis de exemplo (uma subpasta por carrossel) ou algumas fotos em sequência. A IA usa como referência.' },
-    texts: { n: 'Copy', title: 'Agora a copy: peça pra IA ou escolha um arquivo', sub: 'A IA escreve o texto de todos os slides de cada carrossel, a partir do seu pedido.' },
+    texts: { n: 'Copy', title: 'Agora a copy: a IA decide ou você manda um CSV', sub: 'A IA pesquisa o nicho e escreve o texto de todos os slides de cada carrossel.' },
     out: { n: 'Saída', title: 'Por último, onde salvar os carrosséis', sub: 'Cada carrossel pronto vira uma pasta com os slides em PNG.' },
     ready: { title: 'Tudo pronto', sub: '' },
   };
@@ -621,7 +648,15 @@
     paintIcons();
     el.stage = stage; el.wires = wires;
     el.links = inNodes.map(function (n) { return [n, nm]; }).concat([[nm, no]]);
-    requestAnimationFrame(drawWires);
+    requestAnimationFrame(function () {
+      drawWires();
+      // Passo da vez sempre à vista (a coluna de entradas pode passar da altura)
+      var active = stage.querySelector('.bw-node.is-active');
+      if (active) {
+        var sb = stage.getBoundingClientRect(), ab = active.getBoundingClientRect();
+        if (ab.bottom > sb.bottom || ab.top < sb.top) stage.scrollTop += ab.top - sb.top - (sb.height - ab.height) / 2;
+      }
+    });
   }
 
   function guideText(title, sub, n, total, ok) {
@@ -714,8 +749,8 @@
     var body = [];
     if (st === 'done' && waitingAi()) {
       body.push(h('div', { class: 'bw-brief-sum' }, [
-        h('span', { class: 'bw-brief-sum__tag', html: icon('bot') + '<span>A IA vai escrever</span>' }),
-        h('p', { class: 'bw-brief-sum__text', text: state.brief.pedido }),
+        h('span', { class: 'bw-brief-sum__tag', html: icon('sparkles') + '<span>A IA decide</span>' }),
+        h('p', { class: 'bw-brief-sum__text', text: state.brief.pedido.trim() || 'Vai pesquisar o que está funcionando no seu nicho e escrever a copy.' }),
       ]));
       body.push(h('div', { class: 'bw-row' }, [
         h('span', { class: 'bw-meta', text: plural(briefCount(), 'carrossel', 'carrosséis') + ' · ' + plural(copySlots(m).length, 'texto', 'textos') + ' cada' }),
@@ -733,15 +768,22 @@
     } else if (st === 'active' && state.briefMode) {
       body.push(briefForm(m));
     } else if (st === 'active') {
-      body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('bot') + '<span>Pedir pra IA escrever</span>', onclick: function () { state.briefMode = true; saveBrief(); render(); } }));
-      body.push(h('button', { class: 'bw-btn bw-cta', html: icon('file-search') + '<span>Já tenho os textos</span>', onclick: pickTexts }));
+      body.push(h('button', { class: 'bw-choice', onclick: function () { state.briefMode = true; state.brief.ok = false; saveBrief(); render(); } }, [
+        h('span', { class: 'bw-choice__icon', html: icon('sparkles') }),
+        h('span', { class: 'bw-choice__txt' }, [h('strong', { text: 'A IA decide' }), h('span', { text: 'Ela pesquisa o nicho e escreve' })]),
+      ]));
+      body.push(h('button', { class: 'bw-choice', onclick: pickTexts }, [
+        h('span', { class: 'bw-choice__icon', html: icon('sheet') }),
+        h('span', { class: 'bw-choice__txt' }, [h('strong', { text: 'Arrastar CSV' }), h('span', { text: 'Uma linha por carrossel' })]),
+      ]));
+      body.push(h('button', { class: 'bw-link', html: icon('download') + '<span>baixar CSV modelo</span>', onclick: downloadCsvTemplate }));
     } else {
-      body.push(h('span', { class: 'bw-hint', text: 'Um arquivo de textos ou um pedido pra IA' }));
+      body.push(h('span', { class: 'bw-hint', text: 'A IA decide ou você manda um CSV' }));
     }
     var action = null;
     if (st === 'done') {
       action = swapBtn(function () {
-        state.texts = null; state.briefMode = false;
+        state.texts = null; state.briefMode = false; state.brief.ok = false;
         idbSet('texts', null); saveBrief(); render();
       });
     }
@@ -755,25 +797,24 @@
   // Pedido pra IA: o que escrever + quantos carrosséis
   function briefForm(m) {
     var ta = h('textarea', {
-      class: 'bw-textarea', rows: '4',
-      placeholder: 'Ex.: carrosséis sobre produtividade pra quem trabalha em casa. Capa com hook curto, slides com uma dica cada, último com CTA pra seguir. Tom direto, sem emoji.',
+      class: 'bw-textarea', rows: '3',
+      placeholder: 'Opcional. Ex.: produtividade pra quem trabalha em casa, tom direto, último slide com CTA pra seguir.',
     });
     ta.value = state.brief.pedido;
     var qty = h('input', { class: 'bw-qty', type: 'number', min: '1', max: '200', placeholder: String(state.photos ? state.photos.files.length : 10) });
     qty.value = state.brief.quantidade;
     var ok = h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('check') + '<span>Pronto</span>' });
-    ok.disabled = !state.brief.pedido.trim();
-    ta.addEventListener('input', function () { state.brief.pedido = ta.value; ok.disabled = !ta.value.trim(); saveBrief(); });
+    ta.addEventListener('input', function () { state.brief.pedido = ta.value; saveBrief(); });
     qty.addEventListener('input', function () { state.brief.quantidade = qty.value; saveBrief(); });
-    ok.addEventListener('click', function () { if (state.brief.pedido.trim()) render(); });
+    ok.addEventListener('click', function () { state.brief.ok = true; saveBrief(); render(); });
     setTimeout(function () { ta.focus(); }, 30);
     return h('div', { class: 'bw-brief' }, [
-      h('label', { class: 'bw-brief__label', text: 'Qual copy a IA deve escrever?' }),
-      h('span', { class: 'bw-hint bw-brief__hint', text: 'Ela escreve todos os ' + plural(copySlots(m).length, 'texto', 'textos') + ' do carrossel, slide a slide.' }),
+      h('label', { class: 'bw-brief__label', text: 'Quer dar uma direção?' }),
+      h('span', { class: 'bw-hint bw-brief__hint', text: 'Se deixar vazio, a IA deduz o nicho pelos exemplos e fotos, pesquisa o mercado e escreve os ' + plural(copySlots(m).length, 'texto', 'textos') + ' de cada carrossel.' }),
       ta,
       h('label', { class: 'bw-brief__row' }, [h('span', { text: 'Quantos carrosséis' }), qty]),
       ok,
-      h('button', { class: 'bw-link', text: 'ou escolher um arquivo de textos', onclick: function () { state.briefMode = false; saveBrief(); pickTexts(); } }),
+      h('button', { class: 'bw-link', text: 'ou arrastar um CSV', onclick: function () { state.briefMode = false; saveBrief(); pickTexts(); } }),
     ]);
   }
 
@@ -783,7 +824,7 @@
     if (st === 'done' && state.refSkipped) {
       body.push(h('span', { class: 'bw-hint', text: 'Sem exemplo: a IA segue só o pedido.' }));
     } else if (st === 'done') {
-      state.ref.carousels.slice(0, 2).forEach(function (c) {
+      state.ref.carousels.slice(0, 1).forEach(function (c) {
         var strip = h('div', { class: 'bw-strip bw-strip--seq' });
         c.files.slice(0, 5).forEach(function (f) { strip.appendChild(thumbImg(f)); });
         if (c.files.length > 5) strip.appendChild(h('span', { class: 'bw-strip__more', text: '+' + (c.files.length - 5) }));
@@ -875,7 +916,7 @@
       btn.addEventListener('click', function () { copyPrompt(m, btn); });
       side.appendChild(h('div', { class: 'bw-ai' }, [
         h('div', { class: 'bw-ai__head', html: icon('bot') + '<span>Agora é com a IA</span>' }),
-        h('p', { class: 'bw-ai__text', text: 'No Claude (com o MCP carousel-maker ligado), mande a frase abaixo. Ela lê seu pedido, olha os exemplos, o modelo e as fotos, escreve a copy de ' + plural(briefCount(), 'carrossel', 'carrosséis') + ' e gera tudo na sua pasta de saída.' }),
+        h('p', { class: 'bw-ai__text', text: 'No Claude (com o MCP carousel-maker ligado), mande a frase abaixo. Ela olha os exemplos, o modelo e as fotos, pesquisa o que funciona no seu nicho, escreve a copy de ' + plural(briefCount(), 'carrossel', 'carrosséis') + ' e gera tudo na sua pasta de saída.' }),
         h('pre', { class: 'bw-ai__prompt', text: aiPrompt(m) }),
         btn,
         state.out ? null : h('p', { class: 'bw-ai__warn', text: 'Escolha a saída (passo 3) antes, pra IA ter onde salvar.' }),
@@ -1108,6 +1149,7 @@
       }
     }
     return {
+      modo: state.texts ? 'textos_prontos' : 'ia_decide',
       pedido: state.brief.pedido.trim() || null,
       quantidade: briefCount(),
       quantidade_origem: parseInt(state.brief.quantidade, 10) > 0 ? 'pedida' : (state.photos ? 'uma por foto' : 'padrão'),

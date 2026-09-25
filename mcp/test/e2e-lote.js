@@ -113,8 +113,8 @@ async function main() {
   await page.click('text=Escolher pasta de fotos');
   await page.click('text=Escolher pasta de exemplos');
   await page.waitForSelector('.bw-node--ref.is-done');
-  await page.click('text=Pedir pra IA escrever');
-  await page.fill('.bw-textarea', 'Hooks curtos sobre produtividade para quem trabalha em casa. Tom direto.');
+  // "A IA decide" sem direção nenhuma: ela tem que pesquisar o nicho sozinha
+  await page.click('.bw-choice:has-text("A IA decide")');
   await page.fill('.bw-qty', '3');
   await page.click('.bw-brief >> text=Pronto');
   await page.click('text=Escolher saída');
@@ -127,14 +127,15 @@ async function main() {
   if (pedido.isError) fail('ver_pedido_lote: ' + JSON.stringify(pedido.content));
   const info = JSON.parse(pedido.content[0].text);
   const imagens = pedido.content.filter(c => c.type === 'image').length;
-  if (!/produtividade/.test(info.pedido || '')) fail('pedido não veio: ' + info.pedido);
+  if (info.modo !== 'ia_decide') fail('modo deveria ser ia_decide, veio ' + info.modo);
+  if (!pedido.content.some(c => c.type === 'text' && /PESQUISE O MERCADO/.test(c.text))) fail('instrução de pesquisa de mercado não veio');
   if (info.quantidade !== 3) fail('quantidade deveria ser 3, veio ' + info.quantidade);
   if (!info.pronto) fail('deveria estar pronto, falta: ' + info.faltando);
   const chaves = (info.copys || []).map(c => c.chave).join(',');
   if (chaves !== 'hooks,slide2_texto1,slide2_texto2') fail('copys deveriam cobrir os 3 textos dos 2 slides, vieram: ' + chaves);
   if (!info.resultado_desejado || info.resultado_desejado.carrosseis.length !== 2) fail('resultado desejado deveria ter 2 carrosséis: ' + JSON.stringify(info.resultado_desejado));
   if (imagens < 10) fail(`esperava 6 slides de exemplo + molde + 3 fotos, vieram ${imagens} imagens`);
-  console.log(`✓ ver_pedido_lote: pedido, quantidade ${info.quantidade}, ${info.resultado_desejado.carrosseis.length} exemplos, ${imagens} imagens, variável {{${info.variavel_de_texto}}}`);
+  console.log(`✓ ver_pedido_lote: modo ia_decide + pesquisa, quantidade ${info.quantidade}, ${info.resultado_desejado.carrosseis.length} exemplos, ${imagens} imagens, variável {{${info.variavel_de_texto}}}`);
 
   // Copy completa: um objeto por carrossel, uma chave por texto
   const gerado = await tool('gerar_lote', { textos: [
@@ -166,6 +167,18 @@ async function main() {
   });
   if (!mudou) fail('override por id (#2) não mudou o slide 2');
   console.log('✓ saída:', pastas.join(' | '));
+
+  // Caminho do CSV: colunas = campos de copy, uma linha por carrossel
+  const csv = 'hooks,slide2_texto1,slide2_texto2\nHook do CSV 1,Título 1,Corpo 1\n"Hook, com vírgula",Título 2,Corpo 2\n';
+  const csvPath = require('path').join(require('os').tmpdir(), 'tcm-e2e-copy.csv');
+  require('fs').writeFileSync(csvPath, csv);
+  await page.click('.bw-node--texts .bw-swap');
+  const [chooser] = await Promise.all([page.waitForEvent('filechooser'), page.click('.bw-choice:has-text("Arrastar CSV")')]);
+  await chooser.setFiles(csvPath);
+  await page.waitForSelector('.bw-go:has-text("Gerar 2 carrosséis")', { timeout: 5000 }).catch(() => {});
+  const botaoCsv = await page.textContent('.bw-go');
+  if (!/Gerar 2 carrosséis/.test(botaoCsv)) fail('CSV deveria dar 2 carrosséis, botão: ' + botaoCsv);
+  console.log('✓ CSV com colunas de copy: ' + botaoCsv.trim());
 
   await browser.close();
   mcp.kill();

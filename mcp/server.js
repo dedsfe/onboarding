@@ -381,8 +381,14 @@ server.tool(
       const exemplo = Object.fromEntries(resto.copys.map(c => [c.chave, '...']));
       conteudo.push({ type: 'text', text: `Formato para gerar_lote: textos = [ ${JSON.stringify(exemplo)}, ... ] — ${resto.quantidade} objeto(s), um por carrossel.` });
     }
-    if (!resto.pedido) {
-      conteudo.push({ type: 'text', text: 'O usuário ainda não escreveu um pedido na tela. Pergunte o tema/tom ou peça para ele escrever no passo 2 ("Pedir pra IA escrever").' });
+    if (resto.modo === 'ia_decide') {
+      conteudo.push({ type: 'text', text: [
+        'MODO "A IA DECIDE" — o usuário quer que você crie a copy. Antes de escrever:',
+        `1. Descubra o nicho e o público: ${resto.pedido ? 'use a direção do usuário acima' : 'o usuário não deu direção, então deduza'} a partir dos exemplos de resultado desejado e das fotos.`,
+        '2. PESQUISE O MERCADO: use busca na web e, se você tiver, ferramentas de tendências (ex.: trends get_top_trends / get_top_posts) para achar hooks, ângulos e formatos de carrossel que estão performando agora nesse nicho.',
+        '3. Escreva a copy de cada carrossel com ângulos diferentes (não repita a mesma estrutura), em PT-BR, cabendo no tamanho de cada campo.',
+        '4. Chame gerar_lote e conte ao usuário, em 2–3 linhas, o que achou na pesquisa e quais ângulos usou.',
+      ].join('\n') });
     }
     if (resto.faltando && resto.faltando.length) {
       conteudo.push({ type: 'text', text: `Antes de gerar, falta no app: ${resto.faltando.join('; ')}. Peça para o usuário resolver e tente de novo.` });
