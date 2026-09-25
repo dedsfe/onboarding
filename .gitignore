@@ -22,3 +22,5 @@ credentials*.json
 
 # Lotes gerados via MCP (locais)
 lotes/
+mcp/templates-data.js
+mcp/*.tgz

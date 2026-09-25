@@ -1,0 +1,29 @@
+{
+  "name": "carousel-maker-mcp",
+  "version": "0.1.0",
+  "description": "Servidor MCP do The Carousel Maker: a IA lê o pedido de lote (fotos, exemplos, molde) e gera carrosséis prontos pelo app aberto no navegador.",
+  "license": "UNLICENSED",
+  "bin": {
+    "carousel-maker-mcp": "bin.js"
+  },
+  "main": "server.js",
+  "files": [
+    "bin.js",
+    "server.js",
+    "instalar.js",
+    "templates-data.js",
+    "README.md"
+  ],
+  "scripts": {
+    "prepack": "node -e \"require('fs').copyFileSync('../templates-data.js','templates-data.js')\""
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["mcp", "model-context-protocol", "carousel", "instagram", "tiktok", "claude"],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "ws": "^8.21.3",
+    "zod": "^4.6.5"
+  }
+}

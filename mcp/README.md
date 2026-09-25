@@ -32,7 +32,26 @@ Fluxo: `criar_posts` → limpa canvas → aplica template → amarra `{{fundo}}`
 carrega os posts → exporta → grava `lotes/<nome>/<nome>.zip` (+ `lote.csv`).
 Imagens de fundo: caminhos locais (jpg/png/webp), ciclando `fundos[i % n]`.
 
-## Conectar (um comando, rodado na pasta do app)
+## Instalar pelo npm (usuário final)
+
+```bash
+npx -y carousel-maker-mcp install code      # Claude Code
+npx -y carousel-maker-mcp install desktop   # Claude Desktop
+npx -y carousel-maker-mcp install cursor    # Cursor
+```
+
+Depois reabra o cliente e abra o app no navegador. Lotes gerados pelas ferramentas
+antigas (`criar_lote`, `criar_posts`) vão para `~/CarouselMaker/lotes` (ou `TCM_LOTES_DIR`).
+
+### Publicar uma versão nova
+
+```bash
+cd mcp
+npm version patch      # 0.1.0 → 0.1.1
+npm publish            # prepack copia ../templates-data.js para dentro do pacote
+```
+
+## Conectar em dev (um comando, rodado na pasta do app)
 
 | Cliente | Comando |
 |---|---|

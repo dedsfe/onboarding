@@ -583,7 +583,14 @@
   /* ------------------------------------------------ conectar a IA (MCP)
      Antes do fluxo: um comando pra copiar e o status ao vivo da ponte.
      A bolinha fica verde sozinha quando o servidor MCP sobe. */
-  var CONNECT = {
+  /* true depois do `npm publish` do pacote carousel-maker-mcp: o comando passa
+     a funcionar de qualquer pasta. false = comandos de dev (pasta do app). */
+  var MCP_NO_NPM = false;
+  var CONNECT = MCP_NO_NPM ? {
+    code: { nome: 'Claude Code', cmd: 'npx -y carousel-maker-mcp install code', depois: 'Abra o Claude Code' },
+    desktop: { nome: 'Claude Desktop', cmd: 'npx -y carousel-maker-mcp install desktop', depois: 'Reabra o Claude Desktop' },
+    cursor: { nome: 'Cursor', cmd: 'npx -y carousel-maker-mcp install cursor', depois: 'Reabra o Cursor' },
+  } : {
     code: { nome: 'Claude Code', cmd: 'claude mcp add carousel-maker -- node "$(pwd)/mcp/server.js"', depois: 'Abra o Claude Code' },
     desktop: { nome: 'Claude Desktop', cmd: 'npm run mcp:desktop', depois: 'Reabra o Claude Desktop' },
     cursor: { nome: 'Cursor', cmd: 'npm run mcp:cursor', depois: 'Reabra o Cursor' },
@@ -640,7 +647,7 @@
       h('div', { class: 'bw-cx-step' }, [
         h('span', { class: 'bw-cx-step__n', text: '1' }),
         h('span', { class: 'bw-cx-step__icon', html: icon('terminal') }),
-        h('span', { class: 'bw-chip-dir', html: icon('folder') + '<span>pasta do app</span>' }),
+        MCP_NO_NPM ? null : h('span', { class: 'bw-chip-dir', html: icon('folder') + '<span>pasta do app</span>' }),
         h('div', { class: 'bw-cmd' }, [h('code', { text: cfg.cmd }), copyBtn]),
       ]),
       h('span', { class: 'bw-cx-arrow', html: icon('arrow-right') }),

@@ -15,6 +15,7 @@
 
 const http = require('http');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const vm = require('vm');
 const { WebSocketServer } = require('ws');
@@ -23,8 +24,13 @@ const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio
 const { z } = require('zod');
 
 const ROOT = path.resolve(__dirname, '..');
-const LOTES_DIR = path.join(ROOT, 'lotes');
-const TEMPLATES_FILE = path.join(ROOT, 'templates-data.js');
+/* Dentro do repo do app, lotes/ e templates ficam na raiz. Instalado pelo npm
+   (npx carousel-maker-mcp), os templates vêm no pacote e os lotes vão para
+   ~/CarouselMaker/lotes — a pasta do pacote é um cache que o npm apaga. */
+const NO_REPO = fs.existsSync(path.join(ROOT, 'index.html')) && fs.existsSync(path.join(ROOT, 'templates-data.js'));
+const LOTES_DIR = process.env.TCM_LOTES_DIR || (NO_REPO ? path.join(ROOT, 'lotes') : path.join(os.homedir(), 'CarouselMaker', 'lotes'));
+const TEMPLATES_FILE = NO_REPO ? path.join(ROOT, 'templates-data.js') : path.join(__dirname, 'templates-data.js');
+const mostrar = (p) => (NO_REPO ? path.relative(ROOT, p) : p);
 
 
 /* ---------------------------------------------------------------------------
@@ -305,7 +311,7 @@ server.tool(
       content: [
         {
           type: 'text',
-          text: `Lote criado: ${path.relative(ROOT, file)}\nPosts: ${rows.length}\nColunas: ${headers.join(', ')}\n\nPróximo passo: abra o app, menu Lote → arraste o lote.csv para a tabela.`,
+          text: `Lote criado: ${mostrar(file)}\nPosts: ${rows.length}\nColunas: ${headers.join(', ')}\n\nPróximo passo: abra o app, menu Lote → arraste o lote.csv para a tabela.`,
         },
       ],
     };
@@ -617,12 +623,12 @@ server.tool(
           {
             type: 'text',
             text: [
-              `✅ Lote pronto: ${path.relative(ROOT, zipPath)}`,
+              `✅ Lote pronto: ${mostrar(zipPath)}`,
               `Etapas: ${etapas.join(' → ')}`,
               ignoradas.length
                 ? `⚠️ Chaves sem bind no design (ignoradas na renderização): ${ignoradas.join(', ')} — binds disponíveis: ${[...bindsValidos].join(', ')}`
                 : `Binds usados: ${chavesUsadas.join(', ')}`,
-              `CSV do lote salvo em: ${path.relative(ROOT, csvPath)}`,
+              `CSV do lote salvo em: ${mostrar(csvPath)}`,
             ].join('\n'),
           },
         ],
