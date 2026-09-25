@@ -7240,13 +7240,22 @@
       if (dockCanvasBtn) dockCanvasBtn.classList.remove('is-dock-drag-hover');
     }
 
+    /* Só arquivo/imagem vindo de fora acende o aviso. Arrastar uma camada
+       do painel por cima do canvas não é "soltar imagem". */
+    function isExternalDrag(e) {
+      const types = [...((e.dataTransfer && e.dataTransfer.types) || [])];
+      return types.includes('Files') || types.includes('text/uri-list') || types.includes('text/html');
+    }
+
     view.addEventListener('dragenter', (e) => {
+      if (!isExternalDrag(e)) return;
       e.preventDefault();
       canvasDragCounter++;
       view.classList.add('is-drag-active');
     });
 
     view.addEventListener('dragover', (e) => {
+      if (!isExternalDrag(e)) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
       if (!view.classList.contains('is-drag-active')) {
@@ -7294,6 +7303,7 @@
     view.addEventListener('drop', async (e) => {
       e.preventDefault();
       clearCanvasDropVisuals();
+      if (!isExternalDrag(e)) return;
       const worldPt = screenToWorld(e.clientX, e.clientY);
       await processDroppedOrPastedImage(e.dataTransfer, worldPt);
     });
