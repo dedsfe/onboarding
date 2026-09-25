@@ -7050,3 +7050,9 @@ body.is-scrubbing * {
   .canvas-layers { display: none; }
   .canvas-layers-open { display: none !important; }
 }
+
+/* Arrastando um elemento para fora do post: ele não é cortado pela máscara
+   e fica por cima dos outros posts até ser solto */
+.canvas-frame.is-drag-source { z-index: 40; }
+.canvas-frame.is-drag-source .canvas-frame__content { overflow: visible; }
+.ly-row.drop-into { box-shadow: inset 0 0 0 2px var(--ly-accent); }

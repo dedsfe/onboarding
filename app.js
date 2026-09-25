@@ -3045,6 +3045,33 @@
       document.addEventListener('mouseup', onUp);
     }
 
+    /* Post mais de cima que contém o ponto (os últimos do array pintam por cima) */
+    function frameAtWorldPoint(pt) {
+      for (let i = frames.length - 1; i >= 0; i--) {
+        const f = frames[i];
+        if (pt.x >= f.x && pt.x <= f.x + f.w && pt.y >= f.y && pt.y <= f.y + f.h) return f;
+      }
+      return null;
+    }
+
+    /* Tira um texto/imagem de um post e põe em outro.
+       keepWorldPos: fica no mesmo lugar da tela (arraste no canvas).
+       Sem ele, mantém a posição relativa (arraste no painel de camadas).
+       index: posição em children (padrão: por cima de tudo). */
+    function moveChildToFrame(child, from, to, { keepWorldPos = false, index } = {}) {
+      if (!child || !from || !to || from === to) return;
+      const i = (from.children || []).indexOf(child);
+      if (i === -1) return;
+      from.children.splice(i, 1);
+      if (keepWorldPos) {
+        child.x = Math.round(child.x + from.x - to.x);
+        child.y = Math.round(child.y + from.y - to.y);
+      }
+      if (!to.children) to.children = [];
+      if (index == null || index > to.children.length) to.children.push(child);
+      else to.children.splice(Math.max(0, index), 0, child);
+    }
+
     function startChildNodeDrag(e, child, frame, el) {
       const isMultiKey = e.shiftKey || e.metaKey || e.ctrlKey;
       const alreadySelected = isChildNodeSelected(frame.id, child.id);
@@ -3073,6 +3100,7 @@
       });
 
       let moved = false;
+      let dropTarget = null; // post sob o cursor, se for outro
       const frameEl = frameElOf(frame);
       const snapGuideV = frameEl ? frameEl.querySelector('.canvas-frame__snap-guide--v') : null;
       const snapGuideH = frameEl ? frameEl.querySelector('.canvas-frame__snap-guide--h') : null;
@@ -3080,14 +3108,33 @@
       const onMove = ev => {
         if (!moved && Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 3) {
           moved = true;
+          /* Como no Figma, o elemento continua visível fora do post enquanto
+             é arrastado — sem isso a máscara do post cortava ele no meio. */
+          nodesToMove.forEach(n => {
+            const fEl = world.querySelector(`.canvas-frame[data-id="${n.frameId}"]`);
+            if (fEl) fEl.classList.add('is-drag-source');
+          });
         }
         if (!moved) return;
+
+        const overFrame = frameAtWorldPoint(screenToWorld(ev.clientX, ev.clientY));
+        const nextTarget = overFrame && overFrame.id !== frame.id ? overFrame : null;
+        if (nextTarget !== dropTarget) {
+          if (dropTarget) frameElOf(dropTarget)?.classList.remove('is-drop-target');
+          if (nextTarget) frameElOf(nextTarget)?.classList.add('is-drop-target');
+          dropTarget = nextTarget;
+        }
 
         let dx = (ev.clientX - startX) / cam.scale;
         let dy = (ev.clientY - startY) / cam.scale;
 
+        // Em cima de outro post, os ímãs do post de origem não fazem sentido
+        if (dropTarget) {
+          if (snapGuideV) snapGuideV.classList.remove('is-active');
+          if (snapGuideH) snapGuideH.classList.remove('is-active');
+        }
         // Snapping se apenas 1 elemento estiver selecionado
-        if (nodesToMove.length === 1 && snapEnabled && frame) {
+        if (nodesToMove.length === 1 && snapEnabled && frame && !dropTarget) {
           const orig = origins.get(`${frame.id}_${child.id}`);
           if (orig) {
             let targetX = orig.x + dx;
@@ -3218,9 +3265,29 @@
         });
         if (snapGuideV) snapGuideV.classList.remove('is-active');
         if (snapGuideH) snapGuideH.classList.remove('is-active');
+        world.querySelectorAll('.canvas-frame.is-drag-source, .canvas-frame.is-drop-target')
+          .forEach(fEl => fEl.classList.remove('is-drag-source', 'is-drop-target'));
         document.removeEventListener('mousemove', onMove);
         document.removeEventListener('mouseup', onUp);
-        if (moved) saveQuiet();
+        if (!moved) return;
+        /* Soltou em cima de outro post: os elementos passam a ser dele, no
+           mesmo lugar da tela. Solto no vazio, continuam no post de origem. */
+        if (dropTarget) {
+          const moves = nodesToMove.map(n => {
+            const from = frames.find(fr => fr.id === n.frameId);
+            const c = from && (from.children || []).find(ch => ch.id === n.childId);
+            return c && from.id !== dropTarget.id ? { c, from } : null;
+          }).filter(Boolean);
+          if (moves.length) {
+            moves.forEach(({ c, from }) => moveChildToFrame(c, from, dropTarget, { keepWorldPos: true }));
+            renderAll();
+            selectedChildNodes = [];
+            moves.forEach(({ c }, i) => selectTextNode(dropTarget.id, c.id, i > 0));
+            save();
+            return;
+          }
+        }
+        saveQuiet();
       };
 
       document.addEventListener('mousemove', onMove);
@@ -5775,8 +5842,8 @@
 
       /* Arrastar para mudar a ordem (dentro do mesmo post). Soltar na metade
          de cima de uma linha põe por cima dela no canvas; embaixo, por baixo. */
-      const clearDropMarks = () => list.querySelectorAll('.drop-above, .drop-below')
-        .forEach(el => el.classList.remove('drop-above', 'drop-below'));
+      const clearDropMarks = () => list.querySelectorAll('.drop-above, .drop-below, .drop-into')
+        .forEach(el => el.classList.remove('drop-above', 'drop-below', 'drop-into'));
 
       list.addEventListener('dragstart', (e) => {
         const row = e.target.closest('.ly-row--child');
@@ -5789,13 +5856,18 @@
 
       list.addEventListener('dragover', (e) => {
         if (!layersDrag) return;
-        const row = e.target.closest('.ly-row--child');
+        const row = e.target.closest('.ly-row');
         clearDropMarks();
         // Não deixa o soltar-imagem do canvas ver este arrasto (ele força "copy")
         e.stopPropagation();
-        if (!row || Number(row.dataset.frame) !== layersDrag.frameId) return;
+        if (!row || row.dataset.child === String(layersDrag.childId)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
+        // Em cima de um post: entra nele (por cima de tudo)
+        if (row.classList.contains('ly-row--frame')) {
+          row.classList.add('drop-into');
+          return;
+        }
         const r = row.getBoundingClientRect();
         row.classList.add(e.clientY < r.top + r.height / 2 ? 'drop-above' : 'drop-below');
       });
@@ -5804,21 +5876,39 @@
         if (!layersDrag) return;
         e.preventDefault();
         e.stopPropagation();
-        const row = list.querySelector('.drop-above, .drop-below');
+        const row = list.querySelector('.drop-above, .drop-below, .drop-into');
         const above = row && row.classList.contains('drop-above');
+        const into = row && row.classList.contains('drop-into');
         clearDropMarks();
         if (!row) return;
-        const frame = frames.find(f => f.id === layersDrag.frameId);
-        const targetId = Number(row.dataset.child);
-        if (!frame || targetId === layersDrag.childId) return;
-        const kids = frame.children;
-        const from = kids.findIndex(ch => ch.id === layersDrag.childId);
-        if (from === -1) return;
-        const [moved] = kids.splice(from, 1);
-        const to = kids.findIndex(ch => ch.id === targetId);
-        // A lista é invertida: "acima" na lista = depois no array (mais pra frente)
-        kids.splice(above ? to + 1 : to, 0, moved);
-        reorderChildDOM(frame);
+        const from = frames.find(f => f.id === layersDrag.frameId);
+        const to = frames.find(f => f.id === Number(row.dataset.frame));
+        const moved = from && (from.children || []).find(ch => ch.id === layersDrag.childId);
+        if (!from || !to || !moved) return;
+
+        if (from === to) {
+          if (into) return;
+          const kids = from.children;
+          kids.splice(kids.indexOf(moved), 1);
+          const at = kids.findIndex(ch => ch.id === Number(row.dataset.child));
+          // A lista é invertida: "acima" na lista = depois no array (mais pra frente)
+          kids.splice(above ? at + 1 : at, 0, moved);
+          reorderChildDOM(from);
+          save();
+          return;
+        }
+
+        // Outro post: mesma posição dentro dele, na altura em que foi solto
+        let index;
+        if (!into) {
+          const at = (to.children || []).findIndex(ch => ch.id === Number(row.dataset.child));
+          index = above ? at + 1 : at;
+        }
+        const wasSelected = isChildNodeSelected(from.id, moved.id);
+        moveChildToFrame(moved, from, to, { index });
+        layersOpenFrames.add(to.id);
+        renderAll();
+        if (wasSelected) selectTextNode(to.id, moved.id);
         save();
       });
 
