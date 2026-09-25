@@ -68,7 +68,7 @@ async function main() {
     localStorage.setItem('tcm_canvas_v1', JSON.stringify({ cam: { x: 200, y: 100, scale: 0.4 }, frames, links: [] }));
     await new Promise(r => { const d = indexedDB.deleteDatabase('tcm-batch-workflow'); d.onsuccess = d.onerror = d.onblocked = r; });
     const opfs = await navigator.storage.getDirectory();
-    for (const n of ['e2e-fotos', 'e2e-saida']) await opfs.removeEntry(n, { recursive: true }).catch(() => {});
+    for (const n of ['e2e-fotos', 'e2e-saida', 'e2e-exemplos']) await opfs.removeEntry(n, { recursive: true }).catch(() => {});
   });
   await page.reload({ waitUntil: 'networkidle' });
   await page.waitForFunction(() => window.__tcmPonteStatus && window.__tcmPonteStatus().conectada, null, { timeout: 15000 });
@@ -86,12 +86,27 @@ async function main() {
       const fh = await fotos.getFileHandle(`foto-${i + 1}.png`, { create: true });
       const w = await fh.createWritable(); await w.write(blob); await w.close();
     }
+    // Resultado desejado: 2 carrosséis de exemplo, 3 slides cada
+    const exemplos = await opfs.getDirectoryHandle('e2e-exemplos', { create: true });
+    for (const nome of ['exemplo-a', 'exemplo-b']) {
+      const d = await exemplos.getDirectoryHandle(nome, { create: true });
+      for (let i = 1; i <= 3; i++) {
+        const c = document.createElement('canvas'); c.width = 320; c.height = 400;
+        const x = c.getContext('2d'); x.fillStyle = '#222'; x.fillRect(0, 0, 320, 400);
+        x.fillStyle = '#fff'; x.font = 'bold 28px sans-serif'; x.fillText(`${nome} ${i}`, 30, 200);
+        const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+        const fh = await d.getFileHandle(`slide-${i}.png`, { create: true });
+        const w = await fh.createWritable(); await w.write(blob); await w.close();
+      }
+    }
     const saida = await opfs.getDirectoryHandle('e2e-saida', { create: true });
-    window.showDirectoryPicker = async (o) => (o && o.id === 'tcm-saida' ? saida : fotos);
+    window.showDirectoryPicker = async (o) => (o && o.id === 'tcm-saida' ? saida : o && o.id === 'tcm-ref' ? exemplos : fotos);
   });
 
   await page.click('#canvas-batch-btn');
   await page.click('text=Escolher pasta de fotos');
+  await page.click('text=Escolher pasta de exemplos');
+  await page.waitForSelector('.bw-node--ref.is-done');
   await page.click('text=Pedir pra IA escrever');
   await page.fill('.bw-textarea', 'Hooks curtos sobre produtividade para quem trabalha em casa. Tom direto.');
   await page.fill('.bw-qty', '3');
@@ -100,7 +115,7 @@ async function main() {
   await page.waitForSelector('.bw-go:has-text("Esperando a IA")', { timeout: 5000 }).catch(() => {});
   const botao = await page.textContent('.bw-go');
   if (!/Esperando a IA/.test(botao)) fail(`botão deveria esperar a IA, veio "${botao}"`);
-  console.log('✓ tela pronta: fotos + pedido + saída');
+  console.log('✓ tela pronta: fotos + exemplos + pedido + saída');
 
   const pedido = await tool('ver_pedido_lote');
   if (pedido.isError) fail('ver_pedido_lote: ' + JSON.stringify(pedido.content));
@@ -109,8 +124,9 @@ async function main() {
   if (!/produtividade/.test(info.pedido || '')) fail('pedido não veio: ' + info.pedido);
   if (info.quantidade !== 3) fail('quantidade deveria ser 3, veio ' + info.quantidade);
   if (!info.pronto) fail('deveria estar pronto, falta: ' + info.faltando);
-  if (imagens < 4) fail(`esperava modelo + 3 fotos como imagem, vieram ${imagens}`);
-  console.log(`✓ ver_pedido_lote: pedido, quantidade ${info.quantidade}, ${imagens} imagens, variável {{${info.variavel_de_texto}}}`);
+  if (!info.resultado_desejado || info.resultado_desejado.carrosseis.length !== 2) fail('resultado desejado deveria ter 2 carrosséis: ' + JSON.stringify(info.resultado_desejado));
+  if (imagens < 10) fail(`esperava 6 slides de exemplo + molde + 3 fotos, vieram ${imagens} imagens`);
+  console.log(`✓ ver_pedido_lote: pedido, quantidade ${info.quantidade}, ${info.resultado_desejado.carrosseis.length} exemplos, ${imagens} imagens, variável {{${info.variavel_de_texto}}}`);
 
   const gerado = await tool('gerar_lote', { textos: ['Trabalhe menos, entregue mais', 'Seu sofá não é escritório', 'O truque dos 25 minutos'] });
   if (gerado.isError) fail('gerar_lote: ' + gerado.content[0].text);

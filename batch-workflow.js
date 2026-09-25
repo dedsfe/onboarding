@@ -32,6 +32,10 @@
     // Pedido pra IA: o que escrever e quantos carrosséis. A IA lê pelo MCP.
     brief: { pedido: '', quantidade: '' },
     briefMode: false,
+    // Resultado desejado: carrosséis de exemplo (referência para a IA)
+    ref: null,        // { name, carousels: [{ name, files: [..] }], dir }
+    refSkipped: false,
+    pendingRef: null,
   };
   var el = {};
   var thumbUrls = [];
@@ -165,12 +169,14 @@
   function steps(m) {
     var list = [];
     if (imageBinds(m).length) list.push('photos');
+    list.push('ref');
     if (textBinds(m).length) list.push('texts');
     list.push('out');
     return list;
   }
   function isDone(step) {
     if (step === 'photos') return !!(state.photos && state.photos.files.length);
+    if (step === 'ref') return !!(state.ref && state.ref.carousels.length) || state.refSkipped;
     if (step === 'texts') return !!(state.texts && textCount() > 0) || hasBrief();
     if (step === 'out') return !!state.out;
     return false;
@@ -281,6 +287,89 @@
     }
   }
 
+  /* ---------------------------------------- passo: resultado desejado
+     Exemplos do que o usuário quer ver no fim. Pasta com subpastas = um
+     carrossel por subpasta; fotos soltas = uma sequência só. É referência
+     para a IA — quem monta as imagens continua sendo o modelo do canvas. */
+  function byName(a, b) { return a.name.localeCompare(b.name, 'pt-BR', { numeric: true }); }
+
+  async function refFromDir(dir) {
+    var loose = [], carousels = [];
+    for await (var e of dir.values()) {
+      if (e.name.charAt(0) === '.') continue;
+      if (e.kind === 'file' && IMG_RE.test(e.name)) loose.push(e);
+      else if (e.kind === 'directory') {
+        var files = [];
+        for await (var f of e.values()) if (f.kind === 'file' && IMG_RE.test(f.name)) files.push(f);
+        if (files.length) carousels.push({ name: e.name, files: files.sort(byName) });
+      }
+    }
+    carousels.sort(byName);
+    if (loose.length) carousels.unshift({ name: dir.name, files: loose.sort(byName) });
+    return carousels;
+  }
+
+  async function setRefDir(dir) {
+    var carousels = await refFromDir(dir);
+    if (!carousels.length) { toast('info', 'Essa pasta não tem imagens de exemplo.'); return; }
+    state.ref = { name: dir.name, carousels: carousels, dir: dir };
+    state.refSkipped = false;
+    state.pendingRef = null;
+    await idbSet('ref', dir);
+    render();
+  }
+
+  // Lista de arquivos (fotos escolhidas ou pasta lida sem acesso direto)
+  function setRefFiles(fileList, rootName) {
+    var groups = new Map();
+    [].forEach.call(fileList || [], function (f) {
+      if (!IMG_RE.test(f.name)) return;
+      var parts = (f.webkitRelativePath || f.name).split('/');
+      var key = parts.length > 2 ? parts[1] : (parts.length === 2 ? parts[0] : 'exemplo');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(f);
+    });
+    if (!groups.size) { toast('info', 'Nenhuma imagem nessa seleção.'); return; }
+    var carousels = [];
+    groups.forEach(function (files, name) { carousels.push({ name: name, files: files.sort(byName) }); });
+    state.ref = { name: rootName || 'exemplos', carousels: carousels.sort(byName) };
+    state.refSkipped = false;
+    render();
+  }
+
+  async function pickRef() {
+    if (canWriteDisk) {
+      try { await setRefDir(await window.showDirectoryPicker({ id: 'tcm-ref', mode: 'read' })); }
+      catch (e) { if (e && e.name !== 'AbortError') toast('error', 'Não consegui abrir essa pasta.'); }
+      return;
+    }
+    var input = h('input', { type: 'file' });
+    input.webkitdirectory = true;
+    input.multiple = true;
+    input.addEventListener('change', function () {
+      var first = input.files[0];
+      setRefFiles(input.files, first && first.webkitRelativePath ? first.webkitRelativePath.split('/')[0] : 'exemplos');
+    });
+    input.click();
+  }
+
+  function pickRefPhotos() {
+    var input = h('input', { type: 'file', accept: 'image/*', multiple: 'multiple' });
+    input.addEventListener('change', function () { setRefFiles(input.files, 'fotos escolhidas'); });
+    input.click();
+  }
+
+  async function dropRef(ev) {
+    var first = ev.dataTransfer && ev.dataTransfer.items && ev.dataTransfer.items[0];
+    try {
+      if (first && first.getAsFileSystemHandle) {
+        var hnd = await first.getAsFileSystemHandle();
+        if (hnd && hnd.kind === 'directory') { await setRefDir(hnd); return; }
+      }
+    } catch (e) {}
+    setRefFiles(ev.dataTransfer.files, 'fotos escolhidas');
+  }
+
   /* ---------------------------------------------------- passo 2: textos */
   function setTextsFromString(name, text) {
     var m = model();
@@ -353,6 +442,12 @@
   }
 
   async function reopen(kind) {
+    if (kind === 'ref') {
+      try {
+        if ((await state.pendingRef.requestPermission({ mode: 'read' })) === 'granted') await setRefDir(state.pendingRef);
+      } catch (e) { toast('error', 'Não consegui reabrir a pasta. Escolha de novo.'); }
+      return;
+    }
     var hnd = kind === 'photos' ? state.pendingPhotos : state.pendingOut;
     if (!hnd) return;
     try {
@@ -379,6 +474,12 @@
         try { var files = await photosFromDir(p); if (files.length) state.photos = { name: p.name, files: files, dir: p }; } catch (e) {}
       } else state.pendingPhotos = p;
     }
+    var rf = await idbGet('ref');
+    if (rf && rf.queryPermission && !state.ref) {
+      if ((await rf.queryPermission({ mode: 'read' })) === 'granted') {
+        try { var cs = await refFromDir(rf); if (cs.length) state.ref = { name: rf.name, carousels: cs, dir: rf }; } catch (e) {}
+      } else state.pendingRef = rf;
+    }
     var t = await idbGet('texts');
     if (t && !state.texts) setTextsFromString(t.name, t.text);
     var o = await idbGet('out');
@@ -391,6 +492,7 @@
   /* --------------------------------------------------------------- UI */
   var STEP_INFO = {
     photos: { n: 'Fotos', title: 'Escolha a pasta com as fotos', sub: 'Cada carrossel vai usar uma foto dessa pasta, na ordem dos nomes.' },
+    ref: { n: 'Resultado desejado', title: 'Mostre o resultado que você quer', sub: 'Uma pasta com carrosséis de exemplo (uma subpasta por carrossel) ou algumas fotos em sequência. A IA usa como referência.' },
     texts: { n: 'Textos', title: 'Agora os textos: peça pra IA ou escolha um arquivo', sub: 'Cada texto vira um carrossel. A IA escreve a partir do seu pedido.' },
     out: { n: 'Saída', title: 'Por último, onde salvar os carrosséis', sub: 'Cada carrossel pronto vira uma pasta com os slides em PNG.' },
     ready: { title: 'Tudo pronto', sub: '' },
@@ -460,6 +562,7 @@
     var inputsCol = h('div', { class: 'bw-col' });
     var inNodes = [];
     if (list.indexOf('photos') !== -1) { var np = photosNode(m, cur); inputsCol.appendChild(np); inNodes.push(np); }
+    var nr = refNode(m, cur); inputsCol.appendChild(nr); inNodes.push(nr);
     if (list.indexOf('texts') !== -1) { var nt = textsNode(m, cur); inputsCol.appendChild(nt); inNodes.push(nt); }
     var nm = modelNode(m);
     var no = outNode(m, cur, total);
@@ -643,6 +746,39 @@
     ]);
   }
 
+  function refNode(m, cur) {
+    var st = stateOf('ref', cur);
+    var body = [];
+    if (st === 'done' && state.refSkipped) {
+      body.push(h('span', { class: 'bw-hint', text: 'Sem exemplo: a IA segue só o pedido.' }));
+    } else if (st === 'done') {
+      state.ref.carousels.slice(0, 2).forEach(function (c) {
+        var strip = h('div', { class: 'bw-strip bw-strip--seq' });
+        c.files.slice(0, 5).forEach(function (f) { strip.appendChild(thumbImg(f)); });
+        if (c.files.length > 5) strip.appendChild(h('span', { class: 'bw-strip__more', text: '+' + (c.files.length - 5) }));
+        body.push(strip);
+      });
+      body.push(h('span', { class: 'bw-meta', html: icon('folder') + '<span>' + escapeHtml(state.ref.name) + ' · ' + plural(state.ref.carousels.length, 'carrossel', 'carrosséis') + '</span>' }));
+    } else if (st === 'active') {
+      if (state.pendingRef) {
+        body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('folder-open') + '<span>Reabrir “' + escapeHtml(state.pendingRef.name) + '”</span>', onclick: function () { reopen('ref'); } }));
+        body.push(h('button', { class: 'bw-link', text: 'ou escolher outra pasta', onclick: pickRef }));
+      } else {
+        body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('folder-search') + '<span>Escolher pasta de exemplos</span>', onclick: pickRef }));
+        body.push(h('button', { class: 'bw-btn bw-cta', html: icon('images') + '<span>Escolher fotos em sequência</span>', onclick: pickRefPhotos }));
+      }
+      body.push(h('button', { class: 'bw-link', text: 'pular este passo', onclick: function () { state.refSkipped = true; render(); } }));
+    } else {
+      body.push(h('span', { class: 'bw-hint', text: 'Carrosséis de exemplo' }));
+    }
+    return node('ref', {
+      icon: 'target', title: 'Resultado desejado', sub: st === 'done' ? null : 'Passo ' + (steps(m).indexOf('ref') + 1),
+      state: st, body: body,
+      action: st === 'done' ? swapBtn(function () { state.ref = null; state.refSkipped = false; idbSet('ref', null); render(); }) : null,
+      onDrop: dropRef,
+    });
+  }
+
   function modelNode(m) {
     var body = [];
     if (!m) {
@@ -665,7 +801,7 @@
       body.push(chips);
     }
     return node('model', {
-      icon: 'palette', title: 'Resultado desejado',
+      icon: 'palette', title: 'Modelo do canvas',
       sub: m ? m.nome + ' · ' + plural(m.frames.length, 'slide', 'slides') : 'sem modelo',
       state: m && m.binds.length ? 'done' : 'active', body: body,
     });
@@ -711,6 +847,15 @@
         btn,
         state.out ? null : h('p', { class: 'bw-ai__warn', text: 'Escolha a saída (passo 3) antes, pra IA ter onde salvar.' }),
       ]));
+    }
+    if (state.ref && !state.refSkipped) {
+      var seqs = h('div', { class: 'bw-seqs' });
+      state.ref.carousels.forEach(function (c) {
+        var row = h('div', { class: 'bw-seq' });
+        c.files.forEach(function (f) { row.appendChild(thumbImg(f)); });
+        seqs.appendChild(h('div', { class: 'bw-seq__item' }, [h('span', { class: 'bw-tile__name', text: c.name + ' · ' + plural(c.files.length, 'slide', 'slides') }), row]));
+      });
+      side.appendChild(section('target', 'Resultado desejado', plural(state.ref.carousels.length, 'carrossel', 'carrosséis'), seqs));
     }
     if (state.photos) {
       var grid = h('div', { class: 'bw-grid' });
@@ -761,7 +906,8 @@
   }
 
   function thumbImg(item) {
-    var img = h('img', { class: 'bw-thumb', alt: nameOf(item), loading: 'lazy', draggable: 'false' });
+    // alt vazio: o nome do arquivo piscava no lugar da miniatura enquanto carregava
+    var img = h('img', { class: 'bw-thumb', alt: '', title: nameOf(item), loading: 'lazy', draggable: 'false' });
     fileOf(item).then(function (f) {
       var url = URL.createObjectURL(f);
       thumbUrls.push(url);
@@ -892,6 +1038,20 @@
         modeloImgs.push(c.toDataURL('image/jpeg', 0.8));
       }
     }
+    // Exemplos: até 3 carrosséis × 5 slides, pequenos (é referência de estilo)
+    var refImgs = [];
+    if (state.ref && !state.refSkipped) {
+      var carr = state.ref.carousels.slice(0, 3);
+      for (var ci = 0; ci < carr.length; ci++) {
+        var slidesRef = [];
+        for (var si = 0; si < Math.min(carr[ci].files.length, 5); si++) {
+          var u = URL.createObjectURL(await fileOf(carr[ci].files[si]));
+          slidesRef.push(await smallJpeg(u, 384));
+          URL.revokeObjectURL(u);
+        }
+        refImgs.push({ nome: carr[ci].name, slides: slidesRef.filter(Boolean) });
+      }
+    }
     var fotoImgs = [];
     if (state.photos) {
       var files = state.photos.files.slice(0, 8);
@@ -913,7 +1073,10 @@
       textos_ja_escolhidos: state.texts && !state.texts.fromAi ? textCount() : 0,
       pronto: !faltando.length,
       faltando: faltando,
-      imagens: { modelo: modeloImgs, fotos: fotoImgs.filter(Boolean) },
+      resultado_desejado: state.ref && !state.refSkipped
+        ? { pasta: state.ref.name, carrosseis: state.ref.carousels.map(function (c) { return { nome: c.name, slides: c.files.length }; }) }
+        : null,
+      imagens: { modelo: modeloImgs, fotos: fotoImgs.filter(Boolean), exemplos: refImgs },
     };
   }
 

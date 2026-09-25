@@ -355,7 +355,7 @@ function dataUrlParaImagem(url) {
 
 server.tool(
   'ver_pedido_lote',
-  'PRIMEIRO PASSO para gerar carrosséis em lote a partir da tela "Criar em lote" do app. Devolve o pedido do usuário (o que escrever e quantos carrosséis), as variáveis de texto do carrossel modelo, a pasta de fotos e a pasta de saída — mais as imagens do modelo e das fotos para você ver o estilo. Depois escreva exatamente `quantidade` textos seguindo o pedido e o visual, e chame gerar_lote.',
+  'PRIMEIRO PASSO para gerar carrosséis em lote a partir da tela "Criar em lote" do app. Devolve o pedido do usuário (o que escrever e quantos carrosséis), os carrosséis de RESULTADO DESEJADO (exemplos de como deve ficar), o molde do canvas com as variáveis de texto, as fotos e a pasta de saída — tudo com imagens. Depois escreva exatamente `quantidade` textos seguindo o pedido e o estilo dos exemplos, e chame gerar_lote.',
   {},
   async () => {
     if (!ponteConectada()) return desconectado();
@@ -364,8 +364,13 @@ server.tool(
     const conteudo = [{ type: 'text', text: JSON.stringify(resto, null, 2) }];
     const modelo = (imagens && imagens.modelo) || [];
     const fotos = (imagens && imagens.fotos) || [];
+    const exemplos = (imagens && imagens.exemplos) || [];
+    exemplos.forEach((ex, i) => {
+      conteudo.push({ type: 'text', text: `RESULTADO DESEJADO — exemplo ${i + 1} "${ex.nome}" (${ex.slides.length} slide(s)). É assim que o usuário quer que fique: copie o tom, o tamanho e o tipo de texto.` });
+      ex.slides.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
+    });
     if (modelo.length) {
-      conteudo.push({ type: 'text', text: `Carrossel modelo (${modelo.length} slide(s)) — o texto que você escrever entra no lugar de {{${resto.variavel_de_texto || 'texto'}}}:` });
+      conteudo.push({ type: 'text', text: `Molde do canvas (${modelo.length} slide(s)) — é o design que vai montar as imagens. O texto que você escrever entra no lugar de {{${resto.variavel_de_texto || 'texto'}}}:` });
       modelo.map(dataUrlParaImagem).filter(Boolean).forEach(img => conteudo.push(img));
     }
     if (fotos.length) {
