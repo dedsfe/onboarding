@@ -585,7 +585,7 @@
      A bolinha fica verde sozinha quando o servidor MCP sobe. */
   /* true depois do `npm publish` do pacote carousel-maker-mcp: o comando passa
      a funcionar de qualquer pasta. false = comandos de dev (pasta do app). */
-  var MCP_NO_NPM = false;
+  var MCP_NO_NPM = true;
   var CONNECT = MCP_NO_NPM ? {
     code: { nome: 'Claude Code', cmd: 'npx -y carousel-maker-mcp install code', depois: 'Abra o Claude Code' },
     desktop: { nome: 'Claude Desktop', cmd: 'npx -y carousel-maker-mcp install desktop', depois: 'Reabra o Claude Desktop' },
