@@ -32,11 +32,18 @@
   --ink-secondary: #6d6d6d;
   --ink-muted: #969696;
 
+  /* a cor da marca: roxo. Só aparece onde importa (ação principal,
+     seleção, variável); todo o resto é cinza e tinta. */
+  --brand: #7C3AED;
+  --brand-strong: #6D28D9;
+  --brand-light: #8B5CF6;
+  --brand-soft: rgba(124, 58, 237, 0.12);
+
   /* the one accent, and its focus ring */
-  --primary: #305dde;
+  --primary: var(--brand);
   --primary-foreground: #ffffff;
-  --ring: #3ba6f1;
-  --accent-blue: #296ff0;
+  --ring: #A78BFA;
+  --accent-blue: var(--brand);
   --accent-emerald: #10b981;
   --line-secondary: color-mix(in srgb, var(--ink) 18%, transparent);
 
@@ -56,7 +63,7 @@
   --shadow-resting: 0 1px 2px rgba(0, 0, 0, 0.06);
   --shadow-floating: 0 1px 2px rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.08);
 
-  --font-sans: "Inter Tight", "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  --font-sans: "Nunito", ui-rounded, "SF Pro Rounded", -apple-system, BlinkMacSystemFont, sans-serif;
   --transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
 
   /* ------------------------------------------------------------
@@ -79,6 +86,11 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* Controles nativos não herdam a fonte sozinhos: sem isso o botão cai em Arial */
+button, input, select, textarea {
+  font-family: inherit;
 }
 
 body {
@@ -241,7 +253,7 @@ body {
 
 /* Estado de Drag & Drop ativo sobre o canvas */
 .canvas-view.is-drag-active {
-  box-shadow: inset 0 0 0 2px rgba(37, 99, 235, 0.45);
+  box-shadow: inset 0 0 0 2px rgba(124, 58, 237, 0.45);
 }
 
 /* Indicador flutuante de arrastar e soltar (OA Design) */
@@ -277,8 +289,8 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: var(--radius-pill, 9999px);
   box-shadow: 0 16px 36px -8px rgba(0, 0, 0, 0.4), 
-              0 0 0 1px rgba(37, 99, 235, 0.4);
-  font-family: var(--font-stack, "Inter Tight", sans-serif);
+              0 0 0 1px rgba(124, 58, 237, 0.4);
+  font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -292,7 +304,7 @@ body {
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: rgba(37, 99, 235, 0.28);
+  background: rgba(124, 58, 237, 0.28);
   color: #60A5FA;
 }
 
@@ -310,8 +322,8 @@ body {
 /* Caixa de seleção múltipla (Marquee Selection / Lasso) */
 .canvas-marquee-box {
   position: absolute;
-  background: rgba(37, 99, 235, 0.12);
-  border: 1.5px solid #3B82F6;
+  background: rgba(124, 58, 237, 0.12);
+  border: 1.5px solid var(--brand-light);
   border-radius: 3px;
   pointer-events: none;
   z-index: 10000;
@@ -391,8 +403,8 @@ body {
 }
 
 .canvas-hud__btn.is-active {
-  background: rgba(37, 99, 235, 0.14);
-  color: #2563EB;
+  background: rgba(124, 58, 237, 0.14);
+  color: var(--brand);
 }
 
 .canvas-hud__btn.is-disabled {
@@ -525,17 +537,17 @@ body {
 }
 
 .canvas-topbar__btn--primary {
-  background: #2563EB;
+  background: var(--brand);
   color: #FFFFFF;
   font-weight: 600;
   padding: 0 12px;
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .canvas-topbar__btn--primary:hover:not(:disabled) {
-  background: #1D4ED8;
+  background: var(--brand-strong);
   color: #FFFFFF;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 .canvas-topbar__btn--primary:active:not(:disabled) {
@@ -562,7 +574,7 @@ body {
   border-bottom-left-radius: 4px;
   border-top-right-radius: var(--radius-pill);
   border-bottom-right-radius: var(--radius-pill);
-  background: rgba(37, 99, 235, 0.85);
+  background: rgba(124, 58, 237, 0.85);
   color: #FFFFFF;
   display: inline-flex;
   align-items: center;
@@ -571,7 +583,7 @@ body {
 }
 
 .canvas-topbar__btn--chevron:hover {
-  background: #1D4ED8;
+  background: var(--brand-strong);
   color: #FFFFFF;
 }
 
@@ -593,7 +605,7 @@ body {
   height: 17px;
   padding: 0 4px;
   border-radius: 9px;
-  background: #3B82F6;
+  background: var(--brand-light);
   color: #FFFFFF;
   font-size: 10px;
   font-weight: 700;
@@ -968,8 +980,8 @@ body {
 }
 
 .canvas-formats__size:focus-within {
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25);
 }
 
 .canvas-formats__preview {
@@ -1038,7 +1050,7 @@ body {
   height: 34px;
   border: none;
   border-radius: 9px;
-  background: #2563EB;
+  background: var(--brand);
   color: #FFFFFF;
   cursor: pointer;
   transition: background 120ms ease, transform 100ms ease;
@@ -1050,7 +1062,7 @@ body {
 }
 
 .canvas-formats__go:hover {
-  background: #1D4ED8;
+  background: var(--brand-strong);
 }
 
 .canvas-formats__go:active {
@@ -1143,13 +1155,13 @@ body {
 .canvas-image-chrome {
   position: absolute;
   pointer-events: none;
-  box-shadow: 0 0 0 calc(1.5px * var(--inv, 1)) #2563EB;
+  box-shadow: 0 0 0 calc(1.5px * var(--inv, 1)) var(--brand);
 }
 
 .canvas-chrome-handle {
   position: absolute;
   background: #FFFFFF;
-  border: 1.5px solid #2563EB;
+  border: 1.5px solid var(--brand);
   pointer-events: auto;
   transform: scale(var(--inv, 1));
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
@@ -1216,7 +1228,7 @@ body {
   position: absolute;
   top: 0;
   bottom: 0;
-  border-right: calc(1.5px * var(--inv, 1)) dashed rgba(37, 99, 235, 0.55);
+  border-right: calc(1.5px * var(--inv, 1)) dashed rgba(124, 58, 237, 0.55);
   /* Traço duplo (azul + branco) para ler sobre fundo escuro OU claro */
   box-shadow: inset calc(-1.5px * var(--inv, 1)) 0 0 rgba(255, 255, 255, 0.45);
 }
@@ -1231,7 +1243,7 @@ body {
   left: calc(10px * var(--inv, 1));
   padding: calc(2px * var(--inv, 1)) calc(7px * var(--inv, 1));
   border-radius: calc(6px * var(--inv, 1));
-  background: rgba(37, 99, 235, 0.9);
+  background: rgba(124, 58, 237, 0.9);
   color: #FFFFFF;
   font-size: calc(11px * var(--inv, 1));
   font-weight: 600;
@@ -1333,31 +1345,31 @@ body {
 /* Contorno e rótulo compensam o zoom (--inv = 1/escala), como no Figma:
    a espessura na tela fica constante em qualquer nível de zoom */
 .canvas-frame.is-selected {
-  outline: calc(2px * var(--inv, 1)) solid #2563EB;
+  outline: calc(2px * var(--inv, 1)) solid var(--brand);
   outline-offset: 0;
 }
 
 /* Post destacado como destino de soltar imagem (OA Design) */
 .canvas-frame.is-drop-target {
-  outline: calc(2.5px * var(--inv, 1)) dashed #2563EB !important;
+  outline: calc(2.5px * var(--inv, 1)) dashed var(--brand) !important;
   outline-offset: calc(3px * var(--inv, 1)) !important;
-  box-shadow: 0 0 0 calc(6px * var(--inv, 1)) rgba(37, 99, 235, 0.22), 
-              0 24px 48px -12px rgba(37, 99, 235, 0.28),
+  box-shadow: 0 0 0 calc(6px * var(--inv, 1)) rgba(124, 58, 237, 0.22), 
+              0 24px 48px -12px rgba(124, 58, 237, 0.28),
               0 10px 30px -12px rgba(0, 0, 0, 0.3) !important;
   transition: box-shadow 140ms ease, outline 140ms ease;
 }
 
 .canvas-frame.is-drop-target .canvas-frame__label {
-  color: #2563EB !important;
+  color: var(--brand) !important;
   font-weight: 600 !important;
-  text-shadow: 0 0 6px #FFFFFF, 0 0 12px rgba(37, 99, 235, 0.4);
+  text-shadow: 0 0 6px #FFFFFF, 0 0 12px rgba(124, 58, 237, 0.4);
 }
 
 /* Modo de Reposicionamento Interativo da Foto de Fundo (Canva / Figma style) */
 .canvas-frame.is-repositioning-bg {
-  outline: calc(2.5px * var(--inv, 1)) solid #3B82F6 !important;
+  outline: calc(2.5px * var(--inv, 1)) solid var(--brand-light) !important;
   outline-offset: 0 !important;
-  box-shadow: 0 0 0 calc(5px * var(--inv, 1)) rgba(59, 130, 246, 0.3), 
+  box-shadow: 0 0 0 calc(5px * var(--inv, 1)) rgba(139, 92, 246, 0.3), 
               0 24px 48px -12px rgba(0, 0, 0, 0.4) !important;
   cursor: grab !important;
 }
@@ -1398,7 +1410,7 @@ body {
 }
 
 .canvas-frame.is-selected .canvas-frame__label {
-  color: #2563EB;
+  color: var(--brand);
 }
 
 .canvas-frame__name-badge {
@@ -1421,15 +1433,15 @@ body {
 
 .canvas-frame__name-badge:hover {
   background: #FFFFFF;
-  border-color: #2563EB;
-  color: #2563EB;
-  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.15);
+  border-color: var(--brand);
+  color: var(--brand);
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.15);
 }
 
 .canvas-frame.is-selected .canvas-frame__name-badge {
   background: #EFF6FF;
-  border-color: #2563EB;
-  color: #2563EB;
+  border-color: var(--brand);
+  color: var(--brand);
 }
 
 .canvas-frame__name-input {
@@ -1438,11 +1450,11 @@ body {
   font-weight: 600;
   color: #111827;
   background: #FFFFFF;
-  border: 1.5px solid #2563EB;
+  border: 1.5px solid var(--brand);
   border-radius: 6px;
   padding: 2px 8px;
   outline: none;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.28);
   min-width: 100px;
   max-width: 240px;
   pointer-events: auto;
@@ -1506,12 +1518,12 @@ body {
 }
 
 .canvas-link:hover .canvas-link__line {
-  stroke: #2563EB;
+  stroke: var(--brand);
   stroke-width: 2.5;
 }
 
 .canvas-link.is-selected .canvas-link__line {
-  stroke: #2563EB;
+  stroke: var(--brand);
   stroke-width: 3;
 }
 
@@ -1537,13 +1549,13 @@ body {
 
 .canvas-link__cut circle {
   fill: #FFFFFF;
-  stroke: #2563EB;
+  stroke: var(--brand);
   stroke-width: 2;
   vector-effect: non-scaling-stroke;
 }
 
 .canvas-link__cut path {
-  stroke: #2563EB;
+  stroke: var(--brand);
   stroke-width: 2;
   stroke-linecap: round;
   fill: none;
@@ -1561,7 +1573,7 @@ body {
 
 /* Corda em construção, enquanto o mouse ainda está arrastando */
 .canvas-link__ghost {
-  stroke: #2563EB;
+  stroke: var(--brand);
   stroke-dasharray: 7 5;
   opacity: 0.75;
 }
@@ -1577,7 +1589,7 @@ body {
   margin: -6.5px 0 0 -6.5px;
   border-radius: 50%;
   background: #FFFFFF;
-  border: 2px solid #2563EB;
+  border: 2px solid var(--brand);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
   /* Compensa o zoom: a bolinha tem sempre o mesmo tamanho na tela */
   transform: scale(var(--inv, 1));
@@ -1609,7 +1621,7 @@ body {
 
 /* Frame sob o cursor enquanto a corda está sendo puxada */
 .canvas-frame.is-link-target {
-  outline: calc(3px * var(--inv, 1)) solid #2563EB;
+  outline: calc(3px * var(--inv, 1)) solid var(--brand);
 }
 
 /* Mesmo destaque, cor de recusa: a cadeia é um post só, então formato diferente
@@ -1977,7 +1989,7 @@ body {
 
 /* Selection ring (só aparece quando o node está focado/selecionado) */
 .canvas-text-node.is-selected {
-  outline: calc(2px * var(--inv, 1)) solid #2563EB;
+  outline: calc(2px * var(--inv, 1)) solid var(--brand);
   outline-offset: 0;
 }
 
@@ -1987,7 +1999,7 @@ body {
   width: 10px;
   height: 10px;
   background: #FFFFFF;
-  border: 2px solid #2563EB;
+  border: 2px solid var(--brand);
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
@@ -2020,7 +2032,7 @@ body {
   width: 18px;
   height: 18px;
   background: #FFFFFF;
-  border: 1.5px solid #2563EB;
+  border: 1.5px solid var(--brand);
   border-radius: 50%;
   cursor: grab;
   z-index: 30;
@@ -2032,7 +2044,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #2563EB;
+  color: var(--brand);
   transition: background 0.12s ease, border-color 0.12s ease, transform 0.1s ease, color 0.12s ease;
 }
 
@@ -2044,7 +2056,7 @@ body {
   transform: translateX(-50%);
   width: 1.5px;
   height: 12px;
-  background: #2563EB;
+  background: var(--brand);
   pointer-events: none;
 }
 
@@ -2061,7 +2073,7 @@ body {
 
 .canvas-node__rotate-handle:hover,
 .canvas-node__rotate-handle.is-rotating {
-  background: #2563EB;
+  background: var(--brand);
   color: #FFFFFF;
   cursor: grab;
 }
@@ -2132,7 +2144,7 @@ body.is-rotating-element * {
 
 .canvas-image-node.is-selected {
   /* Box-shadow respeita o border-radius do elemento pai */
-  box-shadow: 0 0 0 calc(2px * var(--inv, 1)) #2563EB;
+  box-shadow: 0 0 0 calc(2px * var(--inv, 1)) var(--brand);
 }
 
 .canvas-image-node__resize {
@@ -2140,7 +2152,7 @@ body.is-rotating-element * {
   width: 10px;
   height: 10px;
   background: #FFFFFF;
-  border: 2px solid #2563EB;
+  border: 2px solid var(--brand);
   border-radius: 50%;
   opacity: 0;
   pointer-events: none;
@@ -2164,7 +2176,7 @@ body.is-rotating-element * {
    ------------------------------------------------------------ */
 .canvas-image-node.is-cropping {
   cursor: move !important;
-  box-shadow: 0 0 0 calc(2px * var(--inv, 1)) #3B82F6, 0 0 24px rgba(59, 130, 246, 0.45) !important;
+  box-shadow: 0 0 0 calc(2px * var(--inv, 1)) var(--brand-light), 0 0 24px rgba(139, 92, 246, 0.45) !important;
   z-index: 30;
 }
 
@@ -2321,7 +2333,7 @@ body.is-rotating-element * {
   --pp-text: #FFFFFF;
   --pp-muted: #B3B3B3;
   --pp-faint: #8C8C8C;
-  --pp-accent: #0D99FF;
+  --pp-accent: var(--brand);
 
   position: fixed;
   top: 72px;
@@ -2337,7 +2349,7 @@ body.is-rotating-element * {
   border-radius: 13px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15), 0 10px 16px rgba(0, 0, 0, 0.12);
   color: var(--pp-text);
-  font: 450 11px/16px "Inter", var(--font-sans);
+  font: 500 11px/16px var(--font-sans);
   letter-spacing: 0.005em;
   scrollbar-width: none;
 }
@@ -3076,7 +3088,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 .auth-switch-btn {
   background: transparent;
   border: none;
-  color: #2563EB;
+  color: var(--brand);
   font-weight: 600;
   font-family: inherit;
   font-size: inherit;
@@ -3325,7 +3337,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+  background: linear-gradient(135deg, var(--brand-light), var(--brand-strong));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3410,8 +3422,8 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 
 /* Card de Plano / Upgrade */
 .canvas-user-plan-card {
-  background: linear-gradient(145deg, rgba(37, 99, 235, 0.12), rgba(30, 41, 59, 0.4));
-  border: 1px solid rgba(59, 130, 246, 0.25);
+  background: linear-gradient(145deg, rgba(124, 58, 237, 0.12), rgba(30, 41, 59, 0.4));
+  border: 1px solid rgba(139, 92, 246, 0.25);
   border-radius: 14px;
   padding: 10px 12px;
   display: flex;
@@ -3446,19 +3458,19 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   gap: 6px;
   height: 28px;
   width: 100%;
-  background: #3B82F6;
+  background: var(--brand-light);
   color: #FFFFFF;
   border: none;
   border-radius: 9999px;
   font-size: 11.5px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   transition: background-color 150ms, transform 150ms;
 }
 
 .canvas-user-upgrade-btn:hover {
-  background: #2563EB;
+  background: var(--brand);
   transform: translateY(-1px);
 }
 
@@ -3563,7 +3575,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 .canvas-user-menu-btn--auth.is-signin:hover {
-  background: rgba(59, 130, 246, 0.12);
+  background: rgba(139, 92, 246, 0.12);
   color: #93C5FD;
 }
 
@@ -3626,7 +3638,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 .canvas-lib-search-oa:focus {
   border-color: var(--accent-blue);
   background: #FFFFFF;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.1);
 }
 
 .canvas-lib-color-oa {
@@ -4005,7 +4017,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 
 .canvas-grad-range-input-oa {
   width: 100%;
-  accent-color: #2563EB;
+  accent-color: var(--brand);
   cursor: pointer;
 }
 
@@ -4229,9 +4241,9 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 #canvas-library-modal .canvas-lib-search-oa:focus {
-  border-color: #2563EB;
+  border-color: var(--brand);
   background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.25);
 }
 
 #canvas-library-modal .canvas-lib-color-oa {
@@ -4306,9 +4318,9 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 #canvas-library-modal .canvas-grad-color-item-oa.is-dragover {
-  border-color: #3B82F6;
-  background: rgba(59, 130, 246, 0.2);
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
+  border-color: var(--brand-light);
+  background: rgba(139, 92, 246, 0.2);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.4);
   transform: translateY(-2px);
 }
 
@@ -4465,22 +4477,22 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 /* ------------------------------------------------------------
-   UNIFICAÇÃO COM O TOP DOCK (tokens: pill, 34px, azul #2563EB)
+   UNIFICAÇÃO COM O TOP DOCK (tokens: pill, 34px, azul var(--brand))
    ------------------------------------------------------------ */
 
 /* CTA primário: azul do dock com glow (antes era #111827, invisível no vidro escuro) */
 #canvas-library-modal .openpanel-btn-primary {
-  background: #2563EB;
+  background: var(--brand);
   color: #FFFFFF;
   font-weight: 600;
   border-radius: var(--radius-pill);
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 #canvas-library-modal .openpanel-btn-primary:hover:not(:disabled) {
-  background: #1D4ED8;
+  background: var(--brand-strong);
   transform: none;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 #canvas-library-modal .openpanel-btn-primary:active:not(:disabled) {
@@ -4500,7 +4512,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 #canvas-library-modal #canvas-grad-btn-apply-bg {
   height: 38px;
   border-radius: 10px;
-  background: #2563EB;
+  background: var(--brand);
   color: #FFFFFF;
   font-size: 13px;
   font-weight: 600;
@@ -4511,13 +4523,13 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   justify-content: center;
   gap: 8px;
   width: 100%;
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   transition: all 140ms ease;
 }
 
 #canvas-library-modal #canvas-grad-btn-apply-bg:hover:not(:disabled) {
-  background: #1D4ED8;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  background: var(--brand-strong);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
 #canvas-library-modal #canvas-grad-btn-apply-bg:active:not(:disabled) {
@@ -4738,8 +4750,8 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 
 .canvas-bind-input-wrap:focus-within {
   background: rgba(0, 0, 0, 0.5);
-  border-color: #2563EB;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25), inset 0 1px 3px rgba(0, 0, 0, 0.3);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.25), inset 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .canvas-bind-input-prefix,
@@ -4842,11 +4854,11 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   font-size: 12.5px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  background: #2563EB;
+  background: var(--brand);
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: #FFFFFF;
   padding: 0 18px;
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4858,8 +4870,8 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 
 .canvas-bind-btn-primary:hover,
 #canvas-bind-modal .openpanel-btn-primary:hover {
-  background: #1D4ED8;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  background: var(--brand-strong);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   transform: translateY(-1px);
 }
 
@@ -5091,11 +5103,11 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   font-size: 12.5px;
   font-weight: 600;
   letter-spacing: -0.01em;
-  background: #2563EB;
+  background: var(--brand);
   border: 1px solid rgba(255, 255, 255, 0.18);
   color: #FFFFFF;
   padding: 0 18px;
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5106,8 +5118,8 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 #canvas-batch-modal .openpanel-btn-primary:hover:not(:disabled) {
-  background: #1D4ED8;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  background: var(--brand-strong);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3);
   transform: translateY(-1px);
 }
 
@@ -5286,7 +5298,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 .canvas-context-menu-oa .canvas-context-item--primary:hover {
-  background: rgba(37, 99, 235, 0.22);
+  background: rgba(124, 58, 237, 0.22);
   color: #FFFFFF;
 }
 
@@ -5471,7 +5483,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   width: 100%;
   height: 5px;
   border-radius: var(--radius-pill, 9999px);
-  background: linear-gradient(to right, #2563EB 0%, #2563EB 33%, rgba(255, 255, 255, 0.12) 33%, rgba(255, 255, 255, 0.12) 100%);
+  background: linear-gradient(to right, var(--brand) 0%, var(--brand) 33%, rgba(255, 255, 255, 0.12) 33%, rgba(255, 255, 255, 0.12) 100%);
   outline: none;
   cursor: pointer;
   transition: background 120ms ease;
@@ -5545,16 +5557,16 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 .canva-seg-btn.is-active {
-  background: #2563EB;
+  background: var(--brand);
   color: #FFFFFF;
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
 .canva-export-submit-btn {
   width: 100%;
   height: 42px;
-  background: #2563EB;
+  background: var(--brand);
   border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: var(--radius-pill, 9999px);
   font-size: 13.5px;
@@ -5568,15 +5580,15 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   gap: 7px;
   cursor: pointer;
   transition: all 140ms cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  box-shadow: 0 4px 16px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.28);
   margin-top: 4px;
   outline: none;
 }
 
 .canva-export-submit-btn:hover:not(:disabled) {
-  background: #1D4ED8;
+  background: var(--brand-strong);
   transform: translateY(-1px);
-  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 .canva-export-submit-btn:active:not(:disabled) {
@@ -5631,7 +5643,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.18) 0%, rgba(37, 99, 235, 0.14) 100%);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.18) 0%, rgba(124, 58, 237, 0.14) 100%);
   border: 1px solid rgba(56, 189, 248, 0.3);
   display: flex;
   align-items: center;
@@ -5935,8 +5947,8 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 .canvas-tpl-action-pill:hover {
-  background: #2563EB;
-  border-color: #3B82F6;
+  background: var(--brand);
+  border-color: var(--brand-light);
   transform: scale(1.04);
 }
 
@@ -6243,8 +6255,8 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  background: rgba(37, 99, 235, 0.08);
-  border: 1px solid rgba(37, 99, 235, 0.22);
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.22);
   border-radius: 12px;
   padding: 10px 12px;
   font-size: 12px;
@@ -6285,10 +6297,10 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 .canvas-pano-pill.is-active {
-  background: #2563EB;
+  background: var(--brand);
   border-color: rgba(255, 255, 255, 0.25);
   color: #FFFFFF;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
 
 .canvas-panoramic-stepper-row {
@@ -6369,7 +6381,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 
 .canvas-slice-block {
   flex: 1;
-  background: linear-gradient(180deg, rgba(37, 99, 235, 0.35) 0%, rgba(37, 99, 235, 0.15) 100%);
+  background: linear-gradient(180deg, rgba(124, 58, 237, 0.35) 0%, rgba(124, 58, 237, 0.15) 100%);
   border: 1px dashed rgba(96, 165, 250, 0.5);
   border-radius: 4px;
   display: flex;
@@ -6397,7 +6409,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
    CANVAS SEAM INDICATORS & PANORAMIC FRAMES
    ------------------------------------------------------------ */
 .canvas-frame.is-panoramic {
-  box-shadow: 0 16px 48px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 16px 48px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(124, 58, 237, 0.25);
 }
 
 .canvas-frame.is-panoramic::after {
@@ -6463,7 +6475,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 .canvas-batch-card:focus-within {
-  border-color: rgba(37, 99, 235, 0.6);
+  border-color: rgba(124, 58, 237, 0.6);
 }
 
 .canvas-batch-card__num {
@@ -6502,7 +6514,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 }
 
 .canvas-batch-card__input:focus {
-  border-color: #2563EB;
+  border-color: var(--brand);
   background: rgba(255, 255, 255, 0.08);
 }
 
@@ -6704,7 +6716,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 
 .xp-thumb.is-picked {
   opacity: 1;
-  box-shadow: 0 0 0 2px #2563EB;
+  box-shadow: 0 0 0 2px var(--brand);
 }
 
 .xp-thumb__check {
@@ -6725,7 +6737,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 .xp-thumb__check svg { width: 11px; height: 11px; stroke-width: 3; }
 
 .xp-thumb.is-picked .xp-thumb__check {
-  background: #2563EB;
+  background: var(--brand);
   box-shadow: none;
   color: #FFFFFF;
 }
@@ -6801,17 +6813,17 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   border: none;
   border-radius: 11px;
   overflow: hidden;
-  background: #2563EB;
+  background: var(--brand);
   color: #FFFFFF;
   font: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 10px rgba(124, 58, 237, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transition: background 120ms ease;
 }
 
-.xp-go:hover:not(:disabled) { background: #1D4ED8; }
+.xp-go:hover:not(:disabled) { background: var(--brand-strong); }
 .xp-go:disabled { background: rgba(255, 255, 255, 0.08); color: rgba(255, 255, 255, 0.4); box-shadow: none; cursor: default; }
 
 /* O próprio botão vira a barra de progresso */
@@ -6834,8 +6846,8 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
 .canvas-frame-ghost {
   position: absolute;
   z-index: 50;
-  background: rgba(37, 99, 235, 0.06);
-  outline: calc(1.5px * var(--inv, 1)) solid #2563EB;
+  background: rgba(124, 58, 237, 0.06);
+  outline: calc(1.5px * var(--inv, 1)) solid var(--brand);
   pointer-events: none;
 }
 
@@ -6846,7 +6858,7 @@ body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right
   margin-top: calc(8px * var(--inv, 1));
   padding: calc(2px * var(--inv, 1)) calc(6px * var(--inv, 1));
   border-radius: calc(4px * var(--inv, 1));
-  background: #2563EB;
+  background: var(--brand);
   color: #FFFFFF;
   font-size: calc(11px * var(--inv, 1));
   font-weight: 600;
@@ -6891,9 +6903,9 @@ body.is-scrubbing * {
   --ly-text: #FFFFFF;
   --ly-muted: #B3B3B3;
   --ly-faint: #8C8C8C;
-  --ly-accent: #0D99FF;
-  --ly-sel: rgba(13, 153, 255, 0.22);
-  --ly-sel-soft: rgba(13, 153, 255, 0.09);
+  --ly-accent: var(--brand);
+  --ly-sel: rgba(124, 58, 237, 0.22);
+  --ly-sel-soft: rgba(124, 58, 237, 0.09);
 
   position: fixed;
   top: 72px;
@@ -6908,7 +6920,7 @@ body.is-scrubbing * {
   border-radius: 13px;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15), 0 10px 16px rgba(0, 0, 0, 0.12);
   color: var(--ly-text);
-  font: 450 11px/16px "Inter", var(--font-sans);
+  font: 500 11px/16px var(--font-sans);
   letter-spacing: 0.005em;
   user-select: none;
 }

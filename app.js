@@ -12795,7 +12795,7 @@
           const min = Number(slider.min) || 2;
           const max = Number(slider.max) || 10;
           const pct = ((currentCount - min) / (max - min)) * 100;
-          slider.style.background = `linear-gradient(to right, #2563EB 0%, #2563EB ${pct}%, rgba(255, 255, 255, 0.12) ${pct}%, rgba(255, 255, 255, 0.12) 100%)`;
+          slider.style.background = `linear-gradient(to right, var(--brand) 0%, var(--brand) ${pct}%, rgba(255, 255, 255, 0.12) ${pct}%, rgba(255, 255, 255, 0.12) 100%)`;
         }
         if (pillsWrap) {
           pillsWrap.querySelectorAll('.canvas-pano-pill').forEach(p => {
