@@ -554,6 +554,8 @@
             <i data-lucide="shapes"></i>
           </button>
           <div class="canvas-dropdown-card canvas-tool-menu" id="canvas-elements-menu">
+            <button class="canvas-tool-tile" data-action="tool-rect" title="Retângulo (R)"><i data-lucide="square"></i><span>Retângulo</span></button>
+            <button class="canvas-tool-tile" data-action="tool-ellipse" title="Elipse (O)"><i data-lucide="circle"></i><span>Elipse</span></button>
             <button class="canvas-tool-tile" data-action="open-icons"><i data-lucide="smile-plus"></i><span>Ícones</span></button>
             <button class="canvas-tool-tile" data-action="open-mesh"><i data-lucide="blend"></i><span>Gradientes</span></button>
           </div>
@@ -874,8 +876,8 @@
       <!-- IMAGEM -->
       <div class="pp-panel" id="canvas-image-toolbar">
         <header class="pp-head">
-          <span class="pp-head__title">Imagem</span>
-          <button class="pp-btn pp-btn--type" id="canvas-image-bind" title="Virar variável do Batch Create">{}</button>
+          <span class="pp-head__title" id="canvas-image-title">Imagem</span>
+          <button class="pp-btn pp-btn--type" data-image-only id="canvas-image-bind" title="Virar variável do Batch Create">{}</button>
           <button class="pp-btn" id="canvas-image-dup" title="Duplicar imagem (⌘D)"><i data-lucide="copy"></i></button>
           <button class="pp-btn pp-btn--danger" id="canvas-image-del" title="Apagar imagem (Delete)"><i data-lucide="trash-2"></i></button>
         </header>
@@ -937,9 +939,12 @@
         <section class="pp-section">
           <div class="pp-section__head">
             <span class="pp-section__title">Aparência</span>
-            <button class="pp-btn" id="canvas-image-crop" title="Recortar / Zoom (Duplo clique ou Enter)"><i data-lucide="crop"></i></button>
+            <button class="pp-btn" data-image-only id="canvas-image-crop" title="Recortar / Zoom (Duplo clique ou Enter)"><i data-lucide="crop"></i></button>
           </div>
-          <div class="pp-row">
+          <div class="pp-row" data-shape-only>
+            <label class="pp-color" title="Preenchimento"><input type="color" id="canvas-shape-fill" value="#d9d9d9"><span class="pp-color__hex"></span></label>
+          </div>
+          <div class="pp-row" id="canvas-image-radius-row">
             <label class="pp-field" title="Arredondamento (px)"><i data-lucide="square-dashed"></i><input type="number" class="pp-input" id="canvas-image-radius" value="0" min="0" step="1"></label>
           </div>
         </section>
@@ -955,7 +960,7 @@
         <section class="pp-section">
           <span class="pp-section__title">Efeitos</span>
           <div class="pp-row">
-            <label class="pp-field" title="Desfoque (px)"><i data-lucide="aperture"></i><input type="number" class="pp-input" id="canvas-image-blur" value="0" min="0" step="1"></label>
+            <label class="pp-field" data-image-only title="Desfoque (px)"><i data-lucide="aperture"></i><input type="number" class="pp-input" id="canvas-image-blur" value="0" min="0" step="1"></label>
             <label class="pp-field" title="Sombra (px)"><i data-lucide="layers"></i><input type="number" class="pp-input" id="canvas-image-shadow" value="0" min="0" step="1"></label>
           </div>
         </section>

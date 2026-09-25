@@ -909,6 +909,23 @@
     const btnCropReset = document.getElementById('canvas-crop-reset');
     const btnCropDone = document.getElementById('canvas-crop-done');
 
+    /* Formas (R / O, como no Figma). Moram na mesma casca da imagem —
+       seleção, chrome, camadas e arrasto vêm de graça — só sem foto. */
+    const SHAPE_DEFAULTS = { fill: '#D9D9D9', borderRadius: 0, borderWidth: 0, borderColor: '#000000', opacity: 100, shadow: 0, rotation: 0 };
+
+    function isBoxNode(child) {
+      return !!child && (child.type === 'image' || child.type === 'shape');
+    }
+
+    function shapeRadiusCss(child) {
+      if (child.type === 'shape' && child.shape === 'ellipse') return '50%';
+      return `${child.borderRadius || 0}px`;
+    }
+
+    function shapeLabel(child) {
+      return child.shape === 'ellipse' ? 'Elipse' : 'Retângulo';
+    }
+
     function ensureImageProps(child) {
       if (!child || child.type !== 'image') return;
       if (!child.origW || !child.origH) {
@@ -936,16 +953,22 @@
       el.style.height = `${child.h}px`;
       el.style.transform = child.rotation ? `rotate(${child.rotation}deg)` : '';
       el.style.transformOrigin = 'center center';
-      el.style.borderRadius = `${child.borderRadius || 0}px`;
+      const radius = shapeRadiusCss(child);
+      el.style.borderRadius = radius;
 
       const clip = el.querySelector('.canvas-image-node__clip');
       if (clip) {
-        clip.style.borderRadius = `${child.borderRadius || 0}px`;
+        clip.style.borderRadius = radius;
         clip.style.borderWidth = `${child.borderWidth || 0}px`;
         clip.style.borderColor = child.borderColor || 'transparent';
         clip.style.borderStyle = child.borderWidth ? 'solid' : 'none';
         clip.style.boxSizing = 'border-box';
         clip.style.overflow = 'hidden';
+        if (child.type === 'shape') {
+          clip.style.background = child.fill || SHAPE_DEFAULTS.fill;
+          clip.style.opacity = (child.opacity != null ? child.opacity : 100) / 100;
+          clip.style.filter = child.shadow ? `drop-shadow(0px ${child.shadow}px ${child.shadow * 1.5}px rgba(0,0,0,0.3))` : 'none';
+        }
       }
 
       const img = el.querySelector('.canvas-image-node__img');
@@ -1086,7 +1109,7 @@
         const frame = frames.find(f => f.id === sel.frameId);
         if (!frame) return;
         const child = (frame.children || []).find(c => c.id === sel.childId);
-        if (!child || child.type !== 'image') return;
+        if (!isBoxNode(child)) return;
         action(child);
         const el = world.querySelector(`.canvas-image-node[data-id="${child.id}"]`);
         if (el) updateImageNodeDOM(child, el);
@@ -1371,6 +1394,9 @@
     });
     if (inputBlur) inputBlur.addEventListener('input', (e) => applyImageToolbarAction(c => c.blur = Number(e.target.value) || 0));
     if (inputShadow) inputShadow.addEventListener('input', (e) => applyImageToolbarAction(c => c.shadow = Number(e.target.value) || 0));
+
+    const inputShapeFill = document.getElementById('canvas-shape-fill');
+    if (inputShapeFill) inputShapeFill.addEventListener('input', (e) => applyImageToolbarAction(c => { if (c.type === 'shape') c.fill = e.target.value; }));
 
     if (btnImageDup) btnImageDup.addEventListener('click', () => duplicateTextNode());
     if (btnImageDel) btnImageDel.addEventListener('click', () => { deleteTextNode(); updateTextToolbar(); });
@@ -1778,9 +1804,18 @@
           : 'Virar variável do Batch Create';
       });
 
-      if (child.type === 'image') {
+      if (isBoxNode(child)) {
         if (!imageToolbar) return;
         const idle = (el) => el && document.activeElement !== el;
+        const isShape = child.type === 'shape';
+        const title = document.getElementById('canvas-image-title');
+        if (title) title.textContent = isShape ? shapeLabel(child) : 'Imagem';
+        imageToolbar.querySelectorAll('[data-image-only]').forEach(n => { n.style.display = isShape ? 'none' : ''; });
+        imageToolbar.querySelectorAll('[data-shape-only]').forEach(n => { n.style.display = isShape ? '' : 'none'; });
+        const radiusRow = document.getElementById('canvas-image-radius-row');
+        if (radiusRow) radiusRow.style.display = isShape && child.shape === 'ellipse' ? 'none' : '';
+        const inputFill = document.getElementById('canvas-shape-fill');
+        if (isShape && idle(inputFill)) inputFill.value = child.fill || SHAPE_DEFAULTS.fill;
         const inputRadius = document.getElementById('canvas-image-radius');
         const inputBorderWidth = document.getElementById('canvas-image-border-width');
         const inputBorderColor = document.getElementById('canvas-image-border-color');
@@ -2571,7 +2606,7 @@
     /* Chrome de imagem (estilo Figma): contorno + 8 alças de resize + botão de
        rotação, todos FORA da máscara do frame pra nunca serem cortados. */
     function imageChromeOf(child) {
-      if (!child || child.type !== 'image') return null;
+      if (!isBoxNode(child)) return null;
       return world.querySelector(`.canvas-image-chrome[data-id="${child.id}"]`);
     }
 
@@ -2604,7 +2639,7 @@
       const frame = frames.find(f => f.id === sel.frameId);
       if (!frame) return;
       const child = (frame.children || []).find(c => c.id === sel.childId);
-      if (!child || child.type !== 'image' || (croppingImage && croppingImage.childId === child.id)) return;
+      if (!isBoxNode(child) || (croppingImage && croppingImage.childId === child.id)) return;
 
       // Reaproveita o chrome existente
       let chrome = imageChromeOf(child);
@@ -2656,7 +2691,7 @@
       chrome.style.top = `${child.y}px`;
       chrome.style.width = `${child.w}px`;
       chrome.style.height = `${child.h}px`;
-      chrome.style.borderRadius = `${child.borderRadius || 0}px`;
+      chrome.style.borderRadius = shapeRadiusCss(child);
       if (child.rotation) {
         chrome.style.transform = `rotate(${child.rotation}deg)`;
       } else {
@@ -2689,14 +2724,20 @@
 
         /* Cantos: trava a proporção e refaz a âncora com o tamanho JÁ limitado.
            Sem isso, ao bater no mínimo a imagem escorregava para o lado. */
-        if (dir.length === 2) {
+        const freeCorner = child.type === 'shape' && !ev.shiftKey;
+        if (dir.length === 2 && freeCorner) {
+          w = Math.max(1, dir.includes('w') ? o.w - dx : o.w + dx);
+          h = Math.max(1, dir.includes('n') ? o.h - dy : o.h + dy);
+          x = dir.includes('w') ? o.x + (o.w - w) : o.x;
+          y = dir.includes('n') ? o.y + (o.h - h) : o.y;
+        } else if (dir.length === 2) {
           w = Math.max(20, w);
           h = w / ratio;
           x = dir.includes('w') ? o.x + (o.w - w) : o.x;
           y = dir.includes('n') ? o.y + (o.h - h) : o.y;
         }
 
-        const scale = dir.length === 2 ? w / o.w : 1;
+        const scale = dir.length === 2 && !freeCorner ? w / o.w : 1;
         child.x = Math.round(x);
         child.y = Math.round(y);
         child.w = Math.round(w);
@@ -4043,6 +4084,41 @@
       return el;
     }
 
+    function renderShapeNode(child, frame, frameEl) {
+      const el = document.createElement('div');
+      el.className = 'canvas-image-node canvas-shape-node';
+      el.dataset.id = child.id;
+      const clip = document.createElement('div');
+      clip.className = 'canvas-image-node__clip';
+      el.appendChild(clip);
+      updateImageNodeDOM(child, el);
+
+      el.addEventListener('mousedown', (e) => {
+        if (e.button === 0 && (e.metaKey || e.ctrlKey || e.shiftKey)) return;
+        e.stopPropagation();
+        e.preventDefault();
+        startChildNodeDrag(e, child, frame, el);
+      });
+      el.addEventListener('dblclick', (e) => e.stopPropagation());
+
+      const contentMask = frameEl.querySelector('.canvas-frame__content');
+      if (contentMask) contentMask.appendChild(el);
+      else frameEl.appendChild(el);
+      return el;
+    }
+
+    function addShapeNode(frame, kind, x, y, w, h) {
+      const frameEl = frameElOf(frame);
+      if (!frameEl) return null;
+      if (!frame.children) frame.children = [];
+      const child = { ...SHAPE_DEFAULTS, id: childSeq++, type: 'shape', shape: kind, x, y, w, h };
+      frame.children.push(child);
+      renderChildNode(child, frame, frameEl);
+      selectTextNode(frame.id, child.id);
+      save();
+      return child;
+    }
+
     /* --------------------------------------------------
        Variáveis do Batch Create
        O nó continua mostrando o texto de exemplo — é ele que faz o design ficar
@@ -4149,6 +4225,7 @@
 
     function renderChildNode(child, frame, frameEl) {
       if (child.type === 'image') return renderImageNode(child, frame, frameEl);
+      if (child.type === 'shape') return renderShapeNode(child, frame, frameEl);
       if (child.type !== 'text') return;
       const el = document.createElement('div');
       el.className = 'canvas-text-node';
@@ -5386,7 +5463,78 @@
 
     window.addEventListener('keydown', (e) => {
       if (frameToolOn && e.key === 'Escape') setFrameTool(false);
+      if (shapeTool && e.key === 'Escape') setShapeTool(null);
     });
+
+    /* Ferramentas de forma: R (retângulo) e O (elipse), como no Figma.
+       Arraste dentro de um post para desenhar; clique simples cria 100×100.
+       Shift deixa quadrado/círculo. */
+    let shapeTool = null;
+
+    function setShapeTool(kind) {
+      shapeTool = kind;
+      if (kind && frameToolOn) setFrameTool(false);
+      view.classList.toggle('is-frame-tool', !!kind || frameToolOn);
+      if (kind) toast.info(`Arraste num post para desenhar ${kind === 'ellipse' ? 'a elipse' : 'o retângulo'} · Esc cancela`);
+    }
+
+    function frameAtWorld(pt) {
+      for (let i = frames.length - 1; i >= 0; i--) {
+        const f = frames[i];
+        if (pt.x >= f.x && pt.x <= f.x + f.w && pt.y >= f.y && pt.y <= f.y + f.h) return f;
+      }
+      return null;
+    }
+
+    view.addEventListener('mousedown', (e) => {
+      if (!shapeTool || e.button !== 0) return;
+      if (e.target.closest('.canvas-topbar, .canvas-hud, .canvas-props, .canvas-layers, .canvas-dropdown-card')) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const start = screenToWorld(e.clientX, e.clientY);
+      const frame = frameAtWorld(start);
+      if (!frame) {
+        toast.info('Comece o desenho dentro de um post');
+        return;
+      }
+      const kind = shapeTool;
+      const ghost = document.createElement('div');
+      ghost.className = 'canvas-frame-ghost';
+      if (kind === 'ellipse') ghost.style.borderRadius = '50%';
+      const label = document.createElement('span');
+      label.className = 'canvas-frame-ghost__label';
+      ghost.appendChild(label);
+      world.appendChild(ghost);
+      let rect = null;
+
+      const onMove = (ev) => {
+        const pt = screenToWorld(ev.clientX, ev.clientY);
+        let w = Math.abs(pt.x - start.x);
+        let h = Math.abs(pt.y - start.y);
+        if (ev.shiftKey) w = h = Math.max(w, h);
+        const x = pt.x < start.x ? start.x - w : start.x;
+        const y = pt.y < start.y ? start.y - h : start.y;
+        rect = { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) };
+        Object.assign(ghost.style, { left: `${rect.x}px`, top: `${rect.y}px`, width: `${rect.w}px`, height: `${rect.h}px` });
+        label.textContent = `${rect.w} × ${rect.h}`;
+      };
+
+      const onUp = () => {
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        ghost.remove();
+        setShapeTool(null);
+        const tiny = !rect || rect.w * cam.scale < 4 || rect.h * cam.scale < 4;
+        const r = tiny
+          ? { x: Math.round(start.x - 50), y: Math.round(start.y - 50), w: 100, h: 100 }
+          : rect;
+        addShapeNode(frame, kind, r.x - frame.x, r.y - frame.y, Math.max(1, r.w), Math.max(1, r.h));
+      };
+
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    }, true);
 
     function deleteFrame(id) {
       const framesToDelete = selectedFrameIds.size > 0 ? getSelectedFrameIds() : (id !== null ? [id] : []);
@@ -5868,6 +6016,8 @@
       lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
       group: '<rect x="3" y="3" width="18" height="18" rx="2" stroke-dasharray="3 3"/>',
       unlock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+      rect: '<rect width="16" height="16" x="4" y="4" rx="1"/>',
+      ellipse: '<circle cx="12" cy="12" r="8"/>',
     };
 
     function lyIcon(name) {
@@ -5877,6 +6027,7 @@
     function layerChildName(child) {
       if (child.name && child.name.trim()) return child.name;
       if (child.type === 'image') return 'Imagem';
+      if (child.type === 'shape') return shapeLabel(child);
       // Como no Figma: camada de texto se chama pelo próprio texto
       const raw = (child.text || '').replace(/\s+/g, ' ').trim();
       return raw ? raw.slice(0, 40) : 'Texto';
@@ -5994,7 +6145,7 @@
         if (c.hidden) cls.push('is-hidden');
         return `<div class="${cls.join(' ')}" role="treeitem" draggable="true" data-frame="${r.f.id}" data-child="${c.id}" style="--depth:${r.depth}">
           <span class="ly-row__chev is-blank"></span>
-          <span class="ly-row__icon">${lyIcon(c.type === 'image' ? 'image' : 'text')}</span>
+          <span class="ly-row__icon">${lyIcon(c.type === 'shape' ? (c.shape === 'ellipse' ? 'ellipse' : 'rect') : (c.type === 'image' ? 'image' : 'text'))}</span>
           <span class="ly-row__name">${esc(r.name)}</span>
           <button type="button" class="ly-row__btn${c.locked ? ' is-on' : ''}" data-act="lock" title="${c.locked ? 'Destravar' : 'Travar'}">${lyIcon(c.locked ? 'lock' : 'unlock')}</button>
           <button type="button" class="ly-row__btn${c.hidden ? ' is-on' : ''}" data-act="hide" title="${c.hidden ? 'Mostrar' : 'Esconder'}">${lyIcon(c.hidden ? 'eyeOff' : 'eye')}</button>
@@ -7788,6 +7939,7 @@
       if (targetFrame && selectedId !== targetFrame.id) selectFrame(targetFrame.id);
 
       const library = { 'open-photos': 'photos', 'open-mesh': 'gradients', 'open-icons': 'icons' };
+      if (action === 'tool-rect' || action === 'tool-ellipse') { setShapeTool(action === 'tool-rect' ? 'rect' : 'ellipse'); return; }
       if (action === 'add-text') addTextToSelectedFrame();
       else if (action === 'add-image') { if (imageUpload) imageUpload.click(); }
       else if (library[action] && window.openIconLibrary) window.openIconLibrary(library[action]);
@@ -8169,10 +8321,20 @@
         return;
       }
 
+      // 'R' / 'O': formas, funcionam com ou sem seleção
+      if (!e.metaKey && !e.ctrlKey && !e.altKey && (e.code === 'KeyR' || e.code === 'KeyO')) {
+        e.preventDefault();
+        e.stopPropagation();
+        const kind = e.code === 'KeyR' ? 'rect' : 'ellipse';
+        setShapeTool(shapeTool === kind ? null : kind);
+        return;
+      }
+
       // 'F': ferramenta de página, funciona com ou sem seleção
       if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key.toLowerCase() === 'f') {
         e.preventDefault();
         e.stopPropagation();
+        if (shapeTool) setShapeTool(null);
         setFrameTool(!frameToolOn);
         return;
       }
@@ -9138,6 +9300,42 @@
         const children = frame.children || [];
         for (const child of children) {
           if (child.hidden) continue; // olho fechado no painel de camadas
+          if (child.type === 'shape') {
+            ctx.save();
+            ctx.globalAlpha = (child.opacity != null ? child.opacity : 100) / 100;
+            if (child.rotation) {
+              const cx = child.x + child.w / 2;
+              const cy = child.y + child.h / 2;
+              ctx.translate(cx, cy);
+              ctx.rotate((child.rotation * Math.PI) / 180);
+              ctx.translate(-cx, -cy);
+            }
+            if (child.shadow) {
+              ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+              ctx.shadowBlur = child.shadow * 1.5;
+              ctx.shadowOffsetY = child.shadow;
+            }
+            ctx.beginPath();
+            if (child.shape === 'ellipse') {
+              ctx.ellipse(child.x + child.w / 2, child.y + child.h / 2, child.w / 2, child.h / 2, 0, 0, Math.PI * 2);
+            } else if (child.borderRadius && ctx.roundRect) {
+              ctx.roundRect(child.x, child.y, child.w, child.h, Math.min(child.borderRadius, child.w / 2, child.h / 2));
+            } else {
+              ctx.rect(child.x, child.y, child.w, child.h);
+            }
+            ctx.fillStyle = child.fill || SHAPE_DEFAULTS.fill;
+            ctx.fill();
+            if (child.borderWidth) {
+              // Contorno por dentro, igual ao box-sizing do canvas
+              ctx.shadowColor = 'transparent';
+              ctx.clip();
+              ctx.lineWidth = child.borderWidth * 2;
+              ctx.strokeStyle = child.borderColor || '#000000';
+              ctx.stroke();
+            }
+            ctx.restore();
+            continue;
+          }
           if (child.type === 'image') {
             const src = await resolveChildImageSrc(child, overrides);
             const img = await loadExportImage(src);
