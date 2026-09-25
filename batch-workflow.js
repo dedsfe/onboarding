@@ -197,7 +197,8 @@
      passo de fotos, sem variável de texto não há passo de textos. */
   function steps(m) {
     var list = [];
-    if (imageBinds(m).length) list.push('photos');
+    // Fotos sempre: o lote não depende do canvas (sem modelo, o molde sai dos exemplos)
+    if (!m || imageBinds(m).length) list.push('photos');
     list.push('ref');
     list.push('texts'); // sempre à vista: sem texto no modelo, o passo explica o que fazer
     list.push('out');
@@ -748,7 +749,7 @@
   function textsNode(m, cur) {
     var st = stateOf('texts', cur);
     var body = [];
-    var semTexto = m && !copySlots(m).length;
+    var semTexto = !!m && !copySlots(m).length;
     if (semTexto && st === 'done') {
       body.push(h('span', { class: 'bw-hint', text: 'Sem copy: os carrosséis mudam só as fotos.' }));
     } else if (semTexto && st === 'active') {
@@ -764,7 +765,7 @@
         h('p', { class: 'bw-brief-sum__text', text: state.brief.pedido.trim() || 'Vai pesquisar o que está funcionando no seu nicho e escrever a copy.' }),
       ]));
       body.push(h('div', { class: 'bw-row' }, [
-        h('span', { class: 'bw-meta', text: plural(briefCount(), 'carrossel', 'carrosséis') + ' · ' + plural(copySlots(m).length, 'texto', 'textos') + ' cada' }),
+        h('span', { class: 'bw-meta', text: plural(briefCount(), 'carrossel', 'carrosséis') + (m ? ' · ' + plural(copySlots(m).length, 'texto', 'textos') + ' cada' : ' · textos definidos pela IA') }),
         bindSelect(textBinds(m), state.textBind, function (v) { state.textBind = v; }),
       ]));
     } else if (st === 'done') {
@@ -865,7 +866,7 @@
   function modelNode(m) {
     var body = [];
     if (!m) {
-      body.push(h('span', { class: 'bw-hint', text: 'Crie o carrossel no canvas.' }));
+      body.push(h('span', { class: 'bw-hint', text: 'Sem post no canvas: o molde vai sair do Resultado desejado.' }));
     } else {
       var slides = h('div', { class: 'bw-slides' });
       m.frames.slice(0, 3).forEach(function (f) { slides.appendChild(slideThumb(f)); });
@@ -887,7 +888,7 @@
     }
     return node('model', {
       icon: 'palette', title: 'Modelo do canvas',
-      sub: m ? m.nome + ' · ' + plural(m.frames.length, 'slide', 'slides') : 'sem modelo',
+      sub: m ? m.nome + ' · ' + plural(m.frames.length, 'slide', 'slides') : 'nenhum post no canvas',
       state: m && m.binds.length ? 'done' : 'active', body: body,
     });
   }
