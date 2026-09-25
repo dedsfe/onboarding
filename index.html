@@ -563,9 +563,12 @@
         <span class="canvas-topbar__sep"></span>
 
         <!-- Grupo 2: Automação & Carrossel -->
-        <button class="canvas-topbar__btn" id="canvas-batch-btn" title="Criar posts em lote">
-          <i data-lucide="wand-2" style="width: 15px; height: 15px;"></i>
-          <span class="canvas-topbar__btn-label">Criar em Lote</span>
+        <!-- Mesmo desenho do +: anel translúcido com o miolo claro -->
+        <button class="canvas-topbar__add canvas-topbar__add--pill" id="canvas-batch-btn" title="Criar carrosséis em lote" aria-label="Criar em lote">
+          <span class="canvas-topbar__add-core">
+            <i data-lucide="wand-2"></i>
+            <span class="canvas-topbar__add-label">Criar em lote</span>
+          </span>
           <span class="canvas-topbar__badge" id="canvas-batch-binds-count" style="display: none;">0</span>
         </button>
 

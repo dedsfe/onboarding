@@ -5406,7 +5406,7 @@
 
       // Habilita/desabilita menus e ações
       const postCount = realFrames().length;
-      if (btnBatch) btnBatch.disabled = postCount === 0;
+      // Lote não depende do canvas: fica sempre ativo
       const exportBtn = document.getElementById('canvas-export-btn');
       if (exportBtn) exportBtn.disabled = postCount === 0;
       const libBtn = document.getElementById('canvas-library-btn');
