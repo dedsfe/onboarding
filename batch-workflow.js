@@ -1025,7 +1025,7 @@
       body.push(h('div', { class: 'bw-slides bw-slides--ghost' }, [ghost('sparkles', 'is-slide'), ghost('sparkles', 'is-slide')]));
     } else {
       var slides = h('div', { class: 'bw-slides' });
-      m.frames.slice(0, 3).forEach(function (f) { slides.appendChild(slideThumb(f)); });
+      m.frames.slice(0, 3).forEach(function (f, i) { slides.appendChild(slideThumb(f, i)); });
       body.push(slides);
       var chips = h('div', { class: 'bw-binds' });
       m.binds.forEach(function (b) {
@@ -1155,14 +1155,26 @@
     return img;
   }
 
-  function slideThumb(frame) {
+  /* Miniatura do slide: fundo {{foto*}} usa uma foto da pasta (uma por
+     slide), pra prévia mostrar o design de verdade. */
+  function slideThumb(frame, idx) {
     var img = h('img', { class: 'bw-slide', alt: frame.name || 'slide' });
     img.style.aspectRatio = frame.w + ' / ' + frame.h;
-    if (window.renderFrameToCanvas) {
-      window.renderFrameToCanvas(frame, { scale: Math.min(1, 240 / Math.max(frame.w, frame.h)), format: 'jpeg' })
-        .then(function (c) { img.src = c.toDataURL('image/jpeg', 0.8); })
-        .catch(function () {});
-    }
+    if (!window.renderFrameToCanvas) return img;
+    var files = state.photos ? state.photos.files : [];
+    var photo = frame.bgBind && files.length ? files[(idx || 0) % files.length] : null;
+    (photo ? fileOf(photo) : Promise.resolve(null))
+      .then(function (file) {
+        var overrides = {};
+        if (file) {
+          var url = URL.createObjectURL(file);
+          thumbUrls.push(url);
+          overrides[frame.bgBind] = url;
+        }
+        return window.renderFrameToCanvas(frame, { scale: Math.min(1, 240 / Math.max(frame.w, frame.h)), format: 'jpeg', overrides: overrides });
+      })
+      .then(function (c) { img.src = c.toDataURL('image/jpeg', 0.8); })
+      .catch(function () {});
     return img;
   }
 

@@ -4986,6 +4986,10 @@
       });
     }
 
+    const BG_BIND_PLACEHOLDER_COLOR = '#3F3F46';
+    const BG_BIND_PLACEHOLDER_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#A1A1AA" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>';
+    const BG_BIND_PLACEHOLDER_ICON = `url("data:image/svg+xml,${encodeURIComponent(BG_BIND_PLACEHOLDER_SVG)}")`;
+
     function applyFrameBackground(frame, frameEl) {
       const el = frameEl || frameElOf(frame);
       if (!el) return;
@@ -5074,8 +5078,18 @@
         } else {
           overlayEl.style.display = 'none';
         }
+      } else if (frame.bgBind) {
+        // 2. Fundo é variável de foto e ainda não tem foto: placeholder, nunca branco
+        bgLayer.style.backgroundImage = BG_BIND_PLACEHOLDER_ICON;
+        bgLayer.style.backgroundColor = BG_BIND_PLACEHOLDER_COLOR;
+        bgLayer.style.backgroundRepeat = 'no-repeat';
+        bgLayer.style.backgroundPosition = 'center';
+        bgLayer.style.backgroundSize = '22%';
+        bgLayer.style.filter = 'none';
+        bgLayer.style.transform = 'none';
+        overlayEl.style.display = 'none';
       } else {
-        // 2. Cor sólida ou gradiente
+        // 3. Cor sólida ou gradiente
         bgLayer.style.backgroundImage = (frame.bg && frame.bg.includes('gradient')) ? frame.bg : 'none';
         bgLayer.style.backgroundColor = (frame.bg && !frame.bg.includes('gradient')) ? frame.bg : (frame.bg || '#FFFFFF');
         bgLayer.style.filter = 'none';
@@ -9611,6 +9625,15 @@
         } else if (bgOverride && (bgOverride.startsWith('#') || bgOverride.startsWith('rgb'))) {
           ctx.fillStyle = bgOverride;
           ctx.fillRect(0, 0, frameW, frameH);
+        } else if (frame.bgBind) {
+          // Variável de foto sem foto: mesmo placeholder do canvas
+          ctx.fillStyle = BG_BIND_PLACEHOLDER_COLOR;
+          ctx.fillRect(0, 0, frameW, frameH);
+          const icon = await loadExportImage(`data:image/svg+xml,${encodeURIComponent(BG_BIND_PLACEHOLDER_SVG)}`);
+          if (icon) {
+            const side = Math.min(frameW, frameH) * 0.22;
+            ctx.drawImage(icon, (frameW - side) / 2, (frameH - side) / 2, side, side);
+          }
         } else if (frame.bg && frame.bg.includes('gradient')) {
           const hexes = frame.bg.match(/#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}/g);
           const c1 = (hexes && hexes[0]) || '#18181B';
@@ -10326,7 +10349,11 @@
             f.name = spec.nome || 'Molde da IA';
             const fundo = sl.fundo || {};
             if (fundo.cor) f.bg = fundo.cor;
-            if (fundo.foto) { f.bgBind = slugifyBind(fundo.foto) || 'foto'; f.bgOverlay = fundo.escurecer != null ? Number(fundo.escurecer) : 30; }
+            if (fundo.foto) {
+              f.bgBind = slugifyBind(fundo.foto) || 'foto';
+              f.bgOverlay = fundo.escurecer != null ? Number(fundo.escurecer) : 30;
+              if (!fundo.cor) f.bg = '#18181B';
+            }
             (sl.textos || []).forEach((t, ti) => {
               const w = Math.round(Math.min(fmt.w, Math.max(40, Number(t.w) || fmt.w * 0.84)));
               const child = {
