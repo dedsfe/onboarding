@@ -7081,3 +7081,6 @@ body.is-scrubbing * {
 }
 .canvas-frame.is-free .canvas-text-node,
 .canvas-frame.is-free .canvas-image-node { pointer-events: auto; }
+
+/* Arrasto no painel de camadas mirando o nível de cima (solto no canvas) */
+.ly-list.drop-root { box-shadow: inset 0 0 0 2px var(--ly-accent); border-radius: 8px; }

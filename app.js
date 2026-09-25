@@ -3676,9 +3676,17 @@
            canvas (Figma). Tudo que veio do mesmo post vai junto, então grupo
            e caixa continuam inteiros. */
         const upPt = upEv ? screenToWorld(upEv.clientX, upEv.clientY) : null;
-        const leftPost = !dropTarget && !frame.free && upPt
+        const pointerOut = upPt && !(upPt.x >= frame.x && upPt.x <= frame.x + frame.w && upPt.y >= frame.y && upPt.y <= frame.y + frame.h);
+        // Elemento inteiro fora do post ficaria invisível (a máscara corta): solta ele
+        const allOutside = nodesToMove.every(n => {
+          const c = (frame.children || []).find(ch => ch.id === n.childId);
+          if (!c) return false;
+          const h = childBoxHeight(c);
+          return c.x + (c.w || 0) <= 0 || c.x >= frame.w || c.y + h <= 0 || c.y >= frame.h;
+        });
+        const leftPost = !dropTarget && !frame.free
           && nodesToMove.every(n => n.frameId === frame.id)
-          && !(upPt.x >= frame.x && upPt.x <= frame.x + frame.w && upPt.y >= frame.y && upPt.y <= frame.y + frame.h);
+          && (pointerOut || allOutside);
         if (leftPost) {
           const kids = nodesToMove.map(n => (frame.children || []).find(ch => ch.id === n.childId)).filter(Boolean);
           const topIds = new Set(kids.map(c => c.id));
@@ -6506,8 +6514,11 @@
 
       /* Arrastar para mudar a ordem (dentro do mesmo post). Soltar na metade
          de cima de uma linha põe por cima dela no canvas; embaixo, por baixo. */
-      const clearDropMarks = () => list.querySelectorAll('.drop-above, .drop-below, .drop-into')
-        .forEach(el => el.classList.remove('drop-above', 'drop-below', 'drop-into'));
+      const clearDropMarks = () => {
+        list.classList.remove('drop-root');
+        list.querySelectorAll('.drop-above, .drop-below, .drop-into')
+          .forEach(el => el.classList.remove('drop-above', 'drop-below', 'drop-into'));
+      };
 
       list.addEventListener('dragstart', (e) => {
         const row = e.target.closest('.ly-row--child');
@@ -6524,12 +6535,21 @@
         clearDropMarks();
         // Não deixa o soltar-imagem do canvas ver este arrasto (ele força "copy")
         e.stopPropagation();
-        if (!row || row.dataset.group || row.dataset.child === String(layersDrag.childId)) return;
+        // Espaço vazio da lista: vai para o nível de cima (solto no canvas)
+        if (!row) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          list.classList.add('drop-root');
+          return;
+        }
+        if (row.dataset.group || row.dataset.child === String(layersDrag.childId)) return;
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
-        // Em cima de um post: entra nele (por cima de tudo)
+        /* Em cima de um post: entra nele (por cima de tudo). Na borda de
+           cima da linha do post: fica solto no canvas, como no Figma. */
         if (row.classList.contains('ly-row--frame')) {
-          row.classList.add('drop-into');
+          const fr = row.getBoundingClientRect();
+          row.classList.add(e.clientY < fr.top + fr.height * 0.3 ? 'drop-above' : 'drop-into');
           return;
         }
         const r = row.getBoundingClientRect();
@@ -6543,12 +6563,33 @@
         const row = list.querySelector('.drop-above, .drop-below, .drop-into');
         const above = row && row.classList.contains('drop-above');
         const into = row && row.classList.contains('drop-into');
+        const onRoot = list.classList.contains('drop-root');
         clearDropMarks();
-        if (!row) return;
+        if (!row && !onRoot) return;
         const from = frames.find(f => f.id === layersDrag.frameId);
-        const to = frames.find(f => f.id === Number(row.dataset.frame));
+        const to = row ? frames.find(f => f.id === Number(row.dataset.frame)) : null;
         const moved = from && (from.children || []).find(ch => ch.id === layersDrag.childId);
-        if (!from || !to || !moved || (from === to && into)) return;
+        if (!from || !moved) return;
+
+        /* Nível de cima = solto no canvas, no mesmo lugar da tela. Vale para
+           espaço vazio, borda de cima de um post e linha de outro solto. */
+        const toRoot = onRoot
+          || (row.classList.contains('ly-row--frame') && above)
+          || (isFreeFrame(to) && to !== from);
+        if (toRoot) {
+          if (from.free && from.children.length === 1) return; // já está solto
+          delete moved.groupId;
+          if (!moved.box) delete moved.boxId;
+          const holder = makeFreeHolder(from, [moved, ...boxMembers(from, moved)]);
+          normalizeBoxOrder(holder);
+          const wasSel = isChildNodeSelected(from.id, moved.id);
+          pruneFreeFrames();
+          renderAll();
+          if (wasSel) selectTextNode(holder.id, moved.id);
+          save();
+          return;
+        }
+        if (!to || (from === to && into)) return;
 
         /* Soltou entre membros de um grupo: entra nele. Fora de grupo: sai. */
         const targetChild = !into && (to.children || []).find(ch => ch.id === Number(row.dataset.child));
@@ -6574,8 +6615,13 @@
           index = above ? at + 1 : at;
         }
         const wasSelected = isChildNodeSelected(from.id, moved.id);
-        moveChildToFrame(moved, from, to, { index });
+        const members = boxMembers(from, moved);
+        if (!moved.box) delete moved.boxId;
+        moveChildToFrame(moved, from, to, { index, keepWorldPos: from.free });
+        members.forEach(m => moveChildToFrame(m, from, to, { keepWorldPos: from.free }));
+        normalizeBoxOrder(to);
         layersOpenFrames.add(to.id);
+        pruneFreeFrames();
         renderAll();
         if (wasSelected) selectTextNode(to.id, moved.id);
         save();
