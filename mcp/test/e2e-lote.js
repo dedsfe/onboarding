@@ -110,6 +110,7 @@ async function main() {
   await page.click('.bw-choice:has-text("A IA decide")');
   await page.click('.bw-brief >> text=Pronto');
   await page.fill('.bw-qty-big', '3');
+  await page.click('.bw-versions >> text=×2'); // 2 copys por post (A/B)
   await page.click('.bw-node--qty >> text=OK');
   await page.waitForSelector('.bw-node--qty.is-done');
   await page.click('text=Escolher saída');
@@ -167,6 +168,7 @@ async function main() {
   const chaves = info.copys.map(c => c.chave).join(',');
   if (chaves !== 'hook,dica,corpo') fail('copys do molde deveriam ser hook,dica,corpo — vieram ' + chaves);
   if (info.quantidade !== 3) fail('variações deveriam ser 3, veio ' + info.quantidade);
+  if (info.versoes_de_copy !== 2 || !/2 COPYS DIFERENTES POR POST/.test(textoDe(pedido))) fail('pedido deveria pedir 2 copys por post');
   if (info.modo !== 'ia_decide') fail('modo deveria ser ia_decide');
   if (!info.pronto) fail('deveria estar pronto, falta: ' + info.faltando);
   if (!/PESQUISE O NICHO/.test(textoDe(pedido))) fail('playbook sem pesquisa de nicho');

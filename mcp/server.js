@@ -399,7 +399,10 @@ server.tool(
       const exemplo = Object.fromEntries(resto.copys.map(c => [c.chave, '...']));
       exemplo._foto = 1;
       exemplo._legenda = '...';
-      conteudo.push({ type: 'text', text: `Formato de cada carrossel (previsualizar_lote e gerar_lote): ${JSON.stringify(exemplo)} — gere ${resto.quantidade} variação(ões).` });
+      const v = resto.versoes_de_copy || 1;
+      if (v > 1) exemplo._variacoes = Array.from({ length: v - 1 }, () => ({ [resto.copys[0].chave]: '...' }));
+      conteudo.push({ type: 'text', text: `Formato de cada carrossel (previsualizar_lote e gerar_lote): ${JSON.stringify(exemplo)} — gere ${resto.quantidade} variação(ões).`
+        + (v > 1 ? ` O usuário quer ${v} COPYS DIFERENTES POR POST (teste A/B): em cada carrossel mande _variacoes com ${v - 1} item(ns), cada um com um ângulo realmente diferente (troque ao menos o hook). Total: ${resto.quantidade * v} carrosséis.` : '') });
     }
     if (resto.modo === 'ia_decide') {
       conteudo.push({ type: 'text', text: `MODO "A IA DECIDE": o usuário quer que você crie a copy${resto.pedido ? ' seguindo a direção acima' : ' — ele não deu direção, deduza o nicho pelos exemplos e fotos'}.` });

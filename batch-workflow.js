@@ -33,7 +33,7 @@
     brief: { pedido: '', quantidade: '' },
     briefMode: false,
     // Resultado desejado: carrosséis de exemplo (referência para a IA)
-    qty: { n: '', ok: false }, // Variações: quantos carrosséis sair do lote
+    qty: { n: '', v: 1, ok: false }, // Variações: quantos posts e quantas copys (A/B) por post
     ref: null,        // { name, carousels: [{ name, files: [..] }], dir }
     refSkipped: false,
     pendingRef: null,
@@ -247,14 +247,20 @@
   }
 
   function briefCount() { return variationsCount(); }
-  function saveQty() { idbSet('qty', { n: state.qty.n, ok: !!state.qty.ok }); }
+  function saveQty() { idbSet('qty', { n: state.qty.n, v: state.qty.v, ok: !!state.qty.ok }); }
+
+  // Copys diferentes por post (teste A/B): só quando a IA escreve a copy
+  function copyVersions() {
+    if (state.texts && !state.texts.fromAi) return 1;
+    return Math.max(1, Math.min(3, Number(state.qty.v) || 1));
+  }
 
   function saveBrief() { idbSet('brief', { pedido: state.brief.pedido, quantidade: state.brief.quantidade, on: state.briefMode, ok: !!state.brief.ok }); }
 
   // A IA já mandou a copy: sai o que ela escreveu. Senão manda o passo Variações.
   function totalToMake(m) {
     if (state.texts && state.texts.fromAi) return textCount();
-    return variationsCount();
+    return variationsCount() * copyVersions();
   }
 
   /* ----------------------------------------------------- passo 1: fotos */
@@ -543,7 +549,7 @@
       } else state.pendingPhotos = p;
     }
     var q = await idbGet('qty');
-    if (q) state.qty = { n: q.n || '', ok: !!q.ok };
+    if (q) state.qty = { n: q.n || '', v: Number(q.v) || 1, ok: !!q.ok };
     var rf = await idbGet('ref');
     if (rf && rf.queryPermission && !state.ref) {
       if ((await rf.queryPermission({ mode: 'read' })) === 'granted') {
@@ -981,9 +987,23 @@
         h('button', { class: 'bw-stepper__btn', html: icon('plus'), onclick: function () { set((parseInt(num.value, 10) || 0) + 1); } }),
       ]));
       body.push(chips);
+      if (!(state.texts && !state.texts.fromAi)) {
+        var vers = h('div', { class: 'bw-versions', title: 'Copys diferentes por post' }, [h('span', { class: 'bw-versions__icon', html: icon('type') })]);
+        [1, 2, 3].forEach(function (v) {
+          vers.appendChild(h('button', {
+            class: 'bw-chip-n' + (v === copyVersions() ? ' is-on' : ''), text: '×' + v,
+            onclick: function () {
+              state.qty.v = v; saveQty();
+              vers.querySelectorAll('.bw-chip-n').forEach(function (c, ci) { c.classList.toggle('is-on', ci + 1 === v); });
+            },
+          }));
+        });
+        body.push(vers);
+      }
       body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('check') + '<span>OK</span>', onclick: function () { set(num.value); state.qty.ok = true; saveQty(); render(); } }));
     } else if (st === 'done') {
-      body.push(h('div', { class: 'bw-big', html: '<strong>×' + n + '</strong>' }));
+      body.push(h('div', { class: 'bw-big', html: '<strong>×' + n + '</strong>'
+        + (copyVersions() > 1 ? '<span class="bw-big__sub" title="Copys diferentes por post">' + icon('type') + '×' + copyVersions() + '</span>' : '') }));
     } else {
       body.push(ghost('copy'));
     }
@@ -1420,7 +1440,8 @@
     return {
       modo: state.texts && !state.texts.fromAi ? 'textos_prontos' : 'ia_decide',
       pedido: state.brief.pedido.trim() || null,
-      quantidade: totalToMake(m) || variationsCount(),
+      quantidade: variationsCount(),
+      versoes_de_copy: copyVersions(),
       molde: m ? { nome: m.nome, slides: m.frames.length, variaveis: m.binds.map(function (b) { return { nome: b.name, tipo: b.type === 'image' ? 'imagem' : 'texto' }; }) } : null,
       copys: copySlots(m).map(function (c) { return { chave: c.key, slide: c.slide, texto_do_modelo: c.exemplo, caracteres: c.exemplo.length }; }),
       variaveis_de_foto: imageBinds(m).map(function (b) { return b.name; }),
