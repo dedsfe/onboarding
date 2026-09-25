@@ -94,7 +94,7 @@
   grid-template-columns: 1fr 380px;
   min-height: 0;
 }
-.bw-body:has(.bw-empty) { grid-template-columns: 1fr; }
+.bw-body:has(.bw-drop) { grid-template-columns: 1fr; }
 
 .bw-stage {
   position: relative;
@@ -421,52 +421,35 @@ button.bw-tile { cursor: pointer; }
 .bw-btn--primary:hover { background: #0A85E0; }
 .bw-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-/* Sem pasta ainda */
-.bw-empty {
+/* Sem pasta ainda: uma área de soltar, nada mais */
+.bw-drop {
   align-self: center;
   justify-self: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  max-width: 460px;
-  padding: 32px;
+  gap: 10px;
+  width: min(440px, calc(100% - 48px));
+  padding: 44px 28px 32px;
+  border: 1.5px dashed #555;
+  border-radius: 16px;
   text-align: center;
+  transition: border-color 0.15s ease, background 0.15s ease;
 }
-.bw-empty__art {
+.bw-drop.is-over { border-color: var(--bw-accent); background: rgba(13, 153, 255, 0.06); }
+.bw-drop__art {
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
+  width: 60px;
+  height: 60px;
   border-radius: 16px;
   background: rgba(245, 166, 35, 0.14);
   color: var(--bw-amber);
 }
-.bw-empty__art svg { width: 30px !important; height: 30px !important; }
-.bw-empty__title { margin: 4px 0 0; font-size: 18px; font-weight: 600; }
-.bw-empty__text { margin: 0; font-size: 13px; line-height: 1.5; color: var(--bw-muted); }
-.bw-empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 8px; }
-
-.bw-tree {
-  width: 100%;
-  margin-top: 6px;
-  padding: 12px 14px;
-  border: 1px solid var(--bw-line);
-  border-radius: 10px;
-  background: var(--bw-panel);
-  text-align: left;
-}
-.bw-tree__row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 0 4px calc(var(--d) * 18px);
-  font-size: 12px;
-}
-.bw-tree__icon { color: var(--bw-amber); display: grid; }
-.bw-tree__icon svg { width: 14px !important; height: 14px !important; }
-.bw-tree__name { font-family: 'JetBrains Mono', ui-monospace, monospace; }
-.bw-tree__note { margin-left: auto; color: var(--bw-faint); font-size: 11px; }
+.bw-drop__art svg { width: 28px !important; height: 28px !important; }
+.bw-drop__title { margin: 6px 0 0; font-size: 17px; font-weight: 600; }
+.bw-drop__text { margin: 0 0 10px; font-size: 13px; color: var(--bw-muted); }
+.bw-drop .bw-link { margin-top: 2px; }
 
 @media (max-width: 900px) {
   .bw-body { grid-template-columns: 1fr; grid-template-rows: 1fr 280px; }

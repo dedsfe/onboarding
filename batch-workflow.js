@@ -235,12 +235,122 @@
     return 0;
   }
 
+  /* ------------------------------------------ pasta virtual (fallback)
+     Navegador sem acesso direto a pastas (Safari, Firefox, Brave, http
+     fora do localhost): a pasta escolhida é lida para a memória com a mesma
+     interface dos handles de verdade. Nada é gravado no disco — no fim o
+     out/ sai num .zip. */
+  var canWriteDisk = typeof window.showDirectoryPicker === 'function';
+
+  function VDir(name) {
+    this.kind = 'directory';
+    this.name = name;
+    this.virtual = true;
+    this.kids = new Map();
+  }
+  VDir.prototype.values = async function* () { for (var v of this.kids.values()) yield v; };
+  VDir.prototype.getDirectoryHandle = async function (name, opts) {
+    var k = this.kids.get(name);
+    if (k && k.kind === 'directory') return k;
+    if (!opts || !opts.create) throw new DOMException('não existe', 'NotFoundError');
+    k = new VDir(name);
+    this.kids.set(name, k);
+    return k;
+  };
+  VDir.prototype.getFileHandle = async function (name, opts) {
+    var k = this.kids.get(name);
+    if (k && k.kind === 'file') return k;
+    if (!opts || !opts.create) throw new DOMException('não existe', 'NotFoundError');
+    k = new VFile(name, new Blob([]));
+    this.kids.set(name, k);
+    return k;
+  };
+
+  function VFile(name, blob) {
+    this.kind = 'file';
+    this.name = name;
+    this.blob = blob;
+  }
+  VFile.prototype.getFile = async function () {
+    return this.blob instanceof File ? this.blob : new File([this.blob], this.name, { type: this.blob.type });
+  };
+  VFile.prototype.createWritable = async function () {
+    var self = this, parts = [];
+    return {
+      write: async function (d) { parts.push(d); },
+      close: async function () { self.blob = new Blob(parts); },
+    };
+  };
+
+  // Lista de arquivos de <input webkitdirectory> → árvore virtual
+  function vdirFromFiles(files) {
+    var root = null;
+    [].forEach.call(files, function (f) {
+      var parts = (f.webkitRelativePath || f.name).split('/');
+      if (!root) root = new VDir(parts.length > 1 ? parts[0] : 'lote');
+      var d = root;
+      for (var i = 1; i < parts.length - 1; i++) {
+        if (!d.kids.has(parts[i])) d.kids.set(parts[i], new VDir(parts[i]));
+        d = d.kids.get(parts[i]);
+      }
+      d.kids.set(parts[parts.length - 1], new VFile(parts[parts.length - 1], f));
+    });
+    return root;
+  }
+
+  // Pasta arrastada do Finder (qualquer navegador) → árvore virtual
+  async function vdirFromEntry(entry) {
+    var dir = new VDir(entry.name);
+    var reader = entry.createReader();
+    var batch;
+    do {
+      batch = await new Promise(function (res, rej) { reader.readEntries(res, rej); });
+      for (var i = 0; i < batch.length; i++) {
+        var e = batch[i];
+        if (e.isDirectory) dir.kids.set(e.name, await vdirFromEntry(e));
+        else dir.kids.set(e.name, new VFile(e.name, await new Promise(function (res, rej) { e.file(res, rej); })));
+      }
+    } while (batch.length);
+    return dir;
+  }
+
+  function pickFolderFallback() {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.webkitdirectory = true;
+    input.multiple = true;
+    input.addEventListener('change', function () {
+      var root = input.files && input.files.length ? vdirFromFiles(input.files) : null;
+      if (root) useFolder(root);
+    });
+    input.click();
+  }
+
+  async function onFolderDrop(ev) {
+    var item = ev.dataTransfer && ev.dataTransfer.items && ev.dataTransfer.items[0];
+    if (!item) return;
+    try {
+      // Chrome/Edge: handle de verdade, dá pra gravar direto na pasta
+      if (item.getAsFileSystemHandle) {
+        var handle = await item.getAsFileSystemHandle();
+        if (handle && handle.kind === 'directory') {
+          if (handle.requestPermission) await handle.requestPermission({ mode: 'readwrite' });
+          await useFolder(handle);
+          return;
+        }
+      }
+      var entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+      if (entry && entry.isDirectory) { await useFolder(await vdirFromEntry(entry)); return; }
+      toast('info', 'Solte uma pasta, não um arquivo.');
+    } catch (e) {
+      console.error('[lote] falha ao ler pasta solta', e);
+      toast('error', 'Não consegui ler essa pasta.');
+    }
+  }
+
   /* ------------------------------------------------------- abrir pasta */
   async function pickFolder() {
-    if (!window.showDirectoryPicker) {
-      toast('error', 'Seu navegador não abre pastas do computador. Use o Chrome ou o Edge.');
-      return;
-    }
+    if (!canWriteDisk) { pickFolderFallback(); return; }
     try {
       var dir = await window.showDirectoryPicker({ id: 'tcm-lote', mode: 'readwrite' });
       await useFolder(dir);
@@ -285,7 +395,7 @@
     state.root = dir;
     state.pendingRoot = null;
     state.binPath = ['inputs'];
-    await idbSet('root', dir);
+    if (!dir.virtual) await idbSet('root', dir); // pasta virtual não sobrevive a recarregar
     await refresh();
   }
 
@@ -383,42 +493,25 @@
   }
 
   function renderEmpty() {
-    var tree = h('div', { class: 'bw-tree' }, [
-      treeRow('folder', 'carrossel-dicas', 0),
-      treeRow('folder-input', 'inputs', 1, 'fotos, textos'),
-      treeRow('images', 'fotos/', 2, 'as imagens'),
-      treeRow('file-text', 'hooks.txt', 2, 'um hook por linha'),
-      treeRow('palette', 'DesiredOutput', 1, 'o carrossel modelo'),
-      treeRow('package', 'out', 1, 'os carrosséis prontos'),
+    var drop = h('div', { class: 'bw-drop' }, [
+      h('div', { class: 'bw-drop__art', html: icon('folder-open') }),
+      h('h3', { class: 'bw-drop__title', text: 'Solte a pasta do lote aqui' }),
+      h('p', { class: 'bw-drop__text', text: 'Dentro dela: uma pasta de fotos e um hooks.txt' }),
     ]);
-    var actions = h('div', { class: 'bw-empty__actions' });
+    var btn;
     if (state.pendingRoot) {
-      actions.appendChild(h('button', {
-        class: 'bw-btn bw-btn--primary',
-        html: icon('folder-open') + '<span>Reabrir “' + escapeHtml(state.pendingRoot.name) + '”</span>',
-        onclick: reopenPending,
-      }));
-      actions.appendChild(h('button', { class: 'bw-btn', html: icon('folder-search') + '<span>Outra pasta</span>', onclick: pickFolder }));
+      btn = h('button', { class: 'bw-btn bw-btn--primary', html: icon('folder-open') + '<span>Reabrir “' + escapeHtml(state.pendingRoot.name) + '”</span>', onclick: reopenPending });
+      drop.appendChild(btn);
+      drop.appendChild(h('button', { class: 'bw-link', text: 'ou escolher outra pasta', onclick: pickFolder }));
     } else {
-      actions.appendChild(h('button', { class: 'bw-btn bw-btn--primary', html: icon('folder-plus') + '<span>Criar pasta do lote</span>', onclick: createFolder }));
-      actions.appendChild(h('button', { class: 'bw-btn', html: icon('folder-open') + '<span>Abrir pasta que já existe</span>', onclick: pickFolder }));
+      btn = h('button', { class: 'bw-btn bw-btn--primary', html: icon('folder-search') + '<span>Escolher pasta</span>', onclick: pickFolder });
+      drop.appendChild(btn);
+      if (canWriteDisk) drop.appendChild(h('button', { class: 'bw-link', text: 'ou criar uma pasta nova', onclick: createFolder }));
     }
-    var card = h('div', { class: 'bw-empty' }, [
-      h('div', { class: 'bw-empty__art', html: icon('folder-tree') }),
-      h('h3', { class: 'bw-empty__title', text: 'O lote mora numa pasta do seu computador' }),
-      h('p', { class: 'bw-empty__text', text: 'Cada pasta dentro de inputs/ alimenta a variável de mesmo nome do design. Cada linha de texto vira um carrossel pronto em out/.' }),
-      tree,
-      actions,
-    ]);
-    el.body.appendChild(card);
-  }
-
-  function treeRow(ic, name, depth, note) {
-    return h('div', { class: 'bw-tree__row', style: '--d:' + depth }, [
-      h('span', { class: 'bw-tree__icon', html: icon(ic) }),
-      h('span', { class: 'bw-tree__name', text: name }),
-      note ? h('span', { class: 'bw-tree__note', text: note }) : null,
-    ]);
+    drop.addEventListener('dragover', function (e) { e.preventDefault(); e.stopPropagation(); drop.classList.add('is-over'); });
+    drop.addEventListener('dragleave', function () { drop.classList.remove('is-over'); });
+    drop.addEventListener('drop', function (e) { e.preventDefault(); e.stopPropagation(); drop.classList.remove('is-over'); onFolderDrop(e); });
+    el.body.appendChild(drop);
   }
 
   /* ------------------------------------------------------ fluxo (nós) */
@@ -789,7 +882,12 @@
         await new Promise(function (r) { setTimeout(r, 0); });
       }
       fill.style.width = '100%';
-      toast('success', total + (total === 1 ? ' carrossel pronto' : ' carrosséis prontos') + ' em ' + state.root.name + '/out');
+      if (state.root.virtual) {
+        await downloadVirtualOut(state.root);
+        toast('success', total + (total === 1 ? ' carrossel pronto' : ' carrosséis prontos') + ' — baixados em ' + state.root.name + '-out.zip');
+      } else {
+        toast('success', total + (total === 1 ? ' carrossel pronto' : ' carrosséis prontos') + ' em ' + state.root.name + '/out');
+      }
     } catch (e) {
       console.error('[lote] falha ao gerar', e);
       toast('error', 'O lote parou no meio: ' + (e && e.message ? e.message : 'erro desconhecido'));
@@ -799,6 +897,29 @@
       await refresh();
       openBin(['out']);
     }
+  }
+
+  async function downloadVirtualOut(root) {
+    if (!window.JSZip) { toast('error', 'Biblioteca de .zip não carregou. Tente de novo.'); return; }
+    var zip = new window.JSZip();
+    async function addDir(dir, prefix) {
+      for await (var e of dir.values()) {
+        if (e.kind === 'directory') await addDir(e, prefix + e.name + '/');
+        else zip.file(prefix + e.name, await e.getFile());
+      }
+    }
+    for (var name of ['out', 'DesiredOutput']) {
+      var d = await getDir(root, name, false);
+      if (d) await addDir(d, name + '/');
+    }
+    var blob = await zip.generateAsync({ type: 'blob' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = root.name + '-out.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
 
   /* ------------------------------------------------------ abrir/fechar */
