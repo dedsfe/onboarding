@@ -239,6 +239,12 @@
 
 .bw-strip { display: flex; gap: 4px; }
 .bw-strip .bw-thumb { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; background: var(--bw-card); }
+/* Fotos: qual foto cai em cada variável de foto (1º carrossel) */
+.bw-slots { display: flex; gap: 8px; }
+.bw-slot { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.bw-slot .bw-thumb { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; background: var(--bw-card); }
+.bw-var { max-width: 56px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; font-weight: 600; color: #B794F6; text-decoration: underline; text-underline-offset: 2px; }
+
 .bw-strip__more { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 6px; background: var(--bw-card); font-size: 11px; color: var(--bw-muted); }
 
 .bw-mini-lines { margin: 0; padding: 0 0 0 18px; font-size: 12px; line-height: 1.4; }

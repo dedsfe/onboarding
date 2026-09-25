@@ -127,6 +127,8 @@ async function main() {
     nome: 'OD - Chorando POV', formato: 'ig-story',
     slides: [
       { fundo: { foto: 'foto', escurecer: 0 }, textos: [{ chave: 'hook', texto: 'POV', x: 80, y: 20, w: 920, tamanho: 30, cor: '#FFFFFF' }] },
+      { fundo: { foto: 'foto2' }, textos: [{ chave: 'meio', texto: 'meio', x: 80, y: 900, w: 920, tamanho: 60, cor: '#FFFFFF' }] },
+      { fundo: { foto: 'foto3' }, textos: [{ chave: 'fim', texto: 'fim', x: 80, y: 900, w: 920, tamanho: 60, cor: '#FFFFFF' }] },
       { fundo: { cor: '#000000' }, textos: [{ chave: 'corpo', texto: 'texto', x: 80, y: 900, w: 920, tamanho: 12, cor: '#111111' }] },
     ],
   });
@@ -135,8 +137,16 @@ async function main() {
   for (const esperado of ['hook com 30px', 'colado no topo', 'película de 0%', '12px ilegível', 'contraste']) {
     if (!revisao.includes(esperado)) fail(`revisão do molde deveria acusar "${esperado}" — veio:\n${revisao}`);
   }
-  if (imagensDe(ruim) !== 2) fail('criar_molde deveria devolver 2 imagens, veio ' + imagensDe(ruim));
-  console.log('✓ criar_molde (story ruim): revisão acusou contraste/tamanho/topo + 2 imagens');
+  if (imagensDe(ruim) !== 4) fail('criar_molde deveria devolver 4 imagens, veio ' + imagensDe(ruim));
+  // {{foto}}, {{foto2}}, {{foto3}}: cada slide com uma foto diferente (cor do canto)
+  const urls = ruim.content.filter(c => c.type === 'image').slice(0, 3).map(c => `data:${c.mimeType};base64,${c.data}`);
+  const cantos = await page.evaluate(async (us) => Promise.all(us.map(u => new Promise(r => {
+    const img = new Image();
+    img.onload = () => { const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); r(Array.from(x.getImageData(5, img.height - 5, 1, 1).data.slice(0, 3)).map(v => Math.round(v / 16)).join(',')); };
+    img.src = u;
+  }))), urls);
+  if (new Set(cantos).size !== 3) fail('as 3 variáveis de foto deveriam receber 3 fotos diferentes — cantos: ' + cantos.join(' | '));
+  console.log('✓ criar_molde (story ruim): revisão acusou contraste/tamanho/topo + 4 imagens, 3 fotos diferentes');
 
   const molde = await tool('criar_molde', {
     nome: 'Molde da IA', formato: 'ig-feed',

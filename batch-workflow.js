@@ -838,17 +838,30 @@
     return sel;
   }
 
+  /* Cada variável de foto com a foto que ela recebe no 1º carrossel */
+  function photoSlots(m) {
+    var plan = photoPlan(m, 0, null);
+    var row = h('div', { class: 'bw-slots' });
+    Object.keys(plan).forEach(function (bind) {
+      row.appendChild(h('div', { class: 'bw-slot' }, [thumbImg(plan[bind]), h('span', { class: 'bw-var', text: bind })]));
+    });
+    return row;
+  }
+
   function photosNode(m, cur) {
     var st = stateOf('photos', cur);
     var body = [];
     if (st === 'done') {
-      var strip = h('div', { class: 'bw-strip' });
-      state.photos.files.slice(0, 5).forEach(function (f) { strip.appendChild(thumbImg(f)); });
-      if (state.photos.files.length > 5) strip.appendChild(h('span', { class: 'bw-strip__more', text: '+' + (state.photos.files.length - 5) }));
-      body.push(strip);
+      if (imageBinds(m).length > 1) {
+        body.push(photoSlots(m));
+      } else {
+        var strip = h('div', { class: 'bw-strip' });
+        state.photos.files.slice(0, 5).forEach(function (f) { strip.appendChild(thumbImg(f)); });
+        if (state.photos.files.length > 5) strip.appendChild(h('span', { class: 'bw-strip__more', text: '+' + (state.photos.files.length - 5) }));
+        body.push(strip);
+      }
       body.push(h('div', { class: 'bw-row' }, [
         h('span', { class: 'bw-meta', html: icon('folder') + '<span>' + escapeHtml(state.photos.name) + ' · ' + plural(state.photos.files.length, 'foto', 'fotos') + '</span>' }),
-        bindSelect(imageBinds(m), state.photoBind, function (v) { state.photoBind = v; }),
       ]));
     } else if (st === 'active') {
       if (state.pendingPhotos) {
@@ -1025,11 +1038,12 @@
       body.push(h('div', { class: 'bw-slides bw-slides--ghost' }, [ghost('sparkles', 'is-slide'), ghost('sparkles', 'is-slide')]));
     } else {
       var slides = h('div', { class: 'bw-slides' });
-      m.frames.slice(0, 3).forEach(function (f, i) { slides.appendChild(slideThumb(f, i)); });
+      var plan1 = photoPlan(m, 0, null);
+      m.frames.slice(0, 3).forEach(function (f) { slides.appendChild(slideThumb(f, f.bgBind ? plan1[f.bgBind] : null)); });
       body.push(slides);
       var chips = h('div', { class: 'bw-binds' });
       m.binds.forEach(function (b) {
-        var fed = (b.type === 'image' && state.photos && state.photoBind === b.name)
+        var fed = (b.type === 'image' && !!state.photos)
           || (b.type !== 'image' && state.texts && (state.texts.columns ? !!state.texts.columns[b.name] : state.textBind === b.name));
         chips.appendChild(h('span', {
           class: 'bw-bind' + (fed ? ' is-fed' : ''),
@@ -1155,14 +1169,12 @@
     return img;
   }
 
-  /* Miniatura do slide: fundo {{foto*}} usa uma foto da pasta (uma por
-     slide), pra prévia mostrar o design de verdade. */
-  function slideThumb(frame, idx) {
+  /* Miniatura do slide: fundo {{foto*}} usa a foto que o 1º carrossel vai
+     usar, pra prévia mostrar o design de verdade. */
+  function slideThumb(frame, photo) {
     var img = h('img', { class: 'bw-slide', alt: frame.name || 'slide' });
     img.style.aspectRatio = frame.w + ' / ' + frame.h;
     if (!window.renderFrameToCanvas) return img;
-    var files = state.photos ? state.photos.files : [];
-    var photo = frame.bgBind && files.length ? files[(idx || 0) % files.length] : null;
     (photo ? fileOf(photo) : Promise.resolve(null))
       .then(function (file) {
         var overrides = {};
@@ -1200,6 +1212,33 @@
     return files[i % files.length];
   }
 
+  /* Fotos de um carrossel: cada variável de foto do molde ({{foto}},
+     {{foto2}}...) recebe uma foto diferente da pasta. Carrossel i começa
+     na foto i·N, então carrosséis seguidos também não repetem enquanto
+     houver fotos. _foto (1ª variável) e _fotos { foto2: 3 } da IA mandam. */
+  function photoPlan(m, i, row) {
+    var files = state.photos ? state.photos.files : [];
+    var binds = imageBinds(m).map(function (b) { return b.name; });
+    var plan = {};
+    if (!files.length) return plan;
+    var n = binds.length;
+    var used = new Set();
+    binds.forEach(function (bind, j) {
+      var pick = row ? (j === 0 && row._foto != null ? row._foto : (row._fotos && row._fotos[bind])) : null;
+      var item;
+      if (pick != null && pick !== '') {
+        item = photoItem(i, pick);
+      } else {
+        var idx = (i * n + j) % files.length;
+        for (var t = 0; t < files.length && used.has(files[idx]); t++) idx = (idx + 1) % files.length;
+        item = files[idx];
+      }
+      used.add(item);
+      plan[bind] = item;
+    });
+    return plan;
+  }
+
   async function photoData(item, cache) {
     var key = nameOf(item);
     if (!cache.has(key)) cache.set(key, await readAsDataUrl(await fileOf(item)));
@@ -1233,17 +1272,9 @@
       }
       hook = state.textBind ? textFor(i, state.textBind) : (state.texts && state.texts.lines ? state.texts.lines[i % state.texts.lines.length] : '');
     }
-    if (state.photos) {
-      // Variável de foto principal + outras que a IA mapear (_fotos: { foto2: 3 })
-      var extra = (row && row._fotos && typeof row._fotos === 'object') ? row._fotos : {};
-      if (state.photoBind) overrides[state.photoBind] = await photoData(photoItem(i, row && row._foto), cache);
-      var keys = Object.keys(extra);
-      for (var k = 0; k < keys.length; k++) {
-        if (imageBinds(m).some(function (b) { return b.name === keys[k]; })) {
-          overrides[keys[k]] = await photoData(photoItem(i, extra[keys[k]]), cache);
-        }
-      }
-    }
+    var plan = photoPlan(m, i, row);
+    var binds = Object.keys(plan);
+    for (var k = 0; k < binds.length; k++) overrides[binds[k]] = await photoData(plan[binds[k]], cache);
     return { overrides: overrides, hook: hook, legenda: legenda };
   }
 
@@ -1390,7 +1421,6 @@
       quantidade: totalToMake(m) || variationsCount(),
       molde: m ? { nome: m.nome, slides: m.frames.length, variaveis: m.binds.map(function (b) { return { nome: b.name, tipo: b.type === 'image' ? 'imagem' : 'texto' }; }) } : null,
       copys: copySlots(m).map(function (c) { return { chave: c.key, slide: c.slide, texto_do_modelo: c.exemplo, caracteres: c.exemplo.length }; }),
-      variavel_de_foto: state.photoBind,
       variaveis_de_foto: imageBinds(m).map(function (b) { return b.name; }),
       fotos: state.photos ? { pasta: state.photos.name, total: state.photos.files.length, nomes: state.photos.files.map(nameOf) } : null,
       saida: state.out ? (state.out.zip ? '.zip baixado no navegador' : 'pasta ' + state.out.name) : null,
@@ -1472,13 +1502,13 @@
     var res = window.__tcmBatch.criarMolde(spec || {});
     if (el.overlay) render();
     var m = model();
-    var files = state.photos ? state.photos.files : [];
     var imagens = [];
     var cache = new Map();
+    var plan = m ? photoPlan(m, 0, null) : {};
     for (var i = 0; m && i < m.frames.length; i++) {
       var f = m.frames[i];
       var overrides = {};
-      if (f.bgBind && files.length) overrides[f.bgBind] = await photoData(files[i % files.length], cache);
+      if (f.bgBind && plan[f.bgBind]) overrides[f.bgBind] = await photoData(plan[f.bgBind], cache);
       imagens.push(await frameJpeg(f, 720, overrides));
     }
     res.imagens = imagens;

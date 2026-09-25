@@ -463,7 +463,7 @@ const estiloTexto = z.object({
 const carrosselLote = z
   .object({
     _foto: z.union([z.number().int().min(1), z.string()]).optional().describe('Índice (1 = primeira) ou nome da foto para a variável de foto principal'),
-    _fotos: z.record(z.string(), z.union([z.number().int().min(1), z.string()])).optional().describe('Outras variáveis de foto: { foto2: 5 }'),
+    _fotos: z.record(z.string(), z.union([z.number().int().min(1), z.string()])).optional().describe('Opcional: escolher a foto de outras variáveis ({ foto2: 5 }). Sem isso, cada variável de foto já recebe uma foto diferente da pasta.'),
     _estilo: z.record(z.string(), estiloTexto).optional().describe('Ajuste por campo de copy: { slide2_texto1: { tamanho: 56 } }'),
     _legenda: z.string().optional().describe('Legenda do post (vai para legenda.txt), com hashtags'),
   })
