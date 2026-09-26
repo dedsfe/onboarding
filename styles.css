@@ -2320,19 +2320,19 @@ body.is-rotating-element * {
 }
 
 /* ------------------------------------------------------------
-   PAINEL DE PROPRIEDADES (Figma UI3, tema escuro)
+   PAINEL DE PROPRIEDADES (branco flutuante, estilo dump)
    Painel flutuante à direita; cada seleção acende um .pp-panel.
    Peças reutilizáveis: pp-head, pp-section, pp-row, pp-field,
    pp-seg, pp-btn, pp-color, pp-select, pp-primary.
    ------------------------------------------------------------ */
 .canvas-props {
-  --pp-bg: #2C2C2C;
-  --pp-line: #444444;
-  --pp-input: #383838;
-  --pp-hover: #4A4A4A;
-  --pp-text: #FFFFFF;
-  --pp-muted: #B3B3B3;
-  --pp-faint: #8C8C8C;
+  --pp-bg: #FFFFFF;
+  --pp-line: color-mix(in srgb, var(--ink) 8%, transparent);
+  --pp-input: #F2F2F4;
+  --pp-hover: color-mix(in srgb, var(--ink) 7%, transparent);
+  --pp-text: var(--ink);
+  --pp-muted: #6F6F76;
+  --pp-faint: #A1A1A8;
   --pp-accent: var(--brand);
 
   position: fixed;
@@ -2340,16 +2340,16 @@ body.is-rotating-element * {
   right: 12px;
   bottom: 12px;
   z-index: 60;
-  width: 240px;
+  width: 264px;
   display: none;
   overflow-y: auto;
   overscroll-behavior: contain;
   background: var(--pp-bg);
   border: 1px solid var(--pp-line);
-  border-radius: 13px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15), 0 10px 16px rgba(0, 0, 0, 0.12);
+  border-radius: 24px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 32px rgba(0, 0, 0, 0.08);
   color: var(--pp-text);
-  font: 500 11px/16px var(--font-sans);
+  font: 600 12px/16px var(--font-sans);
   letter-spacing: 0.005em;
   scrollbar-width: none;
 }
@@ -2361,8 +2361,8 @@ body.is-rotating-element * {
 
 .canvas-props i[data-lucide],
 .canvas-props svg.lucide {
-  width: 14px;
-  height: 14px;
+  width: 15px;
+  height: 15px;
   stroke-width: 1.75;
   flex: none;
 }
@@ -2371,15 +2371,16 @@ body.is-rotating-element * {
 .pp-head {
   display: flex;
   align-items: center;
-  gap: 2px;
-  height: 40px;
-  padding: 0 8px 0 16px;
-  border-bottom: 1px solid var(--pp-line);
+  gap: 4px;
+  height: 52px;
+  padding: 4px 12px 0 20px;
 }
 
 .pp-head__title {
   margin-right: auto;
-  font-weight: 550;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 /* Seção: título + linhas, separadas por fio */
@@ -2387,7 +2388,8 @@ body.is-rotating-element * {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 12px 16px 16px;
+  margin: 0 12px;
+  padding: 14px 8px 16px;
   border-bottom: 1px solid var(--pp-line);
 }
 
@@ -2401,9 +2403,14 @@ body.is-rotating-element * {
   margin-right: -8px;
 }
 
+/* Título de seção: caixa-alta pequena e espaçada */
 .pp-section__title {
   margin-right: auto;
-  font-weight: 550;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pp-faint);
   line-height: 24px;
 }
 
@@ -2430,13 +2437,14 @@ body.is-rotating-element * {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  height: 24px;
-  padding: 0 4px 0 8px;
+  height: 32px;
+  padding: 0 6px 0 10px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 10px;
   background: var(--pp-input);
   color: var(--pp-faint);
   cursor: text;
+  transition: border-color var(--transition), background var(--transition);
 }
 
 .pp-field:hover { border-color: var(--pp-line); }
@@ -2449,7 +2457,7 @@ body.is-rotating-element * {
   margin-left: -8px;
   padding-left: 8px;
 }
-.pp-field:focus-within { border-color: var(--pp-accent); }
+.pp-field:focus-within { border-color: var(--pp-accent); background: #FFFFFF; box-shadow: 0 0 0 3px var(--brand-soft); }
 
 .pp-field__label {
   flex: none;
@@ -2478,11 +2486,11 @@ body.is-rotating-element * {
 .pp-select {
   width: 100%;
   min-width: 0;
-  height: 24px;
-  padding: 0 22px 0 8px;
+  height: 32px;
+  padding: 0 26px 0 10px;
   border: 1px solid transparent;
-  border-radius: 5px;
-  background: var(--pp-input) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' fill='none'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%23B3B3B3' stroke-width='1.2'/%3E%3C/svg%3E") no-repeat right 8px center;
+  border-radius: 10px;
+  background: var(--pp-input) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' fill='none'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%23A1A1A8' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
   color: var(--pp-text);
   font: inherit;
   appearance: none;
@@ -2506,40 +2514,41 @@ body.is-rotating-element * {
   align-items: center;
   justify-content: center;
   flex: none;
-  min-width: 24px;
-  height: 24px;
-  padding: 0 4px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
   border: none;
-  border-radius: 5px;
+  border-radius: 9999px;
   background: transparent;
-  color: var(--pp-text);
+  color: var(--pp-muted);
   font: inherit;
   cursor: default;
+  transition: background var(--transition), color var(--transition);
 }
 
-.pp-btn:hover { background: var(--pp-hover); }
-.pp-btn.is-active { background: var(--pp-hover); color: var(--pp-text); }
+.pp-btn:hover { background: var(--pp-hover); color: var(--pp-text); }
+.pp-btn.is-active { background: var(--brand-soft); color: var(--pp-accent); }
 .pp-btn:disabled { opacity: 0.35; pointer-events: none; }
 .pp-btn--type { font-size: 11px; font-weight: 550; }
-.pp-btn--danger:hover { color: #FF7262; }
+.pp-btn--danger:hover { color: #E5484D; }
 
 /* Segmentado: grupo de botões num fundo único */
 .pp-seg {
   display: flex;
   gap: 0;
-  height: 24px;
-  padding: 0;
-  border-radius: 5px;
+  height: 32px;
+  padding: 3px;
+  border-radius: 9999px;
   background: var(--pp-input);
 }
 
 .pp-row > .pp-seg { justify-self: start; }
-.pp-seg .pp-btn { flex: 1; border-radius: 5px; color: var(--pp-muted); }
+.pp-seg .pp-btn { flex: 1; height: 26px; border-radius: 9999px; color: var(--pp-muted); }
 .pp-seg .pp-btn:hover { background: transparent; color: var(--pp-text); }
 .pp-seg .pp-btn.is-active {
-  background: #535353;
+  background: #FFFFFF;
   color: var(--pp-text);
-  box-shadow: inset 0 0 0 1px #5E5E5E;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 1px 6px rgba(0, 0, 0, 0.06);
 }
 .pp-section__head .pp-seg { background: transparent; }
 .pp-seg--full { width: 100%; }
@@ -2551,10 +2560,10 @@ body.is-rotating-element * {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  height: 24px;
-  padding: 0 8px 0 4px;
+  height: 32px;
+  padding: 0 10px 0 6px;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: 10px;
   background: var(--pp-input);
   cursor: default;
 }
@@ -2563,11 +2572,11 @@ body.is-rotating-element * {
 
 .pp-color input[type="color"] {
   flex: none;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: none;
-  border-radius: 3px;
+  border-radius: 6px;
   background: none;
   cursor: default;
   -webkit-appearance: none;
@@ -2577,10 +2586,10 @@ body.is-rotating-element * {
 .pp-color input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
 .pp-color input[type="color"]::-webkit-color-swatch {
   border: none;
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
 }
-.pp-color input[type="color"]::-moz-color-swatch { border: none; border-radius: 3px; }
+.pp-color input[type="color"]::-moz-color-swatch { border: none; border-radius: 6px; }
 
 .pp-color__hex {
   overflow: hidden;
@@ -2590,20 +2599,20 @@ body.is-rotating-element * {
 
 /* Ação principal (Pronto) */
 .pp-primary {
-  height: 32px;
+  height: 40px;
   border: none;
-  border-radius: 5px;
+  border-radius: 9999px;
   background: var(--pp-accent);
   color: #FFFFFF;
   font: inherit;
-  font-weight: 550;
+  font-weight: 800;
   cursor: default;
 }
 
-.pp-primary:hover { background: #0C8CE9; }
+.pp-primary:hover { background: var(--brand-strong); }
 
 /* Com o painel aberto os avisos saem de baixo dele */
-body:has(.pp-panel.is-visible) .oa-toast-stack { right: 264px; transition: right 150ms ease; }
+body:has(.pp-panel.is-visible) .oa-toast-stack { right: 288px; transition: right 150ms ease; }
 
 /* Suporte de exibição a fundo de marca-texto com padding e quebra elegante */
 .canvas-text-node__content span[data-run="1"],
