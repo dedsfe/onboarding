@@ -6554,8 +6554,10 @@
       document.getElementById('canvas-layers-toggle')?.addEventListener('click', () => setCollapsed(true));
       document.getElementById('canvas-layers-open')?.addEventListener('click', () => setCollapsed(false));
 
-      // O canvas usa a roda para pan/zoom; aqui ela tem que rolar a lista
+      // O canvas usa a roda para pan/zoom; aqui (e no painel de propriedades)
+      // ela tem que rolar o painel
       panel.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
+      document.getElementById('canvas-props')?.addEventListener('wheel', e => e.stopPropagation(), { passive: true });
 
       list.addEventListener('click', (e) => {
         const row = e.target.closest('.ly-row');
