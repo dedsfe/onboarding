@@ -109,7 +109,7 @@ async function main() {
   await page.waitForSelector('.bw-node--ref.is-done');
   await page.click('.bw-choice:has-text("A IA decide")');
   await page.click('.bw-brief >> text=Pronto');
-  await page.fill('.bw-qty-big', '3');
+  await page.click('.bw-ruler__tick[data-n="3"]');
   await page.click('.bw-versions >> text=×2'); // 2 copys por post (A/B)
   await page.click('.bw-node--qty >> text=OK');
   await page.waitForSelector('.bw-node--qty.is-done');

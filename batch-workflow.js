@@ -965,28 +965,91 @@
     ]);
   }
 
+  /* Régua de quantidade: arrasta nos tracinhos, a bolha mostra o número e
+     uma pilha de carrosséis cresce junto. Escala não linear (1…500) pra
+     caber na largura do bloco e ser precisa nos números pequenos. */
+  var RULER_STOPS = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50, 60, 75, 100, 150, 200, 300, 500];
+  var RULER_LABELS = [1, 5, 10, 25, 50, 100, 500];
+  var STACK_MAX = 9;
+
+  function rulerIndex(v) {
+    var best = 0;
+    RULER_STOPS.forEach(function (s, i) { if (Math.abs(s - v) < Math.abs(RULER_STOPS[best] - v)) best = i; });
+    return best;
+  }
+
+  function rulerPicker(value, onSet) {
+    var stack = h('div', { class: 'bw-stack', 'aria-hidden': 'true' });
+    var bubble = h('span', { class: 'bw-ruler__bubble' });
+    var track = h('div', { class: 'bw-ruler__track', tabindex: '0', role: 'slider', 'aria-label': 'Quantos carrosséis', 'aria-valuemin': '1', 'aria-valuemax': '500' });
+    var labels = h('div', { class: 'bw-ruler__labels' });
+    RULER_STOPS.forEach(function (v, i) {
+      track.appendChild(h('button', { type: 'button', class: 'bw-ruler__tick' + (RULER_LABELS.indexOf(v) !== -1 ? ' is-major' : ''), 'data-n': String(v), tabindex: '-1', 'aria-label': String(v) }));
+      if (RULER_LABELS.indexOf(v) !== -1) {
+        var lab = h('span', { text: String(v) });
+        lab.style.left = ((i + 0.5) / RULER_STOPS.length * 100) + '%';
+        labels.appendChild(lab);
+      }
+    });
+
+    function fromX(clientX) {
+      var r = track.getBoundingClientRect();
+      var i = Math.floor((clientX - r.left) / r.width * RULER_STOPS.length);
+      return RULER_STOPS[Math.max(0, Math.min(RULER_STOPS.length - 1, i))];
+    }
+    var dragging = false;
+    track.addEventListener('pointerdown', function (e) { dragging = true; track.setPointerCapture(e.pointerId); onSet(fromX(e.clientX)); });
+    track.addEventListener('pointermove', function (e) { if (dragging) { var v = fromX(e.clientX); if (v !== shown) onSet(v); } });
+    track.addEventListener('pointerup', function () { dragging = false; });
+    track.addEventListener('keydown', function (e) {
+      var i = rulerIndex(shown);
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { e.preventDefault(); onSet(RULER_STOPS[Math.min(RULER_STOPS.length - 1, i + 1)]); }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { e.preventDefault(); onSet(RULER_STOPS[Math.max(0, i - 1)]); }
+    });
+
+    var shown = null;
+    function update(v) {
+      shown = v;
+      var idx = rulerIndex(v);
+      bubble.textContent = String(v);
+      bubble.style.left = ((idx + 0.5) / RULER_STOPS.length * 100) + '%';
+      track.setAttribute('aria-valuenow', String(v));
+      Array.prototype.forEach.call(track.children, function (t, i) {
+        t.classList.toggle('is-on', i === idx);
+        t.classList.toggle('is-filled', i < idx);
+      });
+      // Pilha: um cartão por carrossel (até 9), em leque
+      var k = Math.min(v, STACK_MAX);
+      while (stack.children.length < k) stack.appendChild(h('span', { class: 'bw-stack__card' }));
+      while (stack.children.length > k) stack.removeChild(stack.lastChild);
+      Array.prototype.forEach.call(stack.children, function (c, i) {
+        var off = i - (k - 1) / 2;
+        c.style.transform = 'translateX(' + (off * 13) + 'px) translateY(' + (Math.abs(off) * 2.5) + 'px) rotate(' + (off * 5) + 'deg)';
+        c.style.zIndex = String(STACK_MAX - Math.round(Math.abs(off)));
+      });
+      stack.classList.toggle('is-more', v > STACK_MAX);
+    }
+    update(value);
+
+    return {
+      el: h('div', { class: 'bw-ruler' }, [stack, h('div', { class: 'bw-ruler__scale' }, [bubble, track, labels])]),
+      update: update,
+    };
+  }
+
   function qtyNode(m, cur) {
     var st = stateOf('qty', cur);
     var body = [];
     var n = variationsCount();
     if (st === 'active') {
-      var num = h('input', { class: 'bw-qty-big', type: 'number', min: '1', max: '500', value: String(n) });
+      var cur = n;
       var set = function (v) {
-        v = Math.max(1, Math.min(500, parseInt(v, 10) || 1));
-        state.qty.n = String(v); num.value = String(v); saveQty();
-        chips.querySelectorAll('.bw-chip-n').forEach(function (c) { c.classList.toggle('is-on', Number(c.dataset.n) === v); });
+        cur = Math.max(1, Math.min(500, parseInt(v, 10) || 1));
+        state.qty.n = String(cur); saveQty();
+        picker.update(cur);
       };
-      num.addEventListener('input', function () { if (num.value) set(num.value); });
-      var chips = h('div', { class: 'bw-chips-n' });
-      [10, 25, 50, 100].forEach(function (v) {
-        chips.appendChild(h('button', { class: 'bw-chip-n' + (v === n ? ' is-on' : ''), 'data-n': String(v), text: String(v), onclick: function () { set(v); } }));
-      });
-      body.push(h('div', { class: 'bw-stepper' }, [
-        h('button', { class: 'bw-stepper__btn', html: icon('minus'), onclick: function () { set((parseInt(num.value, 10) || 1) - 1); } }),
-        num,
-        h('button', { class: 'bw-stepper__btn', html: icon('plus'), onclick: function () { set((parseInt(num.value, 10) || 0) + 1); } }),
-      ]));
-      body.push(chips);
+      var picker = rulerPicker(n, set);
+      body.push(picker.el);
       if (!(state.texts && !state.texts.fromAi)) {
         var vers = h('div', { class: 'bw-versions', title: 'Copys diferentes por post' }, [h('span', { class: 'bw-versions__icon', html: icon('type') })]);
         [1, 2, 3].forEach(function (v) {
@@ -1000,7 +1063,7 @@
         });
         body.push(vers);
       }
-      body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('check') + '<span>OK</span>', onclick: function () { set(num.value); state.qty.ok = true; saveQty(); render(); } }));
+      body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('check') + '<span>OK</span>', onclick: function () { set(cur); state.qty.ok = true; saveQty(); render(); } }));
     } else if (st === 'done') {
       body.push(h('div', { class: 'bw-big', html: '<strong>×' + n + '</strong>'
         + (copyVersions() > 1 ? '<span class="bw-big__sub" title="Copys diferentes por post">' + icon('type') + '×' + copyVersions() + '</span>' : '') }));

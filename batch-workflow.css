@@ -517,24 +517,9 @@
 /* Variações: número grande com − / + e atalhos */
 .bw-node--qty { width: 200px; }
 .bw-node--qty .bw-node__icon { background: rgba(168, 85, 247, 0.14); color: #A855F7; }
-.bw-stepper { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; }
-.bw-stepper__btn {
-  display: grid; place-items: center; width: 32px; height: 32px; flex: none;
-  border: 1px solid var(--bw-line); border-radius: 8px; background: var(--bw-card); color: var(--bw-text); cursor: pointer;
-}
-.bw-stepper__btn:hover { background: var(--bw-hover); }
-.bw-qty-big {
-  width: 84px; height: 48px; text-align: center;
-  border: 0; border-radius: 8px; background: var(--bw-bg); color: var(--bw-text);
-  font: 700 30px/1 var(--font-sans);
-  -moz-appearance: textfield;
-}
-.bw-qty-big::-webkit-outer-spin-button, .bw-qty-big::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.bw-qty-big:focus { outline: 2px solid var(--bw-accent); }
-.bw-chips-n { display: flex; gap: 4px; width: 100%; }
 .bw-chip-n {
-  flex: 1; height: 26px; border: 1px solid var(--bw-line); border-radius: 6px;
-  background: transparent; color: var(--bw-muted); font: 600 11px var(--font-sans); cursor: pointer;
+  flex: 1; height: 28px; border: 1px solid var(--bw-line); border-radius: 9999px;
+  background: transparent; color: var(--bw-muted); font: 800 12px var(--font-sans); cursor: pointer;
 }
 .bw-chip-n:hover { color: var(--bw-text); background: var(--bw-hover); }
 .bw-chip-n.is-on { border-color: var(--bw-accent); color: var(--bw-accent); background: rgba(124, 58, 237, 0.10); }
@@ -609,3 +594,57 @@
 .bw-ai-pill:hover { color: var(--bw-text); background: var(--bw-hover); }
 
 .bw-body { grid-template-columns: 1fr 300px; }
+
+/* Régua de quantidade (Variações) */
+.bw-ruler { display: flex; flex-direction: column; align-items: stretch; gap: 6px; width: 100%; user-select: none; }
+.bw-stack { position: relative; height: 74px; display: grid; place-items: center; }
+.bw-stack__card {
+  position: absolute;
+  width: 40px; height: 50px;
+  border-radius: 9px;
+  background: linear-gradient(160deg, #FFFFFF, #F1ECFF);
+  border: 1.5px solid rgba(124, 58, 237, 0.35);
+  box-shadow: 0 4px 10px rgba(60, 30, 120, 0.12);
+  transition: transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: bw-card-in 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.bw-stack__card::before, .bw-stack__card::after {
+  content: ''; position: absolute; left: 7px; right: 7px; height: 4px; border-radius: 4px; background: rgba(124, 58, 237, 0.25);
+}
+.bw-stack__card::before { top: 10px; right: 12px; }
+.bw-stack__card::after { top: 18px; }
+.bw-stack.is-more::after {
+  content: '…'; position: absolute; right: 6px; bottom: 2px; font-weight: 800; color: var(--bw-accent);
+}
+@keyframes bw-card-in { from { opacity: 0; transform: translateY(14px) scale(0.6); } }
+
+.bw-ruler__scale { position: relative; padding-top: 34px; }
+.bw-ruler__bubble {
+  position: absolute; top: 0;
+  transform: translateX(-50%);
+  min-width: 34px; height: 26px; padding: 0 9px;
+  display: grid; place-items: center;
+  border-radius: 9999px;
+  background: var(--bw-text); color: #FFFFFF;
+  font-size: 14px; font-weight: 800; font-variant-numeric: tabular-nums;
+  transition: left 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.bw-ruler__track { display: flex; align-items: flex-end; height: 30px; cursor: ew-resize; touch-action: none; outline: none; border-radius: 6px; }
+.bw-ruler__track:focus-visible { box-shadow: 0 0 0 3px var(--brand-soft, rgba(124, 58, 237, 0.12)); }
+.bw-ruler__tick {
+  flex: 1; height: 14px; padding: 0; border: 0; background: none; cursor: inherit; position: relative;
+}
+.bw-ruler__tick::before {
+  content: ''; position: absolute; left: 50%; bottom: 0; width: 2px; height: 100%; margin-left: -1px;
+  border-radius: 2px; background: #D4D4DA;
+  transition: height 160ms ease, background 160ms ease;
+}
+.bw-ruler__tick.is-major::before { height: 20px; }
+.bw-ruler__tick.is-filled::before { background: #8A8A91; }
+.bw-ruler__tick.is-on::before { height: 28px; width: 3px; margin-left: -1.5px; background: var(--bw-accent); }
+.bw-ruler__labels { position: relative; height: 14px; }
+.bw-ruler__labels span {
+  position: absolute; transform: translateX(-50%);
+  font-size: 10.5px; font-weight: 700; color: var(--bw-faint); font-variant-numeric: tabular-nums;
+}
