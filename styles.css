@@ -229,7 +229,8 @@ body {
   inset: 0;
   display: block;
   overflow: hidden;
-  background: var(--bg, #FFFFFF);
+  /* Palco cinza-claro: painéis brancos e posts saltam dele (estilo dump) */
+  background: var(--bg, #EEEEF1);
   z-index: var(--z-canvas);
   cursor: grab;
   touch-action: none;
@@ -334,7 +335,7 @@ body {
   position: absolute;
   inset: 0;
   /* Ponto pequeno e de baixo contraste: a malha some quando você olha o design */
-  background-image: radial-gradient(rgba(100, 116, 139, 0.3) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(60, 60, 70, 0.16) 1px, transparent 1px);
   background-size: 22px 22px;
   background-position: 0 0;
   pointer-events: none;
@@ -1393,10 +1394,11 @@ body {
   padding-bottom: 8px;
   transform-origin: 0 100%;
   transform: scale(var(--inv, 1));
-  font-size: 11.5px;
-  font-weight: 500;
+  /* Nunca mais largo que o post na tela: nome encolhe, formato some antes */
+  max-width: calc(var(--fw, 1080) * 1px / var(--inv, 1));
+  font-size: 12px;
+  font-weight: 700;
   color: var(--ink-secondary);
-  text-shadow: 0 0 4px #FFFFFF, 0 0 8px #FFFFFF;
   white-space: nowrap;
   user-select: none;
   pointer-events: auto;
@@ -1405,40 +1407,48 @@ body {
   gap: 6px;
   z-index: 10;
 }
+.canvas-frame__label > * { min-width: 0; }
 
 .canvas-frame.is-selected .canvas-frame__label {
   color: var(--brand);
 }
 
 .canvas-frame__name-badge {
-  font-weight: 600;
-  color: #1F2937;
+  font-weight: 800;
+  color: var(--ink);
   cursor: pointer;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(0, 0, 0, 0.15);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 3px 10px;
+  border-radius: 9999px;
+  background: #FFFFFF;
+  border: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.05);
   transition: all 120ms ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  display: block;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: auto;
   user-select: none;
   z-index: 50;
 }
 
 .canvas-frame__name-badge:hover {
-  background: #FFFFFF;
-  border-color: var(--brand);
   color: var(--brand);
-  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.15);
 }
 
 .canvas-frame.is-selected .canvas-frame__name-badge {
-  background: #EFF6FF;
-  border-color: var(--brand);
+  background: var(--brand);
+  color: #FFFFFF;
+}
+
+/* Variável de foto do fundo: só o nome, roxo e sublinhado */
+.canvas-frame__bind-tag {
+  flex: 0 0 auto;
   color: var(--brand);
+  font-weight: 800;
+  text-decoration: underline;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
 }
 
 .canvas-frame__name-input {
@@ -1459,9 +1469,12 @@ body {
 }
 
 .canvas-frame__format-badge {
+  flex: 0 1000 auto;
+  overflow: hidden;
+  text-overflow: clip;
   font-size: 11px;
-  opacity: 0.65;
-  color: #6B7280;
+  font-weight: 600;
+  color: #8A8A91;
 }
 
 .canvas-frame__label b {
@@ -1469,7 +1482,13 @@ body {
   color: inherit;
 }
 
-.canvas-frame__label span {
+/* Formato (Instagram Story · 1080 × 1920) só no post selecionado: menos ruído.
+   Ele fica com a sobra da largura (base 0), então nunca corta o nome. */
+.canvas-frame:not(.is-selected) .canvas-frame__format-badge { display: none; }
+.canvas-frame.is-selected .canvas-frame__label { width: calc(var(--fw, 1080) * 1px / var(--inv, 1)); }
+.canvas-frame.is-selected .canvas-frame__format-badge { flex: 1 1 0; }
+
+.canvas-frame__format-badge span {
   opacity: 0.6;
 }
 

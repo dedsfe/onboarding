@@ -6101,7 +6101,7 @@
         const displayName = formatFrameDisplayName(frame, pos);
         const pagination = (p && p.total > 1 && !displayName.includes(String(p.page))) ? ` · ${p.page}/${p.total}` : '';
         const bindTag = frame.bgBind
-          ? ` <span class="canvas-frame__bind-tag" style="background: #7C3AED; color: #FFFFFF; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; vertical-align: middle;">{{${frame.bgBind}}}</span>`
+          ? `<span class="canvas-frame__bind-tag" title="Foto do fundo vem da variável {{${escapeHtml(frame.bgBind)}}}">${escapeHtml(frame.bgBind)}</span>`
           : '';
 
         label.innerHTML = `
@@ -6134,6 +6134,7 @@
 
         el.classList.toggle('is-linked', !!p && p.total > 1);
         el.classList.toggle('has-bg-bind', !!frame.bgBind);
+        el.style.setProperty('--fw', frame.w);
       });
       updateTopbar();
     }
