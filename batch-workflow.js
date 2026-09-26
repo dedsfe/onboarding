@@ -1068,7 +1068,7 @@
         chips.appendChild(h('span', {
           class: 'bw-bind' + (fed ? ' is-fed' : ''),
           title: fed ? 'Vai mudar em cada carrossel' : 'Fica igual ao modelo',
-          html: icon(b.type === 'image' ? 'image' : 'type') + '<span>{{' + escapeHtml(b.name) + '}}</span>',
+          html: icon(b.type === 'image' ? 'image' : 'type') + '<span>' + escapeHtml(b.name) + '</span>',
         }));
       });
       body.push(chips);
