@@ -9,6 +9,7 @@
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="styles.css?v=1790393448">
   <link rel="stylesheet" href="batch-workflow.css">
+  <link rel="stylesheet" href="shader-lab.css">
   <!-- Fontes do editor de carrossel: cada família aqui aparece no seletor do texto -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -712,6 +713,10 @@
             <i data-lucide="layout-template"></i>
             <span>Biblioteca de Templates</span>
           </button>
+          <button type="button" class="canvas-user-menu-btn" id="canvas-user-action-shader-lab">
+            <i data-lucide="flask-conical"></i>
+            <span>Laboratório de Shader</span>
+          </button>
           <div class="canvas-user-menu-divider"></div>
           <button type="button" class="canvas-user-menu-btn canvas-user-menu-btn--auth" id="canvas-user-action-auth">
             <i data-lucide="log-in" id="canvas-user-action-auth-icon"></i>
@@ -1130,9 +1135,21 @@
        -------------------------------------------------- -->
   <div id="canvas-context-menu" class="canvas-context-menu-oa" style="display: none;"></div>
 
+  <!-- --------------------------------------------------
+       LABORATÓRIO DE SHADER (tela cheia, aberta pelo menu da conta)
+       -------------------------------------------------- -->
+  <div class="shader-lab" id="shader-lab" role="dialog" aria-label="Laboratório de Shader">
+    <h2 class="shader-lab__title">Laboratório de Shader</h2>
+    <button type="button" class="shader-lab__close" id="shader-lab-close" title="Fechar (Esc)" aria-label="Fechar">
+      <i data-lucide="x"></i>
+    </button>
+    <div class="shader-lab__card" id="shader-lab-card"></div>
+  </div>
+
   <script src="templates-data.js"></script>
   <script src="mcp-bridge.js"></script>
   <script src="app.js?v=1790029577"></script>
   <script src="batch-workflow.js"></script>
+  <script src="shader-lab.js"></script>
 </body>
 </html>

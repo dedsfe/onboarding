@@ -1,0 +1,75 @@
+/* ==========================================================================
+   LABORATÓRIO DE SHADER — tela cheia com uma carta de poker (63×88mm)
+   ========================================================================== */
+
+.shader-lab {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: #EEEDF2;
+  font-family: 'Nunito', system-ui, sans-serif;
+}
+
+.shader-lab.is-open {
+  display: flex;
+  animation: shader-lab-in 0.22s ease-out;
+}
+
+@keyframes shader-lab-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.shader-lab__close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 999px;
+  background: #fff;
+  color: #1F1B2E;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(31, 27, 46, 0.1);
+  transition: transform 0.15s ease;
+}
+
+.shader-lab__close:hover { transform: scale(1.06); }
+.shader-lab__close svg { width: 18px; height: 18px; }
+
+.shader-lab__title {
+  position: absolute;
+  top: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  color: #1F1B2E;
+  letter-spacing: 0.01em;
+}
+
+/* Carta de poker: 63 × 88mm → proporção 2.5 : 3.5 */
+.shader-lab__card {
+  height: min(70vh, 560px);
+  aspect-ratio: 63 / 88;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow:
+    0 1px 2px rgba(31, 27, 46, 0.06),
+    0 18px 50px rgba(31, 27, 46, 0.14);
+}
+
+@media (max-width: 600px) {
+  .shader-lab__card {
+    height: auto;
+    width: min(78vw, 400px);
+  }
+}
