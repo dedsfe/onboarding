@@ -436,6 +436,35 @@ server.tool(
   }
 );
 
+const IMG_EXT = /\.(png|jpe?g|webp)$/i;
+const MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' };
+
+server.tool(
+  'definir_pastas_lote',
+  'Escolhe a pasta de fotos e a pasta de saída da tela "Criar em lote" por caminho local, sem o usuário clicar no app. Depois, gerar_lote grava os carrosséis direto na pasta de saída.',
+  {
+    fotos: z.string().describe('Caminho da pasta com as fotos (png, jpg, webp)'),
+    saida: z.string().describe('Caminho da pasta onde os carrosséis vão ser gravados (criada se não existir)'),
+  },
+  async ({ fotos, saida }) => {
+    if (!ponteConectada()) return desconectado();
+    try {
+      const dir = path.resolve(fotos.replace(/^~/, os.homedir()));
+      const nomes = fs.readdirSync(dir).filter(n => IMG_EXT.test(n));
+      if (!nomes.length) throw new Error(`nenhuma foto (png, jpg, webp) em ${dir}`);
+      const lista = nomes.map(nome => {
+        const ext = nome.split('.').pop().toLowerCase();
+        return { nome, dataUrl: `data:${MIME[ext]};base64,${fs.readFileSync(path.join(dir, nome)).toString('base64')}` };
+      });
+      const destino = path.resolve(saida.replace(/^~/, os.homedir()));
+      const r = await ponteCmd('lote_pastas', { fotos: lista, pasta: path.basename(dir), saida: destino }, 120000);
+      return { content: [{ type: 'text', text: `✅ ${r.fotos} foto(s) de ${dir} carregadas. Saída: ${destino}` }] };
+    } catch (e) {
+      return { content: [{ type: 'text', text: e.message }], isError: true };
+    }
+  }
+);
+
 server.tool(
   'ver_fotos_lote',
   'Mostra as fotos que o usuário escolheu para o lote, com o índice de cada uma (12 por página). Use o índice em _foto para casar a foto certa com cada copy.',
@@ -462,6 +491,7 @@ const estiloTexto = z.object({
   cor: z.string().optional().describe('Cor hex, ex.: #FFFFFF'),
   peso: z.number().optional().describe('Peso da fonte: 400, 600, 700, 800'),
   alinhamento: z.enum(['left', 'center', 'right']).optional(),
+  fonte: z.string().optional().describe('Família da fonte, ex.: "Poppins", "Playfair Display", "Caveat"'),
 });
 
 const carrosselLote = z
@@ -515,6 +545,9 @@ server.tool(
         tamanho: z.number().optional(), peso: z.number().optional(), cor: z.string().optional(),
         alinhamento: z.enum(['left', 'center', 'right']).optional(),
         fonte: z.string().optional().describe('Família da fonte, ex.: "Inter Tight", "Poppins", "Bebas Neue"'),
+        contorno: z.number().optional().describe('Largura do contorno em px (estilo TikTok: 6–10). Com contorno, a foto fica sem película'),
+        cor_contorno: z.string().optional().describe('Cor do contorno (padrão #000000)'),
+        caixa: z.string().optional().describe('Cor da caixa atrás do texto, ex.: "#FFFFFF" (use texto escuro)'),
       })).optional(),
     })).min(1).max(20),
   },
@@ -550,6 +583,15 @@ server.tool(
     if (!ponteConectada()) return desconectado();
     try {
       const r = await ponteCmd('lote_gerar', { textos }, EXPORT_TIMEOUT_MS);
+      if (r.zip_b64) {
+        // Saída definida por caminho (definir_pastas_lote): o app devolve o zip e o servidor grava no disco
+        fs.mkdirSync(r.saida, { recursive: true });
+        const zipPath = path.join(os.tmpdir(), `tcm-lote-${Date.now()}.zip`);
+        fs.writeFileSync(zipPath, Buffer.from(r.zip_b64, 'base64'));
+        require('child_process').execFileSync('unzip', ['-o', '-q', zipPath, '-d', r.saida]);
+        fs.unlinkSync(zipPath);
+        r.destino = r.saida;
+      }
       return { content: [{ type: 'text', text: `✅ ${r.gerados} carrossel(éis) de ${r.slides} slide(s) gerado(s) → ${r.destino} (com legenda.txt e copys.csv).` }] };
     } catch (e) {
       return { content: [{ type: 'text', text: `Não gerou: ${e.message}` }], isError: true };

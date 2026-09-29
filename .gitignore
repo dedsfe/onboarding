@@ -11,6 +11,9 @@ node_modules/
 
 # Tool caches & temp
 .claude/
+.bulk-maker/
+.build/
+.tmp-lote/
 supabase/.temp/
 .env*
 *.env

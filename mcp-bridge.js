@@ -105,6 +105,10 @@
       return exigirLote().previa(args || {});
     },
 
+    lote_pastas: function (args) {
+      return exigirLote().pastas(args || {});
+    },
+
     lote_fotos: function (args) {
       return exigirLote().fotos(args || {});
     },

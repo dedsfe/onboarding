@@ -5057,6 +5057,8 @@
           const cor = hexRgb(c.color);
           if (!cor) return;
           if (f.bgBind) {
+            // Contorno ou caixa já garantem a leitura: a foto fica sem película
+            if ((Number(c.strokeWidth) || 0) > 0 || (c.bg && c.bg !== 'transparent')) return;
             if (relLum(cor) < 0.5) {
               avisos.push(`${onde(c)}: texto escuro em cima de foto some — troquei pra branco.`);
               c.color = '#FFFFFF';
@@ -9525,7 +9527,7 @@
         return null;
       }
 
-      /* '#<id>:estilo' = { tamanho, cor, peso, alinhamento }: a IA do lote
+      /* '#<id>:estilo' = { tamanho, cor, peso, alinhamento, fonte }: a IA do lote
          ajusta um texto sem mexer no design salvo. */
       function withStyleOverride(tc, overrides) {
         const st = overrides && overrides['#' + tc.id + ':estilo'];
@@ -9535,6 +9537,7 @@
         if (st.cor) out.color = st.cor;
         if (st.peso) out.fontWeight = Number(st.peso);
         if (st.alinhamento) out.align = st.alinhamento;
+        if (st.fonte) out.fontFamily = st.fonte;
         return out;
       }
 
@@ -10474,6 +10477,12 @@
                 align: t.alinhamento || TEXT_DEFAULTS.align,
               };
               if (t.fonte) child.fontFamily = `"${t.fonte}", sans-serif`;
+              // Estilo TikTok: contorno em volta da letra e/ou caixa atrás do texto
+              if (Number(t.contorno) > 0) {
+                child.strokeWidth = Number(t.contorno);
+                child.strokeColor = t.cor_contorno || '#000000';
+              }
+              if (t.caixa) child.bg = t.caixa;
               if (t.chave) child.bind = slugifyBind(t.chave);
               f.children.push(child);
             });

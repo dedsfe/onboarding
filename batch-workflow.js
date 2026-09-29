@@ -1150,7 +1150,7 @@
     var body = [];
     if (st === 'done') {
       body.push(h('div', { class: 'bw-big', html: '<strong>' + total + '</strong><span>' + (total === 1 ? 'carrossel' : 'carrosséis') + '</span>' }));
-      body.push(h('span', { class: 'bw-meta', html: icon(state.out.zip ? 'file-archive' : 'folder') + '<span>' + escapeHtml(state.out.zip ? 'Baixar como .zip' : state.out.name) + '</span>' }));
+      body.push(h('span', { class: 'bw-meta', html: icon(state.out.zip && !state.out.path ? 'file-archive' : 'folder') + '<span>' + escapeHtml(state.out.zip && !state.out.path ? 'Baixar como .zip' : state.out.name) + '</span>' }));
     } else if (st === 'active') {
       if (state.pendingOut) {
         body.push(h('button', { class: 'bw-btn bw-btn--primary bw-cta', html: icon('folder-open') + '<span>Reabrir “' + escapeHtml(state.pendingOut.name) + '”</span>', onclick: function () { reopen('out'); } }));
@@ -1415,7 +1415,13 @@
       else await writeFile(state.out.dir, 'copys.csv', csv);
 
       fill.style.width = '100%';
-      if (zip) {
+      if (zip && state.out.path) {
+        // Saída escolhida pelo MCP: o servidor recebe o zip e grava no disco
+        label.textContent = 'Empacotando .zip…';
+        var b64 = await zip.generateAsync({ type: 'base64' });
+        toast('success', plural(total, 'carrossel pronto', 'carrosséis prontos') + ' em ' + state.out.name);
+        result = { gerados: total, slides: m.frames.length, destino: state.out.path, saida: state.out.path, zip_b64: b64 };
+      } else if (zip) {
         label.textContent = 'Empacotando .zip…';
         var blob = await zip.generateAsync({ type: 'blob' });
         var a = h('a', { href: URL.createObjectURL(blob), download: fileSlug(m.nome) + '-lote.zip' });
@@ -1509,7 +1515,7 @@
       copys: copySlots(m).map(function (c) { return { chave: c.key, slide: c.slide, texto_do_modelo: c.exemplo, caracteres: c.exemplo.length }; }),
       variaveis_de_foto: imageBinds(m).map(function (b) { return b.name; }),
       fotos: state.photos ? { pasta: state.photos.name, total: state.photos.files.length, nomes: state.photos.files.map(nameOf) } : null,
-      saida: state.out ? (state.out.zip ? '.zip baixado no navegador' : 'pasta ' + state.out.name) : null,
+      saida: state.out ? (state.out.path ? 'pasta ' + state.out.path : state.out.zip ? '.zip baixado no navegador' : 'pasta ' + state.out.name) : null,
       textos_ja_escolhidos: state.texts && !state.texts.fromAi ? textCount() : 0,
       pronto: !faltando.length,
       faltando: faltando,
@@ -1647,6 +1653,15 @@
       texts.lines = textos.map(function (t) { return String(t || '').trim(); }).filter(Boolean);
     }
     state.texts = texts;
+    // Fonte trocada pelo _estilo só existe no canvas se o navegador já baixou ela
+    var fontes = {};
+    (texts.rows || []).forEach(function (r) {
+      Object.keys((r && r._estilo) || {}).forEach(function (k) {
+        var st = r._estilo[k];
+        if (st && st.fonte) fontes[(st.peso || 400) + ' 64px "' + st.fonte + '"'] = true;
+      });
+    });
+    await Promise.all(Object.keys(fontes).map(function (f) { return document.fonts.load(f).catch(function () {}); }));
     el.overlay.classList.add('is-open');
     render();
     var res = await generate();
@@ -1655,7 +1670,25 @@
     return res;
   }
 
+  /* Pastas por caminho (MCP): as fotos chegam como dataUrl e a saída vira
+     um zip que o servidor grava no caminho pedido. */
+  async function lotePastas(args) {
+    var lista = (args && args.fotos) || [];
+    if (!lista.length) throw new Error('nenhuma foto recebida');
+    await ready();
+    var files = await Promise.all(lista.map(async function (f) {
+      var blob = await (await fetch(f.dataUrl)).blob();
+      return new File([blob], f.nome, { type: blob.type });
+    }));
+    setPhotosFiles(files, args.pasta || 'fotos');
+    state.pendingOut = null;
+    state.out = { zip: true, path: args.saida, name: String(args.saida).split('/').pop() };
+    render();
+    return { fotos: state.photos ? state.photos.files.length : 0, saida: args.saida };
+  }
+
   window.__tcmLote = {
+    pastas: lotePastas,
     pedido: lotePedido, gerar: loteGerar, previa: lotePrevia,
     fotos: loteFotos, exemplo: loteExemplo, criarMolde: loteCriarMolde,
   };
