@@ -27,3 +27,5 @@ credentials*.json
 lotes/
 mcp/templates-data.js
 mcp/*.tgz
+
+native/BulkMaker/dist/
