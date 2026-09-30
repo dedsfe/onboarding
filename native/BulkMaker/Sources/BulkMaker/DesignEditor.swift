@@ -43,9 +43,7 @@ struct DesignEditorOverlay: View {
             let phoneHeight = min(geometry.size.height - 80, 820)
             let phoneWidth = phoneHeight * 9 / 19.5
             ZStack {
-                Rectangle().fill(.black.opacity(0.45))
-                    .background(.ultraThinMaterial)
-                    .onTapGesture(perform: close)
+                ModalBackdrop(close: close)
                 HStack(spacing: 0) {
                     phone(width: phoneWidth, height: phoneHeight)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -53,11 +51,10 @@ struct DesignEditorOverlay: View {
                         .frame(width: 320)
                         .padding(.vertical, 14).padding(.trailing, 14)
                 }
-                .scaleEffect(appeared ? 1 : 0.97)
-                .opacity(appeared ? 1 : 0)
+                .modalAppearance(appeared)
             }
         }
-        .onAppear { withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) { appeared = true } }
+        .onAppear { withAnimation(.modalAppear) { appeared = true } }
         .task(id: photoURL) { userPhoto = await photoURL.asyncMap(Self.loadPhoto) ?? nil }
         .onExitCommand(perform: close)
         .animation(.spring(response: 0.4, dampingFraction: 0.86), value: mode)
@@ -67,20 +64,7 @@ struct DesignEditorOverlay: View {
 
     private var sidebar: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("Direção visual").font(.system(size: 17, weight: .semibold))
-                Spacer()
-                Button(action: close) {
-                    Image(systemName: "checkmark").font(.system(size: 13, weight: .bold))
-                        .frame(width: 30, height: 30)
-                        .background(Circle().fill(.white))
-                        .foregroundStyle(.black)
-                }
-                .buttonStyle(.plain)
-                .keyboardShortcut(.defaultAction)
-                .help("Concluído")
-            }
-            .padding(.horizontal, 18).padding(.top, 18).padding(.bottom, 14)
+            ModalHeader(title: "Direção visual", done: close)
             HStack(spacing: 2) {
                 modeOption("Com a IA", icon: "sparkles", value: "agent")
                 modeOption("Eu escolho", icon: "slider.horizontal.3", value: "custom")
@@ -90,10 +74,8 @@ struct DesignEditorOverlay: View {
             .padding(.horizontal, 14)
             TextField("Frase de teste", text: $title, axis: .vertical)
                 .textFieldStyle(.plain)
-                .font(.system(size: 14, weight: .medium))
                 .lineLimit(1...3)
-                .padding(.horizontal, 12).padding(.vertical, 10)
-                .background(RoundedRectangle(cornerRadius: 12).fill(.white.opacity(0.08)))
+                .modalField()
                 .padding(.horizontal, 14).padding(.top, 12)
                 .help("Escreva uma frase pra testar no slide")
             if isCustom {
@@ -146,9 +128,7 @@ struct DesignEditorOverlay: View {
             Spacer(minLength: 0)
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        .glassEffect(.regular.tint(.black.opacity(0.3)), in: .rect(cornerRadius: 26))
-        .environment(\.colorScheme, .dark)
-        .foregroundStyle(.white)
+        .modalPanel()
     }
 
     private func modeOption(_ title: String, icon: String, value: String) -> some View {
