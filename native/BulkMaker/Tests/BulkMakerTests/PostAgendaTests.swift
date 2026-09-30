@@ -18,11 +18,11 @@ final class PostAgendaTests: XCTestCase {
 
     func testFillsTodayThenMovesOnRespectingTheDailyLimit() throws {
         var agenda = PostAgenda(rules: .init(maxPerDay: 2, times: ["19:00", "12:00", "08:00"]))
-        let now = date("2026-09-30 10:00")  // quarta; 08:00 já passou, e só 08:00 e 12:00 contam (máx 2)
+        let now = date("2026-09-30 10:00")  // quarta; só os 2 primeiros da lista contam (19:00 e 12:00)
         let folders = (1...3).map { URL(fileURLWithPath: "/tmp/saida/variacao-0\($0)") }
         let placed = try folders.map { try agenda.schedule(folder: $0, now: now, calendar: calendar) }
         XCTAssertEqual(placed.map { "\($0.date) \($0.time)" },
-                       ["2026-09-30 12:00", "2026-10-01 08:00", "2026-10-01 12:00"])
+                       ["2026-09-30 12:00", "2026-09-30 19:00", "2026-10-01 12:00"])
     }
 
     func testSkipsPastTimesAndBlockedWeekdays() {

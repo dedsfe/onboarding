@@ -80,7 +80,7 @@ public struct PostAgenda: Codable, Sendable, Equatable {
 
     /// The earliest free (date, time) that follows the rules and is not in the past.
     public func nextFreeSlot(now: Date = Date(), calendar: Calendar = .current) -> (date: String, time: String)? {
-        let dailyTimes = Array(rules.times.sorted().prefix(max(rules.maxPerDay, 0)))
+        let dailyTimes = Array(rules.times.prefix(max(rules.maxPerDay, 0))).sorted()
         guard !dailyTimes.isEmpty, !rules.weekdays.isEmpty else { return nil }
         let taken = Set(posts.map { $0.date + " " + $0.time })
         var day = calendar.startOfDay(for: now)
@@ -121,7 +121,7 @@ public struct PostAgenda: Codable, Sendable, Equatable {
         }
     }
 
-    static let dayFormatter: DateFormatter = {
+    public static let dayFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"

@@ -146,7 +146,7 @@ enum AgentSession {
         let names = [1: "dom", 2: "seg", 3: "ter", 4: "qua", 5: "qui", 6: "sex", 7: "sáb"]
         let days = Set(rules.weekdays).count == 7 ? "todos os dias"
             : rules.weekdays.sorted().compactMap { names[$0] }.joined(separator: ", ")
-        let times = rules.times.sorted().prefix(max(rules.maxPerDay, 0)).joined(separator: " e ")
+        let times = rules.times.prefix(max(rules.maxPerDay, 0)).sorted().joined(separator: " e ")
         return "até \(rules.maxPerDay) por dia, às \(times), \(days) (regras em `.bulk-maker/agenda.json`)"
     }
 
