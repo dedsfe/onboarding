@@ -161,6 +161,12 @@ final class CanvasBoardTests: XCTestCase {
         XCTAssertGreaterThan(try color(at: CGPoint(x: 590, y: 390)).g, 150)
         XCTAssertLessThan(try color(at: CGPoint(x: 400, y: 450)).r, 50)
         XCTAssertLessThan(try color(at: CGPoint(x: 150, y: 300)).r, 50)
+
+        // Selecting must not paint over the image (it once filled the selection with white).
+        view.selectAll(nil)
+        let selected = try color(at: CGPoint(x: 400, y: 300))
+        XCTAssertGreaterThan(selected.r, 200)
+        XCTAssertLessThan(selected.b, 100)
     }
 
     func testClickSelectsDragMovesAndTheWindowNeverTakesTheClick() async throws {
