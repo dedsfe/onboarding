@@ -65,4 +65,32 @@ final class PostAgendaTests: XCTestCase {
         XCTAssertTrue(state.contains("Agenda: até 3 por dia, às 09:00 e 12:00 e 19:00, seg, ter, qua, qui, sex"))
         XCTAssertTrue(AgentSession.instructions.contains("--agendar"))
     }
+
+    func testMoveAndUnscheduleGuardTheCalendar() throws {
+        let now = date("2026-09-30 09:00")
+        var agenda = PostAgenda()
+        let a = URL(fileURLWithPath: "/tmp/saida/variacao-01"), b = URL(fileURLWithPath: "/tmp/saida/variacao-02")
+        try agenda.schedule(folder: a, now: now, calendar: calendar)
+        try agenda.schedule(folder: b, now: now, calendar: calendar)
+        XCTAssertEqual(try agenda.move(folder: a, date: "2026-10-03", time: "21:00", now: now).date, "2026-10-03")
+        XCTAssertThrowsError(try agenda.move(folder: b, date: "2026-10-03", time: "21:00", now: now))  // ocupado
+        XCTAssertThrowsError(try agenda.move(folder: b, date: "2026-09-29", time: "21:00", now: now))  // passado
+        XCTAssertThrowsError(try agenda.move(folder: b, date: "2026-10-03", time: "25:00", now: now))  // inválido
+        try agenda.unschedule(folder: b)
+        XCTAssertEqual(agenda.posts.map(\.folder), [a.path])
+        XCTAssertTrue(agenda.summary(now: now).contains("sáb 03/10 21:00"))
+    }
+
+    func testCalendarRuleChangeReachesTheAIState() throws {
+        let workspace = FileManager.default.temporaryDirectory.appendingPathComponent("agenda-state-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        try AgentSession.install(in: workspace, state: AgentSession.state(
+            photos: nil, desired: nil, csv: nil, output: nil, variations: 1, design: DesignPreferences(), custom: false))
+        AgentSession.updateAgendaRules(.init(maxPerDay: 3, times: ["09:00", "12:00", "19:00"]), workspace: workspace)
+        let state = try String(contentsOf: workspace.appendingPathComponent("estado.md"), encoding: .utf8)
+        XCTAssertTrue(state.contains("- Agenda: até 3 por dia, às 09:00 e 12:00 e 19:00"))
+        XCTAssertTrue(AgentSession.instructions.contains(".plano.json"))
+        XCTAssertTrue(AgentSession.instructions.contains("--mover"))
+    }
 }

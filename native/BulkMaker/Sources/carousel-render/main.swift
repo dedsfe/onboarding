@@ -4,10 +4,11 @@ import Foundation
 // carousel-render <plano.json>... --saida <pasta> [--lote] [--estilo <estilo.json>] [--revisao <pasta>] [--json]
 // carousel-render --folha <pasta de fotos> --saida <pasta>
 // carousel-render --agendar <pasta da variação>... --agenda <agenda.json>
+// carousel-render --mover <pasta> --para "yyyy-MM-dd HH:mm" | --desagendar <pasta>... | --listar  (+ --agenda)
 // The AI writes the plan (photos, words, highlights); this draws every slide the same way, in milliseconds.
 // Output is terse on purpose: every character printed here is read (and paid for) by the AI.
 let arguments = Array(CommandLine.arguments.dropFirst())
-let valueFlags: Set<String> = ["--saida", "--estilo", "--revisao", "--folha", "--agenda"]
+let valueFlags: Set<String> = ["--saida", "--estilo", "--revisao", "--folha", "--agenda", "--para"]
 
 func value(of flag: String) -> String? {
     guard let index = arguments.firstIndex(of: flag), index + 1 < arguments.count else { return nil }
@@ -29,6 +30,13 @@ uso:
       com todos os slides lado a lado. --json imprime o relatório completo em JSON.
   carousel-render --agendar <pasta da variação>... --agenda <agenda.json>
       coloca cada variação no próximo horário livre da agenda (regras em "rules"), com a legenda.txt dela.
+  carousel-render --mover <pasta da variação> --para "yyyy-MM-dd HH:mm" --agenda <agenda.json>
+  carousel-render --desagendar <pasta da variação>... --agenda <agenda.json>
+  carousel-render --listar --agenda <agenda.json>
+      move, tira da agenda (os arquivos ficam) ou lista os próximos posts.
+
+Cada render grava <pasta da variação>/.plano.json com o estilo aplicado. Para refazer um post:
+edite esse arquivo e rode  carousel-render "<pasta>/.plano.json" --saida "<pasta>"
 
 plano.json:
 {
@@ -41,6 +49,36 @@ plano.json:
 let positional = arguments.indices.filter { index in
     !arguments[index].hasPrefix("--") && !(index > 0 && valueFlags.contains(arguments[index - 1]))
 }.map { arguments[$0] }
+
+let agendaModes = ["--agendar", "--mover", "--desagendar", "--listar"]
+if let mode = agendaModes.first(where: arguments.contains), mode != "--agendar" {
+    guard let agendaPath = value(of: "--agenda") else { fail(usage) }
+    do {
+        let agendaURL = URL(fileURLWithPath: agendaPath)
+        var agenda = try PostAgenda.load(from: agendaURL)
+        switch mode {
+        case "--mover":
+            guard let folder = positional.first, let target = value(of: "--para") else { fail(usage) }
+            let parts = target.split(separator: " ").map(String.init)
+            guard parts.count == 2 else { fail("use --para \"yyyy-MM-dd HH:mm\"") }
+            let post = try agenda.move(folder: URL(fileURLWithPath: folder, isDirectory: true), date: parts[0], time: parts[1])
+            print("\(URL(fileURLWithPath: folder).lastPathComponent) → \(PostAgenda.describe(date: post.date, time: post.time))")
+        case "--desagendar":
+            guard !positional.isEmpty else { fail(usage) }
+            for folder in positional {
+                try agenda.unschedule(folder: URL(fileURLWithPath: folder, isDirectory: true))
+                print("\(URL(fileURLWithPath: folder).lastPathComponent) saiu da agenda")
+            }
+        default:
+            print(agenda.summary())
+        }
+        if mode != "--listar" { try agenda.save(to: agendaURL) }
+        if let next = agenda.nextFreeSlot() {
+            print("próximo horário livre: \(PostAgenda.describe(date: next.date, time: next.time))")
+        }
+    } catch { fail(error.localizedDescription) }
+    exit(0)
+}
 
 if arguments.contains("--agendar") {
     guard let agendaPath = value(of: "--agenda"), !positional.isEmpty else { fail(usage) }
@@ -103,10 +141,21 @@ do {
         let name = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
         let folder = planPaths.count == 1 && !arguments.contains("--lote") ? output : output.appendingPathComponent(name, isDirectory: true)
         let reports = try SlideRenderer.renderPlan(plan, to: folder)
+        // A redo with fewer slides must not leave the old last slides behind.
+        let keep = Set(reports.map { URL(fileURLWithPath: $0.file).lastPathComponent })
+        for stale in (try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []
+        where stale.hasPrefix("slide-") && stale.hasSuffix(".jpg") && !keep.contains(stale) {
+            try? FileManager.default.removeItem(at: folder.appendingPathComponent(stale))
+        }
+        // The exact plan (style included) travels with the variation, so it can be redone later.
+        let planEncoder = JSONEncoder()
+        planEncoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        try planEncoder.encode(plan).write(to: folder.appendingPathComponent(".plano.json"), options: .atomic)
         everything[name] = reports
         slideCount += reports.count
         if path == planPaths.first { print("estilo aplicado: \(describe(plan.style))") }
-        var header = "\(name) → \(folder.path)"
+        // Redoing from a variation's own .plano.json: name it after its folder.
+        var header = "\(name == ".plano" ? folder.lastPathComponent : name) → \(folder.path)"
         if let review = value(of: "--revisao") {
             let sheet = URL(fileURLWithPath: review).appendingPathComponent(name + ".jpg")
             try ContactSheet.reviewSheet(slides: reports.map { URL(fileURLWithPath: $0.file) }, to: sheet)

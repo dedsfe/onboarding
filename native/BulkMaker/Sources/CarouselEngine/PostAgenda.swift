@@ -114,10 +114,60 @@ public struct PostAgenda: Codable, Sendable, Equatable {
         return post
     }
 
+    /// Moves a scheduled folder to an exact "yyyy-MM-dd" + "HH:mm". The slot must be valid, in the
+    /// future and not taken by another post; the daily limit is the user's call here, not enforced.
+    @discardableResult
+    public mutating func move(folder: URL, date: String, time: String, now: Date = Date()) throws -> Post {
+        let path = folder.standardizedFileURL.path
+        guard let index = posts.firstIndex(where: { $0.folder == path }) else { throw AgendaError.notScheduled(path) }
+        guard Self.dayFormatter.date(from: date) != nil, Self.isTime(time) else { throw AgendaError.invalidSlot(date, time) }
+        guard date + " " + time > Self.stamp(now) else { throw AgendaError.pastSlot(date, time) }
+        if let other = posts.first(where: { $0.date == date && $0.time == time && $0.folder != path }) {
+            throw AgendaError.slotTaken(date, time, URL(fileURLWithPath: other.folder).lastPathComponent)
+        }
+        posts[index].date = date
+        posts[index].time = time
+        posts.sort { ($0.date, $0.time) < ($1.date, $1.time) }
+        return posts.first { $0.folder == path }!
+    }
+
+    /// Takes a folder off the agenda; the files stay where they are.
+    public mutating func unschedule(folder: URL) throws {
+        let path = folder.standardizedFileURL.path
+        guard posts.contains(where: { $0.folder == path }) else { throw AgendaError.notScheduled(path) }
+        posts.removeAll { $0.folder == path }
+    }
+
+    /// Upcoming posts, one line each, for the AI to read cheaply.
+    public func summary(now: Date = Date()) -> String {
+        let upcoming = posts.filter { $0.date + " " + $0.time > Self.stamp(now) }
+        guard !upcoming.isEmpty else { return "nenhum post agendado" }
+        return upcoming.map { "\(Self.describe(date: $0.date, time: $0.time)) · \($0.folder)" }.joined(separator: "\n")
+    }
+
+    private static func isTime(_ text: String) -> Bool {
+        let parts = text.split(separator: ":")
+        guard parts.count == 2, parts.allSatisfy({ $0.count == 2 }),
+              let hour = Int(parts[0]), let minute = Int(parts[1]) else { return false }
+        return (0..<24).contains(hour) && (0..<60).contains(minute)
+    }
+
     public enum AgendaError: LocalizedError {
         case noFreeSlot
+        case notScheduled(String)
+        case invalidSlot(String, String)
+        case pastSlot(String, String)
+        case slotTaken(String, String, String)
+
         public var errorDescription: String? {
-            "Não achei horário livre com essas regras (confira dias da semana, horários e máximo por dia)."
+            switch self {
+            case .noFreeSlot:
+                return "Não achei horário livre com essas regras (confira dias da semana, horários e máximo por dia)."
+            case .notScheduled(let folder): return "\(folder) não está na agenda."
+            case .invalidSlot(let date, let time): return "Data ou hora inválida: \(date) \(time) (use yyyy-MM-dd HH:mm)."
+            case .pastSlot(let date, let time): return "\(date) \(time) já passou."
+            case .slotTaken(let date, let time, let other): return "\(date) \(time) já tem \(other)."
+            }
         }
     }
 

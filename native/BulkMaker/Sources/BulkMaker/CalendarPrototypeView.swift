@@ -1,4 +1,5 @@
 import AppKit
+import ImageIO
 import CarouselEngine
 import SwiftUI
 
@@ -15,6 +16,8 @@ struct CalendarPrototypeView: View {
     @State private var agenda = PostAgenda()
     @State private var agendaStamp: Date?
     @State private var showRules = false
+    /// Slide files of each scheduled folder, listed once per agenda change instead of on every redraw.
+    @State private var slidesByFolder: [String: [URL]] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let calendar: Calendar = {
@@ -62,7 +65,17 @@ struct CalendarPrototypeView: View {
         let stamp = (try? Self.agendaFile.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
         guard stamp != agendaStamp else { return }
         agendaStamp = stamp
-        if let loaded = try? PostAgenda.load(from: Self.agendaFile) { agenda = loaded }
+        if let loaded = try? PostAgenda.load(from: Self.agendaFile) {
+            agenda = loaded
+            listSlides()
+        }
+    }
+
+    private func listSlides() {
+        let folders = Set(agenda.posts.map(\.folder))
+        slidesByFolder = Dictionary(uniqueKeysWithValues: folders.map {
+            ($0, slidesByFolder[$0] ?? CalendarPreview.slides(in: URL(fileURLWithPath: $0)))
+        })
     }
 
     /// Load, change and save right away, so an edit here never clobbers a post the AI just added.
@@ -70,7 +83,9 @@ struct CalendarPrototypeView: View {
         var fresh = (try? PostAgenda.load(from: Self.agendaFile)) ?? agenda
         change(&fresh.rules)
         try? fresh.save(to: Self.agendaFile)
+        AgentSession.updateAgendaRules(fresh.rules, workspace: Self.agendaFile.deletingLastPathComponent())
         agenda = fresh
+        listSlides()
         agendaStamp = (try? Self.agendaFile.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
     }
 
@@ -169,14 +184,17 @@ struct CalendarPrototypeView: View {
                         if isToday(day) { Circle().fill(Color.primary.opacity(0.12)) }
                     }
 
-                let scheduled = posts(on: day)
-                if let post = scheduled.first {
-                    slideFan(for: day, slides: CalendarPreview.slides(in: URL(fileURLWithPath: post.folder)),
-                             help: scheduled.map { "\($0.time) · \(URL(fileURLWithPath: $0.folder).lastPathComponent)" }
-                                .joined(separator: "\n"),
-                             extra: scheduled.count - 1)
+                let scheduled = posts(on: day).sorted { $0.time < $1.time }
+                if scheduled.count > 1 {
+                    // Several posts: one card per post, in posting order, each opening its own carousel.
+                    slideFan(for: day, cards: scheduled.prefix(Self.maxFanCards).map { post in
+                        let slides = slidesByFolder[post.folder] ?? []
+                        return FanCard(id: post.id, cover: slides.first, time: post.time, slides: slides)
+                    }, extra: scheduled.count - Self.maxFanCards)
+                } else if let post = scheduled.first {
+                    slideFan(for: day, cards: slideCards(slidesByFolder[post.folder] ?? [], time: post.time), extra: 0)
                 } else if agenda.posts.isEmpty, day == previewDay, preview.coverURL != nil {
-                    slideFan(for: day, slides: preview.slides, help: "Clique para ver o carrossel", extra: 0)
+                    slideFan(for: day, cards: slideCards(preview.slides, time: nil), extra: 0)
                 }
             }
             Spacer(minLength: 0)
@@ -189,53 +207,89 @@ struct CalendarPrototypeView: View {
         .zIndex(hoveredDay == day ? 10 : 0)
     }
 
-    private func slideFan(for day: Int, slides allSlides: [URL], help: String, extra: Int) -> some View {
+    private static let maxFanCards = 4
+
+    private struct FanCard: Identifiable {
+        let id: String
+        let cover: URL?
+        /// Set when each card is its own post; shown under the card while the fan is open.
+        let time: String?
+        let slides: [URL]
+    }
+
+    /// One post: its first slides as cards, all opening the same carousel.
+    private func slideCards(_ slides: [URL], time: String?) -> [FanCard] {
+        slides.prefix(3).map { FanCard(id: $0.path, cover: $0, time: nil, slides: slides) }
+    }
+
+    private func slideFan(for day: Int, cards: [FanCard], extra: Int) -> some View {
         let expanded = hoveredDay == day
-        // A small hand of cards over the day itself: cover in the middle, next slide left, the one after right.
-        let slides = Array(allSlides.prefix(3))
-        let side: [CGFloat] = [0, -1, 1]
-        return Button {
-            openSlides = allSlides
-            withAnimation(.easeOut(duration: 0.2)) { isCarouselOpen = true }
-        } label: {
-            ZStack {
-                ForEach(slides.indices, id: \.self) { index in
-                    if let image = NSImage(contentsOf: slides[index]) {
-                        Image(nsImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: expanded ? 60 : 48, height: expanded ? 80 : 62)
-                            .clipShape(RoundedRectangle(cornerRadius: expanded ? 10 : 9))
-                            .shadow(color: .black.opacity(expanded ? 0.18 : 0), radius: 6, x: 0, y: 3)
-                            .rotationEffect(.degrees(expanded ? Double(side[index]) * 12 : 0), anchor: .bottom)
-                            .offset(x: expanded ? side[index] * 26 : 0, y: expanded ? -8 : 0)
-                            .opacity(expanded || index == 0 ? 1 : 0)
-                            .zIndex(index == 0 ? 1 : 0)
-                    }
+        let isPostList = cards.contains { $0.time != nil }
+        return ZStack {
+            ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
+                // Post cards spread left to right in posting order; slide cards keep the cover
+                // in the middle with the next slide left and the one after right.
+                let side = isPostList ? CGFloat(index) - CGFloat(cards.count - 1) / 2 : [0, -1, 1][index]
+                Button {
+                    openSlides = card.slides
+                    withAnimation(.easeOut(duration: 0.2)) { isCarouselOpen = true }
+                } label: {
+                    fanCardFace(card, expanded: expanded)
                 }
-            }
-            .frame(width: 48, height: 62)
-            .contentShape(Rectangle())
-            .overlay(alignment: .topTrailing) {
-                // More than one post that day: the fan shows the first, the badge says how many more.
-                if extra > 0 && !expanded {
-                    Text("+\(extra)")
-                        .font(.system(size: 11, weight: .bold))
-                        .monospacedDigit()
-                        .padding(.horizontal, 5)
-                        .frame(height: 18)
-                        .background(Capsule().fill(.regularMaterial))
-                        .offset(x: 10, y: -6)
-                }
+                .buttonStyle(.plain)
+                .rotationEffect(.degrees(Double(side) * (expanded ? (isPostList ? 9 : 12) : (isPostList ? 2.5 : 0))), anchor: .bottom)
+                .offset(x: side * (expanded ? (isPostList ? 24 : 26) : (isPostList ? 3 : 0)), y: expanded ? -8 : 0)
+                // A collapsed post list peeks out behind the first cover, so several posts read at a glance.
+                .opacity(expanded || isPostList || index == 0 ? 1 : 0)
+                .zIndex(Double(cards.count - index))
+                .help(card.time.map { "\($0) · clique para ver" } ?? "Clique para ver o carrossel")
             }
         }
-        .buttonStyle(.plain)
+        .frame(width: 48, height: 62)
+        .contentShape(Rectangle())
+        .overlay(alignment: .topTrailing) {
+            // Only past what the fan can show.
+            if extra > 0 && !expanded {
+                Text("+\(extra)")
+                    .font(.system(size: 11, weight: .bold))
+                    .monospacedDigit()
+                    .padding(.horizontal, 5)
+                    .frame(height: 18)
+                    .background(Capsule().fill(.regularMaterial))
+                    .offset(x: 10, y: -6)
+            }
+        }
         .onHover { inside in
             withAnimation(reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.32, dampingFraction: 0.78)) {
                 hoveredDay = inside ? day : nil
             }
         }
-        .help(help)
+    }
+
+    private func fanCardFace(_ card: FanCard, expanded: Bool) -> some View {
+        Group {
+            if let cover = card.cover {
+                SlideImage(url: cover, maxPixel: 240) { image in image.resizable().scaledToFill() }
+            } else {
+                Color.primary.opacity(0.08)
+            }
+        }
+        .frame(width: expanded ? 60 : 48, height: expanded ? 80 : 62)
+        .clipShape(RoundedRectangle(cornerRadius: expanded ? 10 : 9))
+        .shadow(color: .black.opacity(expanded ? 0.18 : 0.08), radius: 6, x: 0, y: 3)
+        .overlay(alignment: .bottom) {
+            if let time = card.time, expanded {
+                Text(time)
+                    .font(.system(size: 10, weight: .semibold))
+                    .monospacedDigit()
+                    .padding(.horizontal, 5)
+                    .frame(height: 16)
+                    .background(Capsule().fill(.regularMaterial))
+                    .offset(y: 9)
+                    .transition(.opacity)
+            }
+        }
+        .contentShape(Rectangle())
     }
 
     private var previewDay: Int {
@@ -374,16 +428,16 @@ private struct CalendarCarouselViewer: View {
     }
 
     private func slide(at url: URL, width: CGFloat, height: CGFloat) -> some View {
-        ZStack {
-            if let image = NSImage(contentsOf: url) {
-                Image(nsImage: image)
+        SlideImage(url: url, maxPixel: 1600) { image in
+            ZStack {
+                image
                     .resizable()
                     .scaledToFill()
                     .frame(width: width, height: height)
                     .blur(radius: 24)
                     .overlay(.black.opacity(0.35))
 
-                Image(nsImage: image)
+                image
                     .resizable()
                     .scaledToFit()
                     .frame(width: width, height: height)
@@ -508,4 +562,55 @@ private struct AgendaRulesEditor: View {
             set: { rules.times[index] = formatter.string(from: $0); save() }
         )
     }
+}
+
+/// A slide decoded off the main thread at the size it is shown and kept in memory,
+/// so hover and drag animations only ever redraw pixels that are already decoded.
+private struct SlideImage<Content: View>: View {
+    let url: URL
+    let maxPixel: Int
+    @ViewBuilder let content: (Image) -> Content
+    @State private var image: NSImage?
+
+    private static var cache: NSCache<NSString, NSImage> {
+        SlideImageCache.shared
+    }
+
+    private var key: NSString { "\(maxPixel)|\(url.path)" as NSString }
+
+    var body: some View {
+        Group {
+            if let image = image ?? Self.cache.object(forKey: key) {
+                content(Image(nsImage: image))
+            } else {
+                // Decoding takes a few milliseconds; the slide fades in when ready.
+                Color.clear
+            }
+        }
+        .task(id: key) {
+            guard Self.cache.object(forKey: key) == nil else { return }
+            let url = url, maxPixel = maxPixel
+            let decoded = await Task.detached(priority: .userInitiated) { () -> CGImage? in
+                guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+                return CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceShouldCacheImmediately: true,
+                    kCGImageSourceThumbnailMaxPixelSize: maxPixel
+                ] as CFDictionary)
+            }.value
+            guard let decoded else { return }
+            let loaded = NSImage(cgImage: decoded, size: .zero)
+            Self.cache.setObject(loaded, forKey: key)
+            withAnimation(.easeOut(duration: 0.2)) { image = loaded }
+        }
+    }
+}
+
+private enum SlideImageCache {
+    static let shared: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 300
+        return cache
+    }()
 }

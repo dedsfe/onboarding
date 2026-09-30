@@ -63,8 +63,16 @@ enum AgentSession {
 
         \(drawingGuide(output: nil))
 
-        ## Agenda de posts
-        `.bulk-maker/agenda.json` guarda as regras (`rules`: `maxPerDay`, `times` em "HH:mm", `weekdays` 1 = domingo … 7 = sábado, `startDate` "yyyy-MM-dd") e os posts agendados (`posts`). Se o usuário pedir outro limite, horário ou dia ("quero 3 por dia", "não posta domingo"), edite só `rules` e confirme em 1 linha. Para tirar ou mover um post, edite o item dele em `posts`. Nunca apague posts que o usuário não mencionou.
+        ## Agenda de posts (o calendário do app)
+        `.bulk-maker/agenda.json` guarda as regras (`rules`: `maxPerDay`, `times` em "HH:mm", `weekdays` 1 = domingo … 7 = sábado, `startDate` "yyyy-MM-dd") e os posts agendados. O calendário do app mostra essa agenda e se atualiza sozinho. Use sempre os comandos, nunca edite `posts` à mão:
+        - Ver o que está agendado: `.bulk-maker/bin/carousel-render --listar --agenda .bulk-maker/agenda.json`
+        - Mover: `... --mover "<pasta da variação>" --para "yyyy-MM-dd HH:mm" --agenda .bulk-maker/agenda.json` (recusa horário ocupado ou passado; se recusar, diga o motivo e sugira o próximo livre)
+        - Tirar da agenda (os arquivos ficam): `... --desagendar "<pasta>" --agenda .bulk-maker/agenda.json`
+        - Mudar regras ("quero 3 por dia", "não posta domingo"): edite só `rules` no JSON e confirme em 1 linha. Posts já agendados não mudam sozinhos; pergunte se quer remanejar.
+        Nunca tire ou mova posts que o usuário não mencionou. "O post de quinta" = rode `--listar` e ache pela data.
+
+        ## Refazer ou alterar um post que já existe
+        Cada pasta de variação tem um `.plano.json` escondido com fotos, textos, destaques e o estilo usados. Para trocar foto, texto ou destaque de um post: edite esse arquivo e rode `.bulk-maker/bin/carousel-render "<pasta>/.plano.json" --saida "<pasta>" --revisao .bulk-maker/revisao` (sem `--estilo`, para manter o visual original; com `--estilo .bulk-maker/estilo.json` só se o usuário pedir o estilo novo). Os slides são substituídos no lugar, o post continua agendado no mesmo horário e o calendário mostra a versão nova. Atualize a `legenda.txt` se o texto mudar.
 
         ## Regras
         - Gere exatamente o número de variações pedido. Cada variação é o carrossel inteiro, na pasta `<saída>/variacao-NN` que a mensagem de gerar indicar (sem indicação, use a próxima livre).
@@ -148,6 +156,14 @@ enum AgentSession {
             : rules.weekdays.sorted().compactMap { names[$0] }.joined(separator: ", ")
         let times = rules.times.prefix(max(rules.maxPerDay, 0)).sorted().joined(separator: " e ")
         return "até \(rules.maxPerDay) por dia, às \(times), \(days) (regras em `.bulk-maker/agenda.json`)"
+    }
+
+    /// The calendar changed the rules: refresh the agenda line of the live state so the hook tells the AI.
+    static func updateAgendaRules(_ rules: PostAgenda.Rules, workspace: URL) {
+        let stateFile = workspace.appendingPathComponent("estado.md")
+        guard let state = try? String(contentsOf: stateFile, encoding: .utf8) else { return }
+        let lines = state.components(separatedBy: "\n").map { $0.hasPrefix("- Agenda:") ? "- Agenda: \(agendaLine(rules))" : $0 }
+        try? install(in: workspace, state: lines.joined(separator: "\n"))
     }
 
     /// Writes the session files next to the batch. Called on every app change through TerminalHandoff.
