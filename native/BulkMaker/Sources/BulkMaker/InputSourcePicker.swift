@@ -56,18 +56,21 @@ struct InputSourcePicker: View {
 
     var body: some View {
         ZStack {
-            ModalBackdrop(close: close)
+            // Just dimmed, no blur: the batch cards stay readable behind the picker.
+            Rectangle().fill(.black.opacity(0.3))
+                .ignoresSafeArea()
+                .onTapGesture(perform: close)
             VStack(spacing: 0) {
                 ModalHeader(title: kind.title, subtitle: error, subtitleIsError: true, done: apply)
-                HStack(alignment: .top, spacing: 18) {
-                    macColumn.frame(width: 290)
+                HStack(alignment: .top, spacing: 16) {
+                    macColumn.frame(width: 240)
                     canvasColumn
                 }
                 .padding(.horizontal, 18)
                 .frame(maxHeight: .infinity, alignment: .top)
                 footer
             }
-            .frame(width: 860, height: 600)
+            .frame(width: 700, height: 480)
             .modalPanel()
             .modalAppearance(appeared)
         }
@@ -163,7 +166,7 @@ struct InputSourcePicker: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 10)], spacing: 10) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 8)], spacing: 8) {
                         ForEach(canvas, id: \.item.id) { entry in canvasCell(entry) }
                     }
                     .padding(4)
