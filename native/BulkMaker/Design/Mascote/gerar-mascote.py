@@ -1,96 +1,118 @@
 #!/usr/bin/env python3
-"""Desenha o Slidi, mascote do The Carousel Maker: um post de TikTok em pé, com rosto na tela.
-Gera um SVG por expressão (normal, feliz, gerando) e uma folha com as três lado a lado."""
+"""Desenha o Slidi, mascote do The Carousel Maker: um cartão 9:16 fosco com rosto estilo Grok Bot.
+Espelha a SlidiView (Sources/BulkMaker/Slidi.swift) — lá ele anima; aqui fica o quadro parado de cada estado.
+Gera um SVG por estado (normal, feliz, gerando, pensando) e uma folha com os quatro sobre fundo grafite."""
+from math import cos, pi, sin
 from pathlib import Path
 
 HERE = Path(__file__).parent
-CYAN, PINK, INK, WHITE = "#25F4EE", "#FE2C55", "#121218", "#FFFFFF"
+CYAN, PINK, GRAPHITE = "#25F4EE", "#FE2C55", "#1C1D21"
+W, H = 216, 384                  # o cartão; todas as medidas saem da largura, como na SlidiView
+CX, TOP = 200, 98                # centro horizontal e topo do cartão num quadro de 400x600
+EYE_Y = TOP + 0.43 * H
+
+DEFS = f'''<defs>
+  <linearGradient id="corpo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#EDEDF2"/><stop offset="1" stop-color="#BDBFC9"/></linearGradient>
+  <linearGradient id="borda" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0" stop-color="{CYAN}"/><stop offset=".2" stop-color="{CYAN}" stop-opacity="0"/>
+    <stop offset=".8" stop-color="{PINK}" stop-opacity="0"/><stop offset="1" stop-color="{PINK}"/>
+  </linearGradient>
+  <linearGradient id="tiktok" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="{CYAN}"/><stop offset="1" stop-color="{PINK}"/></linearGradient>
+  <linearGradient id="olho" gradientUnits="userSpaceOnUse" x1="0" y1="{EYE_Y - 0.2 * W:.1f}" x2="0" y2="{EYE_Y + 0.2 * W:.1f}">
+    <stop offset="0" stop-color="#30333D"/><stop offset="1" stop-color="#0A0A0F"/>
+  </linearGradient>
+  <linearGradient id="reflexo" x1="0" y1="0" x2="0" y2=".25"><stop offset="0" stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>
+  <filter id="brilho" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="{0.04 * W:.1f}"/></filter>
+  <filter id="macio" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="{0.02 * W:.1f}"/></filter>
+  <filter id="bochecha" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="{0.011 * W:.1f}"/></filter>
+  <filter id="sombra" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="{0.07 * W:.1f}" stdDeviation="{0.045 * W:.1f}" flood-color="#000" flood-opacity=".45"/></filter>
+  <clipPath id="cartao"><rect x="{CX - W / 2}" y="{TOP}" width="{W}" height="{H}" rx="{0.3 * W:.1f}"/></clipPath>
+</defs>'''
 
 
-def eyes(expression):
-    if expression == "feliz":
-        # Olhos fechados de alegria: dois arcos ^ ^
-        arc = lambda cx: f'<path d="M{cx-26} 300 Q{cx} 262 {cx+26} 300" fill="none" stroke="{WHITE}" stroke-width="11" stroke-linecap="round"/>'
-        return arc(255) + arc(345)
-    if expression == "gerando":
-        # Olhos em anel de carregamento, girando quando animado
-        ring = lambda cx: (f'<circle cx="{cx}" cy="292" r="27" fill="none" stroke="{WHITE}" stroke-opacity=".22" stroke-width="10"/>'
-                           f'<path d="M{cx} 265 A27 27 0 0 1 {cx+27} 292" fill="none" stroke="{CYAN}" stroke-width="10" stroke-linecap="round"/>')
-        return ring(255) + ring(345)
-    eye = lambda cx: (f'<ellipse cx="{cx}" cy="292" rx="30" ry="37" fill="{WHITE}"/>'
-                      f'<circle cx="{cx+6}" cy="298" r="17" fill="{INK}"/>'
-                      f'<circle cx="{cx+12}" cy="289" r="6" fill="{WHITE}"/>')
-    return eye(255) + eye(345)
+def card(tag, **attrs):
+    extra = " ".join(f'{k.replace("_", "-")}="{v}"' for k, v in attrs.items())
+    return f'<{tag} x="{CX - W / 2}" y="{TOP}" width="{W}" height="{H}" rx="{0.3 * W:.1f}" {extra}/>'
 
 
-def mouth(expression):
-    if expression == "feliz":
-        return f'<path d="M270 348 Q300 386 330 348 Z" fill="{PINK}" stroke="{WHITE}" stroke-width="6" stroke-linejoin="round"/>'
-    if expression == "gerando":
-        return f'<path d="M282 356 Q300 366 318 356" fill="none" stroke="{WHITE}" stroke-width="7" stroke-linecap="round"/>'
-    return f'<path d="M276 350 Q300 374 324 350" fill="none" stroke="{WHITE}" stroke-width="7" stroke-linecap="round"/>'
+def body():
+    inset = 0.005 * W
+    return f'''
+  <!-- luz ciano/rosa vazando no fundo -->
+  {card("rect", fill="none", stroke="url(#borda)", stroke_width=f"{0.04 * W:.1f}", filter="url(#brilho)", opacity=".3")}
+  <!-- corpo fosco, luz de cima, sombra projetada -->
+  {card("rect", fill="url(#corpo)", filter="url(#sombra)")}
+  <g clip-path="url(#cartao)">
+    <!-- sombra interna embaixo, luz interna em cima -->
+    <g transform="translate(0 {-0.04 * W:.1f})">{card("rect", fill="none", stroke="#000", stroke_opacity=".32", stroke_width=f"{0.14 * W:.1f}", filter="url(#brilho)")}</g>
+    <g transform="translate(0 {0.025 * W:.1f})">{card("rect", fill="none", stroke="#fff", stroke_opacity=".8", stroke_width=f"{0.04 * W:.1f}", filter="url(#macio)")}</g>
+    <!-- borda TikTok como luz lateral -->
+    {card("rect", fill="none", stroke="url(#borda)", stroke_width=f"{0.07 * W:.1f}", filter="url(#macio)", opacity=".5")}
+    <!-- brilho especular no topo -->
+    <ellipse cx="{CX}" cy="{TOP + H / 2 - 0.6 * W:.1f}" rx="{0.35 * W:.1f}" ry="{0.13 * W:.1f}" fill="#fff" opacity=".6" filter="url(#brilho)"/>
+  </g>
+  <rect x="{CX - W / 2 + inset:.1f}" y="{TOP + inset:.1f}" width="{W - 2 * inset:.1f}" height="{H - 2 * inset:.1f}" rx="{0.3 * W - inset:.1f}"
+        fill="none" stroke="url(#reflexo)" stroke-width="{0.01 * W:.1f}"/>'''
 
 
-def extras(expression):
-    if expression == "gerando":
-        # Faíscas de "criando imagem" em volta da cabeça
-        spark = lambda x, y, s: (f'<path d="M{x} {y-s} Q{x} {y} {x+s} {y} Q{x} {y} {x} {y+s} Q{x} {y} {x-s} {y} Q{x} {y} {x} {y-s} Z" '
-                                 f'fill="{CYAN}"/>')
-        return spark(150, 190, 16) + spark(452, 168, 12) + spark(468, 250, 8)
-    if expression == "feliz":
-        return (f'<path d="M140 210 l10 -26 M122 226 l-26 -8 M150 236 l18 16" stroke="{PINK}" stroke-width="7" stroke-linecap="round"/>')
-    return ""
+def eye(state, ex):
+    """ex: centro do olho. Cada olho é um traço de ponta redonda, como o EyeShape da SlidiView."""
+    y, u = EYE_Y, W
+    if state == "feliz":
+        a, b = 0.085 * u, y + 0.035 * u
+        return f'<path d="M{ex - a:.1f} {b:.1f} A{a:.1f} {a:.1f} 0 0 1 {ex + a:.1f} {b:.1f}" fill="none" stroke="url(#olho)" stroke-width="{0.07 * u:.1f}" stroke-linecap="round"/>'
+    if state == "gerando":
+        r = 0.075 * u
+        start, end = -0.62 * pi, -0.02 * pi
+        return (f'<circle cx="{ex:.1f}" cy="{y:.1f}" r="{r:.1f}" fill="none" stroke="url(#olho)" stroke-width="{0.05 * u:.1f}"/>'
+                f'<path d="M{ex + r * cos(start):.1f} {y + r * sin(start):.1f} A{r:.1f} {r:.1f} 0 0 1 {ex + r * cos(end):.1f} {y + r * sin(end):.1f}" '
+                f'fill="none" stroke="url(#tiktok)" stroke-width="{0.05 * u:.1f}" stroke-linecap="round"/>')
+    if state == "pensando":
+        x, y0, y1, thick, glint = ex + 0.05 * u, y - 0.1 * u, y, 0.14 * u, (0.08, -0.08)
+    else:
+        x, y0, y1, thick, glint = ex, y - 0.075 * u, y + 0.075 * u, 0.15 * u, (0.03, -0.06)
+    return (f'<path d="M{x:.1f} {y0:.1f} L{x:.1f} {y1:.1f}" stroke="url(#olho)" stroke-width="{thick:.1f}" stroke-linecap="round"/>'
+            f'<circle cx="{ex + glint[0] * u:.1f}" cy="{y + glint[1] * u:.1f}" r="{0.021 * u:.1f}" fill="#fff" opacity=".95"/>')
 
 
-def character(expression, dx=0):
-    body = "M224 118 h152 a44 44 0 0 1 44 44 v340 a44 44 0 0 1 -44 44 h-152 a44 44 0 0 1 -44 -44 v-340 a44 44 0 0 1 44 -44 Z"
-    return f'''<g transform="translate({dx} 0)">
-  <ellipse cx="300" cy="626" rx="120" ry="16" fill="{INK}" opacity=".14"/>
-  <!-- pernas -->
-  <rect x="246" y="540" width="26" height="64" rx="13" fill="{INK}"/>
-  <rect x="328" y="540" width="26" height="64" rx="13" fill="{INK}"/>
-  <ellipse cx="252" cy="606" rx="30" ry="15" fill="{INK}"/>
-  <ellipse cx="348" cy="606" rx="30" ry="15" fill="{INK}"/>
-  <!-- braço esquerdo acenando -->
-  <path d="M184 392 Q140 372 128 322" fill="none" stroke="{INK}" stroke-width="22" stroke-linecap="round"/>
-  <circle cx="126" cy="312" r="20" fill="{INK}"/>
-  <!-- corpo: o post, com o contorno glitch do TikTok -->
-  <path d="{body}" transform="translate(-9 -7)" fill="{CYAN}"/>
-  <path d="{body}" transform="translate(9 7)" fill="{PINK}"/>
-  <path d="{body}" fill="{INK}"/>
-  <!-- ilha dinâmica, o "chapéu" -->
-  <rect x="264" y="138" width="72" height="20" rx="10" fill="#000"/>
-  <!-- abas "Seguindo · Para você" como sobrancelhas -->
-  <rect x="226" y="190" width="58" height="8" rx="4" fill="{WHITE}" opacity=".45"/>
-  <rect x="300" y="190" width="74" height="8" rx="4" fill="{WHITE}"/>
-  <rect x="322" y="204" width="30" height="5" rx="2.5" fill="{WHITE}"/>
-  {eyes(expression)}
-  <ellipse cx="226" cy="336" rx="15" ry="8" fill="#FF7A98" opacity=".8"/>
-  <ellipse cx="374" cy="336" rx="15" ry="8" fill="#FF7A98" opacity=".8"/>
-  {mouth(expression)}
-  <!-- legenda do post -->
-  <rect x="212" y="430" width="128" height="10" rx="5" fill="{WHITE}" opacity=".85"/>
-  <rect x="212" y="450" width="84" height="10" rx="5" fill="{WHITE}" opacity=".55"/>
-  <!-- bolinhas do carrossel -->
-  <rect x="254" y="490" width="30" height="10" rx="5" fill="{WHITE}"/>
-  <circle cx="298" cy="495" r="5" fill="{WHITE}" opacity=".45"/>
-  <circle cx="316" cy="495" r="5" fill="{WHITE}" opacity=".45"/>
-  <circle cx="334" cy="495" r="5" fill="{WHITE}" opacity=".45"/>
-  <!-- braço direito segurando o coração do post -->
-  <path d="M416 392 Q458 402 470 440" fill="none" stroke="{INK}" stroke-width="22" stroke-linecap="round"/>
-  <path d="M474 482 C444 462 430 448 430 432 C430 418 442 410 454 410 C463 410 470 416 474 424 C478 416 485 410 494 410 C506 410 518 418 518 432 C518 448 504 462 474 482 Z"
-        fill="{PINK}" stroke="{WHITE}" stroke-width="5" stroke-linejoin="round"/>
-  {extras(expression)}
+def face(state):
+    dx = 0.02 * W if state == "pensando" else 0
+    cheek = ".55" if state == "feliz" else ".32"
+    parts = []
+    for side in (-1, 1):
+        parts.append(f'<ellipse cx="{CX + dx + side * 0.3 * W:.1f}" cy="{EYE_Y + 0.15 * W:.1f}" rx="{0.075 * W:.1f}" ry="{0.0375 * W:.1f}" '
+                     f'fill="#FF7A99" opacity="{cheek}" filter="url(#bochecha)"/>')
+        parts.append(eye(state, CX + dx + side * 0.19 * W))
+    return "\n  ".join(parts)
+
+
+def dots(state):
+    size, gap, lit = 0.052 * W, 0.038 * W, 0.13 * W
+    x, y = CX - (lit + 3 * size + 3 * gap) / 2, TOP + 0.875 * H - size / 2
+    fill = "url(#tiktok)" if state == "gerando" else "#121217"
+    out = [f'<rect x="{x:.1f}" y="{y:.1f}" width="{lit:.1f}" height="{size:.1f}" rx="{size / 2:.1f}" fill="{fill}" opacity="{1 if state == "gerando" else .78}"/>']
+    x += lit + gap
+    for _ in range(3):
+        out.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{size:.1f}" height="{size:.1f}" rx="{size / 2:.1f}" fill="#121217" opacity=".16"/>')
+        x += size + gap
+    return "".join(out)
+
+
+def character(state, dx=0):
+    return f'''<g transform="translate({dx} 0)">{body()}
+  {face(state)}
+  {dots(state)}
 </g>'''
 
 
-def svg(content, width=600, height=680, background=None):
+def svg(content, width=400, height=600, background=None):
     bg = f'<rect width="100%" height="100%" fill="{background}"/>' if background else ""
-    return f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">{bg}{content}</svg>\n'
+    return f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">\n{DEFS}\n{bg}{content}</svg>\n'
 
 
-for expression in ["normal", "feliz", "gerando"]:
-    (HERE / f"slidi-{expression}.svg").write_text(svg(character(expression)))
-sheet = "".join(character(e, dx=i * 600) for i, e in enumerate(["normal", "feliz", "gerando"]))
-(HERE / "slidi-folha.svg").write_text(svg(sheet, width=1800, background="#F4F1EC"))
+STATES = ["normal", "feliz", "gerando", "pensando"]
+for state in STATES:
+    (HERE / f"slidi-{state}.svg").write_text(svg(character(state)))
+sheet = "".join(character(s, dx=i * 400) for i, s in enumerate(STATES))
+(HERE / "slidi-folha.svg").write_text(svg(sheet, width=1600, background=GRAPHITE))
 print("ok")

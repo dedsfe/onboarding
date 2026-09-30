@@ -32,9 +32,9 @@
   </g>
   <rect x="93.1" y="99.1" width="213.8" height="381.8" rx="63.7"
         fill="none" stroke="url(#reflexo)" stroke-width="2.2"/>
-  <ellipse cx="135.2" cy="295.5" rx="16.2" ry="8.1" fill="#FF7A99" opacity=".32" filter="url(#bochecha)"/>
-  <circle cx="159.0" cy="263.1" r="16.2" fill="none" stroke="url(#olho)" stroke-width="10.8"/><path d="M153.0 248.1 A16.2 16.2 0 0 1 175.1 262.1" fill="none" stroke="url(#tiktok)" stroke-width="10.8" stroke-linecap="round"/>
-  <ellipse cx="264.8" cy="295.5" rx="16.2" ry="8.1" fill="#FF7A99" opacity=".32" filter="url(#bochecha)"/>
-  <circle cx="241.0" cy="263.1" r="16.2" fill="none" stroke="url(#olho)" stroke-width="10.8"/><path d="M235.1 248.1 A16.2 16.2 0 0 1 257.2 262.1" fill="none" stroke="url(#tiktok)" stroke-width="10.8" stroke-linecap="round"/>
-  <rect x="156.8" y="428.4" width="28.1" height="11.2" rx="5.6" fill="url(#tiktok)" opacity="1"/><rect x="193.1" y="428.4" width="11.2" height="11.2" rx="5.6" fill="#121217" opacity=".16"/><rect x="212.5" y="428.4" width="11.2" height="11.2" rx="5.6" fill="#121217" opacity=".16"/><rect x="232.0" y="428.4" width="11.2" height="11.2" rx="5.6" fill="#121217" opacity=".16"/>
+  <ellipse cx="139.5" cy="295.5" rx="16.2" ry="8.1" fill="#FF7A99" opacity=".32" filter="url(#bochecha)"/>
+  <path d="M174.1 241.5 L174.1 263.1" stroke="url(#olho)" stroke-width="30.2" stroke-linecap="round"/><circle cx="180.6" cy="245.8" r="4.5" fill="#fff" opacity=".95"/>
+  <ellipse cx="269.1" cy="295.5" rx="16.2" ry="8.1" fill="#FF7A99" opacity=".32" filter="url(#bochecha)"/>
+  <path d="M256.2 241.5 L256.2 263.1" stroke="url(#olho)" stroke-width="30.2" stroke-linecap="round"/><circle cx="262.6" cy="245.8" r="4.5" fill="#fff" opacity=".95"/>
+  <rect x="156.8" y="428.4" width="28.1" height="11.2" rx="5.6" fill="#121217" opacity="0.78"/><rect x="193.1" y="428.4" width="11.2" height="11.2" rx="5.6" fill="#121217" opacity=".16"/><rect x="212.5" y="428.4" width="11.2" height="11.2" rx="5.6" fill="#121217" opacity=".16"/><rect x="232.0" y="428.4" width="11.2" height="11.2" rx="5.6" fill="#121217" opacity=".16"/>
 </g></svg>
