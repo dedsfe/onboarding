@@ -10,13 +10,13 @@ Este guia complementa `contexto.md`. O objetivo é entregar slides prontos para 
 
 ## Tipografia e acabamento
 
-- Use uma família de destaque com personalidade compatível com o tema e uma família neutra para textos longos. Confirme que as fontes existem no ambiente de renderização; não presuma que uma fonte nomeada será carregada. Se faltar, escolha uma alternativa disponível e verifique a imagem exportada.
-- Para 1080 × 1350 px, comece com título de capa entre 72 e 112 px, títulos internos entre 52 e 80 px, corpo entre 30 e 44 px e metadados entre 24 e 30 px. Ajuste ao conteúdo real. Corpo abaixo de 28 px exige uma justificativa visual e revisão em tamanho de celular.
-- Distribua pesos com intenção: 400–500 para leitura, 600–700 para subtítulos e 700–800 para impacto. Não coloque tudo em negrito. Entrelinha sugerida: 1,05–1,18 em títulos e 1,25–1,45 no corpo.
-- Dê uma margem inicial de 72–96 px nas laterais e 80–110 px no topo e rodapé. Deixe rostos, produto e texto livres de cortes; verifique a área que a interface da rede social pode cobrir.
-- Escolha 2 cores principais e, se necessário, 1 acento. Mantenha contraste legível sobre cada foto. Use película, caixa sólida ou contorno de texto apenas quando resolver um problema concreto de leitura.
-- Borda e raio não são decoração automática. Quando um contêiner fizer sentido, use borda discreta de 1–3 px na resolução final e raio consistente com a direção visual. Contorno em letras sobre foto pode exigir 6–10 px. Evite sombra difusa, gradiente genérico, ícone sem função e cartão em todo slide.
-- Cada slide deve ter um foco claro. Alterne slides com foto dominante, texto e respiro conforme a narrativa; mantenha uma mesma linguagem entre capa, desenvolvimento e fechamento.
+Quem desenha é o renderizador nativo `.bulk-maker/bin/carousel-render`: fonte, tamanho, contorno, contraste, margens e áreas seguras do TikTok já saem calculados, com o estilo de `.bulk-maker/estilo.json`. Não tente reproduzir isso à mão nem desenhar com HTML, navegador ou Python. O que depende de você:
+
+- Texto curto: uma ideia por slide. Se o relatório disser "fonte reduzida", a frase está longa; encurte em vez de aceitar letra pequena.
+- Destaque com intenção: 1–2 palavras por slide que carregam a emoção ou a virada da frase. Nunca destaque artigo, preposição ou a frase inteira.
+- Foto certa para cada texto: prefira fotos com área limpa (parede, céu, lençol) onde o texto vai ficar. Se o relatório disser que escureceu ou clareou a área, veja se outra foto resolve melhor.
+- Rosto livre: confira na folha de revisão que o texto não cobre olhos ou boca. Se cobrir, troque a foto ou fixe `"position"` naquele slide.
+- Ritmo: capa com gancho forte, desenvolvimento com uma ideia por slide, fechamento com CTA. Variações diferem no ângulo da copy e na escolha das fotos, não só em trocar palavras.
 
 ## Fundos
 
@@ -24,6 +24,6 @@ Prioridade: fotos da pasta de origem, depois arquivos da biblioteca local `.bulk
 
 ## Ferramentas e revisão
 
-O projeto contém um editor web e um servidor MCP em `mcp/server.js`. Se as ferramentas MCP do Carousel Maker estiverem conectadas, use `ver_exemplo_lote`, `definir_pastas_lote`, `ver_fotos_lote`, `criar_molde`, `previsualizar_lote` e `gerar_lote` na ordem adequada. `criar_molde` aceita `fonte`, `peso`, `tamanho`, `cor`, `contorno`, `cor_contorno` e `caixa` por campo de texto. Essas ferramentas dependem da ponte do editor web aberta; não suponha que estão disponíveis só porque os arquivos existem. Se não estiverem conectadas, use os meios de renderização realmente disponíveis e valide os arquivos finais.
+Fluxo: folhas de miniaturas (`carousel-render --folha`) para ver referências e fotos → gravar todos os planos → um único `carousel-render .bulk-maker/planos/variacao-*.json --lote --estilo .bulk-maker/estilo.json --saida <saída> --revisao .bulk-maker/revisao` → ler o relatório e a folha de revisão de cada variação → no máximo uma rodada de ajuste.
 
-Revise cada slide renderizado em 1080 px de largura e em tamanho de celular. Confira texto completo, legibilidade, alinhamento, centralização, margens, cor, fidelidade às referências e consistência. Corrija qualquer corte ou overflow antes de entregar. Nunca declare uma variação concluída sem seus arquivos finais.
+Revise pela folha de revisão, não pelos slides soltos: texto completo, rosto livre, fidelidade às referências e consistência entre slides. Cada pasta de variação leva também `legenda.txt`. Nunca declare uma variação concluída sem seus arquivos finais.

@@ -14,17 +14,21 @@ final class BackgroundBatchRunner: ObservableObject {
     @Published private(set) var recentOutput = ""
     private var process: Process?
     private var outputPipe: Pipe?
+    private var outputCheck: (directory: URL, variations: Int, before: BatchOutputValidator.Snapshot)?
 
-    func start(cli: AgentCLI, prompt: String, photos: URL, desired: URL, output: URL) throws {
+    func start(cli: AgentCLI, prompt: String, photos: URL, desired: URL, output: URL,
+               variations: Int) throws {
         guard let executable = cli.executableURL else {
             throw RunnerError.cliMissing(cli.rawValue)
         }
+        let before = try BatchOutputValidator.capture(in: output, variations: variations)
         try launch(executable: executable, arguments: cli.backgroundArguments(
             prompt: prompt, photos: photos, desired: desired, output: output
-        ))
+        ), outputCheck: (output, variations, before))
     }
 
-    func launch(executable: URL, arguments: [String]) throws {
+    func launch(executable: URL, arguments: [String],
+                outputCheck: (directory: URL, variations: Int, before: BatchOutputValidator.Snapshot)? = nil) throws {
         guard status != .running else { return }
 
         let process = Process()
@@ -46,24 +50,44 @@ final class BackgroundBatchRunner: ObservableObject {
         process.terminationHandler = { [weak self] finished in
             Task { @MainActor [weak self] in
                 guard let self, self.process === finished else { return }
+                let check = self.outputCheck
                 self.outputPipe?.fileHandleForReading.readabilityHandler = nil
                 self.outputPipe = nil
                 self.process = nil
+                self.outputCheck = nil
                 if self.status == .cancelled { return }
-                self.status = finished.terminationStatus == 0
-                    ? .completed : .failed(self.failureMessage)
+                guard finished.terminationStatus == 0 else {
+                    self.status = .failed(self.failureMessage)
+                    return
+                }
+                if let check {
+                    let result = await Task.detached(priority: .utility) {
+                        Result { try BatchOutputValidator.validate(in: check.directory,
+                                                                    variations: check.variations,
+                                                                    after: check.before) }
+                    }.value
+                    guard self.status != .cancelled else { return }
+                    switch result {
+                    case .success: self.status = .completed
+                    case .failure(let error): self.status = .failed(error.localizedDescription)
+                    }
+                } else {
+                    self.status = .completed
+                }
             }
         }
 
         recentOutput = ""
         status = .running
         self.process = process
+        self.outputCheck = outputCheck
         outputPipe = pipe
         do {
             try process.run()
         } catch {
             pipe.fileHandleForReading.readabilityHandler = nil
             self.process = nil
+            self.outputCheck = nil
             outputPipe = nil
             status = .failed(error.localizedDescription)
             throw error
@@ -109,10 +133,13 @@ extension AgentCLI {
     func backgroundArguments(prompt: String, photos: URL, desired: URL, output: URL) -> [String] {
         switch self {
         case .claude:
-            return ["-p", prompt, "--permission-mode", "acceptEdits", "--permission-prompts", "none",
+            // Without prompts only edits are accepted; the renderer is the one command the batch must run.
+            let renderer = TerminalHandoff.projectDirectory.appendingPathComponent(".bulk-maker/bin/carousel-render").path
+            return ["-p", prompt] + AgentSession.claudeCostFlags + ["--strict-mcp-config", "--permission-mode", "acceptEdits", "--permission-prompts", "none",
+                    "--allowedTools", "Bash(.bulk-maker/bin/carousel-render:*)", "Bash(\(renderer):*)",
                     "--add-dir", photos.path, desired.path, output.path]
         case .codex:
-            return ["--ask-for-approval", "never", "exec", "--sandbox", "workspace-write",
+            return ["--ask-for-approval", "never"] + AgentSession.codexCostFlags + ["exec", "--sandbox", "workspace-write",
                     "--cd", TerminalHandoff.projectDirectory.path,
                     "--add-dir", output.path, "--skip-git-repo-check", prompt]
         }

@@ -4,10 +4,11 @@ import XCTest
 final class AgentCLITests: XCTestCase {
     func testInteractiveCLIReceivesTheContextPromptAsOneArgument() {
         let prompt = "Leia .bulk-maker/contexto.md e use a pasta d'água"
-        XCTAssertEqual(AgentCLI.claude.shellCommand(prompt: prompt),
-                       "exec claude 'Leia .bulk-maker/contexto.md e use a pasta d'\\''água'")
-        XCTAssertEqual(AgentCLI.codex.shellCommand(prompt: "Leia o contexto"),
-                       "exec codex 'Leia o contexto'")
+        XCTAssertTrue(AgentCLI.claude.shellCommand(prompt: prompt).contains("--strict-mcp-config"))
+        XCTAssertTrue(AgentCLI.claude.shellCommand(prompt: prompt).contains("'Leia .bulk-maker/contexto.md e use a pasta d'\\''água'"))
+        XCTAssertFalse(AgentCLI.claude.shellCommand(prompt: prompt).contains("--mcp-config"))
+        XCTAssertFalse(AgentCLI.codex.shellCommand(prompt: "Leia o contexto").contains("mcp_servers"))
+        XCTAssertTrue(AgentCLI.codex.shellCommand(prompt: "Leia o contexto").hasSuffix("'Leia o contexto'"))
     }
 
     func testBackgroundCommandsKeepPromptAndDirectoriesAsSeparateArguments() {
@@ -21,10 +22,14 @@ final class AgentCLITests: XCTestCase {
         XCTAssertEqual(claude[1], prompt)
         XCTAssertTrue(claude.contains(output.path))
         XCTAssertTrue(claude.contains("acceptEdits"))
+        XCTAssertTrue(claude.contains("--strict-mcp-config"))
+        XCTAssertFalse(claude.contains("--mcp-config"))
+        XCTAssertTrue(claude.contains("Bash(.bulk-maker/bin/carousel-render:*)"))
 
         let codex = AgentCLI.codex.backgroundArguments(prompt: prompt, photos: photos,
                                                         desired: desired, output: output)
-        XCTAssertEqual(Array(codex.prefix(3)), ["--ask-for-approval", "never", "exec"])
+        XCTAssertEqual(Array(codex.prefix(2)), ["--ask-for-approval", "never"])
+        XCTAssertFalse(codex.contains { $0.contains("mcp_servers") })
         XCTAssertEqual(codex.last, prompt)
         XCTAssertTrue(codex.contains(output.path))
     }

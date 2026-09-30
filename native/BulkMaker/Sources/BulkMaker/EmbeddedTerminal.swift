@@ -7,7 +7,21 @@ enum AgentCLI: String {
     case codex
 
     func shellCommand(prompt: String) -> String {
-        "exec \(rawValue) \(TerminalHandoff.shellQuote(prompt))"
+        // No MCP: the AI draws through .bulk-maker/bin/carousel-render in the shell, so no node/Chrome
+        // renderer is started. --strict-mcp-config without a config also skips the user's global servers.
+        // The session starts already knowing the app (sessao.md) and the live batch state (estado-hook);
+        // forgetting what was "seen" makes the first message carry the full state.
+        let workspace = TerminalHandoff.projectDirectory.appendingPathComponent(".bulk-maker", isDirectory: true)
+        let reset = "rm -f \(TerminalHandoff.shellQuote(workspace.appendingPathComponent(".estado-visto.md").path)); "
+        switch self {
+        case .claude:
+            let instructions = workspace.appendingPathComponent("sessao.md").path
+            return reset + "exec claude \(AgentSession.claudeCostFlags.map(TerminalHandoff.shellQuote).joined(separator: " ")) --strict-mcp-config --append-system-prompt-file \(TerminalHandoff.shellQuote(instructions)) "
+                + "--settings \(TerminalHandoff.shellQuote(AgentSession.claudeSettings(workspace: workspace))) \(TerminalHandoff.shellQuote(prompt))"
+        case .codex:
+            let quoted = String(decoding: (try? JSONEncoder().encode(AgentSession.codexInstructions)) ?? Data(), as: UTF8.self)
+            return reset + "exec codex \(AgentSession.codexCostFlags.map(TerminalHandoff.shellQuote).joined(separator: " ")) -c \(TerminalHandoff.shellQuote("developer_instructions=" + quoted)) \(TerminalHandoff.shellQuote(prompt))"
+        }
     }
 }
 
@@ -23,7 +37,8 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
     private var pendingPrompt = ""
 
     init(cli: AgentCLI? = nil, prompt: String = "") {
-        title = cli.map { $0.rawValue.capitalized } ?? "zsh"
+        // The tab names the model, so comparing Sonnet and Opus side by side stays readable.
+        title = cli.map { $0 == .claude ? "Claude \(ClaudeModel.current.label)" : $0.rawValue.capitalized } ?? "zsh"
         pendingCLI = cli
         pendingPrompt = prompt
     }

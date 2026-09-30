@@ -25,16 +25,28 @@ private struct BatchFlowView: View {
     @State private var lastOutputScan = Date.distantPast
     @State private var outputScanSequence = 0
     @State private var errorMessage: String?
+    @State private var pendingOverwrite: BatchRunRequest?
+    @State private var overwriteFileCount = 0
+    @State private var showOverwriteConfirmation = false
     @State private var lastSelectionData: Data?
     @State private var desiredCatalog: PhotoCatalog?
     @State private var showTerminalPanel = false
     // Decoded once and kept in state; reloading the JPEG on every body pass made panning drop frames.
     @State private var backgroundImage = CanvasBackground.load()
     @State private var backgroundIsCustom = CanvasBackground.isCustom
-    @State private var page = Page.batch
+    @State private var page: Page = ProcessInfo.processInfo.arguments.contains("--calendar-preview") ? .calendar : .batch
+    @State private var showDesignEditor = false
     @Namespace private var navSelection
 
-    private enum Page { case batch, settings }
+    private enum Page { case batch, calendar, settings }
+    private struct BatchRunRequest {
+        let photos: URL
+        let desired: URL
+        let csv: URL?
+        let output: URL
+        let variations: Int
+        let cli: AgentCLI
+    }
     @AppStorage("terminalWidth") private var terminalWidth = 480.0
     @AppStorage("canvasZoom") private var zoom = 1.0
     @AppStorage("batchVariations") private var variations = 3
@@ -60,6 +72,15 @@ private struct BatchFlowView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(alignment: .topTrailing) { if page == .batch { terminalToggle.padding(.top, 14).padding(.trailing, 16) } }
         .background { canvasBackground }
+        .overlay {
+            if showDesignEditor {
+                DesignEditorOverlay(photoURL: photos?.files.first) {
+                    withAnimation(.snappy(duration: 0.25)) { showDesignEditor = false }
+                    _ = refreshContext()
+                }
+                .transition(.opacity)
+            }
+        }
         .ignoresSafeArea(.container, edges: .top)
         .onAppear(perform: importSelectionIfChanged)
         .onChange(of: desiredURL, initial: true) { _, url in desiredCatalog = url.flatMap { try? PhotoCatalog(directory: $0) } }
@@ -78,6 +99,16 @@ private struct BatchFlowView: View {
         )) {
             Button("OK") { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
+        .alert("Substituir arquivos existentes?", isPresented: $showOverwriteConfirmation,
+               presenting: pendingOverwrite) { request in
+            Button("Cancelar", role: .cancel) { pendingOverwrite = nil }
+            Button("Substituir e gerar", role: .destructive) {
+                pendingOverwrite = nil
+                launchBatch(request, overwriteApproved: true)
+            }
+        } message: { request in
+            Text("A pasta de saída já contém \(overwriteFileCount) arquivo(s) nas \(request.variations) pastas de variação desta geração. A IA poderá substituir esses arquivos.")
+        }
     }
 
     private var terminalPanel: some View {
@@ -178,7 +209,7 @@ private struct BatchFlowView: View {
         HStack(spacing: 4) {
             navButton("Criar em lote", icon: "square.stack.3d.up", page: .batch)
             comingSoonNavIcon("Canvas", icon: "square.dashed")
-            comingSoonNavIcon("Calendário", icon: "calendar")
+            navButton("Calendário", icon: "calendar", page: .calendar)
             navButton("Configurações", icon: "gearshape", page: .settings)
                 .keyboardShortcut(",", modifiers: .command)
         }
@@ -232,7 +263,11 @@ private struct BatchFlowView: View {
             .font(.system(size: 14)).padding(.horizontal, 20).frame(height: 64)
             .overlay { topNav }
             .zIndex(1)
-            if page == .settings {
+            if page == .calendar {
+                CalendarPrototypeView(outputFolder: outputURL, background: backgroundImage)
+                    .padding(.top, -64)
+                    .transition(.opacity)
+            } else if page == .settings {
                 // Scrolls under the floating nav instead of being cut off below it.
                 SettingsPage(background: backgroundImage, isCustom: backgroundIsCustom,
                              choose: chooseBackground, drop: setBackground, reset: resetBackground,
@@ -253,7 +288,7 @@ private struct BatchFlowView: View {
             .contentShape(Rectangle())
             .clipped()
             .background {
-                CanvasScrollMonitor { delta in
+                CanvasScrollMonitor(isEnabled: !showDesignEditor) { delta in
                     canvasOffset.width += delta.width
                     canvasOffset.height += delta.height
                 }
@@ -346,8 +381,8 @@ private struct BatchFlowView: View {
                 .offset(x: 572)
             AgentNode(missing: missingInputs, variations: $variations,
                       selectedAgentRaw: $selectedAgentRaw, runner: batchRunner,
-                      generate: startBackgroundBatch, openBackgroundLibrary: openBackgroundLibrary,
-                      designChanged: { _ = refreshContext() })
+                      generate: startBackgroundBatch,
+                      openDesign: { withAnimation(.snappy(duration: 0.25)) { showDesignEditor = true } })
                 .offset(x: 286, y: 236)
             FlowNode(title: "Saída", icon: "folder", emptyAction: "Escolher pasta", hasInput: true, hasOutput: false,
                      state: outputURL.map { .output(directory: $0, catalog: outputCatalog, error: outputScanError) } ?? .empty,
@@ -456,20 +491,35 @@ private struct BatchFlowView: View {
     }
     private func launchCLI(_ cli: AgentCLI) {
         guard refreshContext() else { return }
-        tabs.open(cli, prompt: TerminalHandoff.initialPrompt)
+        tabs.open(cli, prompt: AgentSession.openingPrompt)
         withAnimation(.snappy(duration: 0.24)) { showTerminalPanel = true }
     }
     private func startBackgroundBatch() {
         guard missingInputs.isEmpty, let photos = photos?.directory,
               let desired = desiredURL, let output = outputURL else { return }
-        guard refreshContext() else { return }
-        let cli = AgentCLI(rawValue: selectedAgentRaw) ?? .claude
-        let prompt = TerminalHandoff.context(photos: photos, desired: desired,
-                                             csv: csvURL, output: output, variations: variations)
-            + "\n\nExecute agora em segundo plano. Não espere interação no terminal. Se não houver CSV, crie as copys necessárias a partir das referências. Se algo impedir a geração, explique o bloqueio na resposta."
+        let request = BatchRunRequest(photos: photos, desired: desired, csv: csvURL,
+                                      output: output, variations: variations,
+                                      cli: AgentCLI(rawValue: selectedAgentRaw) ?? .claude)
+        // Each run goes to the next free variacao-NN, so nothing is replaced and runs sit side by side.
+        launchBatch(request, overwriteApproved: false)
+    }
+
+    /// "Gerar" opens the chosen AI in the terminal panel, so the user watches the batch and can step in.
+    private func launchBatch(_ request: BatchRunRequest, overwriteApproved: Bool) {
         do {
-            try batchRunner.start(cli: cli, prompt: prompt, photos: photos,
-                                  desired: desired, output: output)
+            _ = try TerminalHandoff.prepare(photos: request.photos, desired: request.desired,
+                                            csv: request.csv, output: request.output,
+                                            variations: request.variations,
+                                            overwriteApproved: overwriteApproved)
+            lastSelectionData = try Data(contentsOf: BatchSelectionBridge.fileURL)
+            // Plans and review sheets from the previous run would be re-rendered by the `variacao-*` glob.
+            let workspace = TerminalHandoff.projectDirectory.appendingPathComponent(".bulk-maker", isDirectory: true)
+            for scratch in ["planos", "revisao"] {
+                try? FileManager.default.removeItem(at: workspace.appendingPathComponent(scratch, isDirectory: true))
+            }
+            tabs.open(request.cli, prompt: AgentSession.generatePrompt(
+                variations: request.variations, firstIndex: BatchOutputValidator.nextFreeIndex(in: request.output)))
+            withAnimation(.snappy(duration: 0.24)) { showTerminalPanel = true }
         } catch { errorMessage = error.localizedDescription }
     }
     @discardableResult
@@ -742,12 +792,11 @@ private struct AgentNode: View {
     let missing: [String]
     @Binding var variations: Int
     @Binding var selectedAgentRaw: String
+    @AppStorage(ClaudeModel.storageKey) private var claudeModel = ClaudeModel.sonnet.rawValue
     @ObservedObject var runner: BackgroundBatchRunner
     let generate: () -> Void
-    let openBackgroundLibrary: () -> Void
-    let designChanged: () -> Void
+    let openDesign: () -> Void
     @State private var isHovering = false
-    @State private var showDesignSettings = false
 
     private var isReady: Bool { missing.isEmpty }
 
@@ -756,11 +805,23 @@ private struct AgentNode: View {
             NodeHeader(title: "CLI + IA", icon: "sparkles", isReady: isReady)
             VStack(spacing: 0) {
                 controlRow("IA") {
-                    Picker("IA", selection: $selectedAgentRaw) {
-                        Text("Claude").tag(AgentCLI.claude.rawValue)
+                    // One menu for CLI + model: "codex" or a Claude model name.
+                    Picker("IA", selection: Binding(
+                        get: { selectedAgentRaw == AgentCLI.codex.rawValue ? AgentCLI.codex.rawValue : claudeModel },
+                        set: { choice in
+                            if choice == AgentCLI.codex.rawValue {
+                                selectedAgentRaw = AgentCLI.codex.rawValue
+                            } else {
+                                selectedAgentRaw = AgentCLI.claude.rawValue
+                                claudeModel = choice
+                            }
+                        }
+                    )) {
+                        ForEach(ClaudeModel.allCases, id: \.self) { Text("Claude \($0.label)").tag($0.rawValue) }
                         Text("Codex").tag(AgentCLI.codex.rawValue)
                     }
-                    .labelsHidden().pickerStyle(.segmented).frame(width: 128)
+                    .labelsHidden().pickerStyle(.menu).fixedSize()
+                    .help("Haiku gasta menos, Opus capricha mais. O Gerar abre a IA escolhida no terminal.")
                 }
                 Divider().opacity(0.6)
                 controlRow("Variações") {
@@ -780,11 +841,11 @@ private struct AgentNode: View {
                     .help("Número de versões completas do carrossel")
                 }
                 Divider().opacity(0.6)
-                Button { showDesignSettings = true } label: {
+                Button(action: openDesign) {
                     controlRow("Direção visual") {
                         HStack(spacing: 6) {
-                            Text(DesignPreferences.current == DesignPreferences() ? "Auto" : "Personalizada")
-                                .font(.system(size: 13)).foregroundStyle(.secondary)
+                            Text(DesignPreferences.current == DesignPreferences() ? "Com a IA" : "Eu escolho")
+                                .font(.system(size: 13)).foregroundStyle(.secondary).lineLimit(1).fixedSize()
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
                         }
@@ -814,9 +875,6 @@ private struct AgentNode: View {
         .onHover { isHovering = $0 }
         .overlay(alignment: .top) { FlowPort().offset(y: -6) }
         .overlay(alignment: .bottom) { FlowPort().offset(y: 6) }
-        .sheet(isPresented: $showDesignSettings, onDismiss: designChanged) {
-            DesignSettingsView(openBackgroundLibrary: openBackgroundLibrary)
-        }
     }
 
     private func controlRow<Control: View>(_ title: String, @ViewBuilder control: () -> Control) -> some View {
@@ -882,7 +940,7 @@ private struct AgentNode: View {
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.orange)
                 .lineLimit(1)
-                .help(runner.recentOutput)
+                .help(message)
         case .cancelled:
             Label("Interrompido", systemImage: "stop.circle")
                 .font(.system(size: 13, weight: .medium))

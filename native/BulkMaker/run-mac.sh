@@ -10,6 +10,8 @@ binary_dir="$(swift build --package-path "$project_dir" --scratch-path "$scratch
 
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
 cp "$binary_dir/BulkMaker" "$app_dir/Contents/MacOS/BulkMaker"
+# Our native slide renderer; TerminalHandoff copies it into each project's .bulk-maker/bin.
+cp "$binary_dir/carousel-render" "$app_dir/Contents/MacOS/carousel-render"
 ditto "$binary_dir/BulkMaker_BulkMaker.bundle" "$app_dir/Contents/Resources/BulkMaker_BulkMaker.bundle"
 cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -27,4 +29,4 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 PLIST
 
 codesign --force --deep --sign - "$app_dir"
-open -a "$app_dir"
+open -n -a "$app_dir"
