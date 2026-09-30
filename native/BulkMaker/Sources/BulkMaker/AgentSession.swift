@@ -1,3 +1,4 @@
+import CarouselEngine
 import Foundation
 
 /// Everything a Claude/Codex session opened by the app needs to already understand the batch:
@@ -36,6 +37,7 @@ enum AgentSession {
         6. O relatório impresso já diz o estilo aplicado e, por slide, tamanho da fonte, linhas, posição e avisos. Confie nele para estilo e cores; não tente conferir cor olhando a imagem. Avisos: "fonte reduzida" = frase longa, encurte; "escureci/clareei" = pouco contraste, prefira foto com área mais limpa.
         7. Revise lendo só `.bulk-maker/revisao/variacao-NN.jpg` (todos os slides da variação numa imagem): texto cobrindo rosto, foto errada, sequência. Não abra os slides um a um. Se precisar corrigir, edite os planos e renderize de novo; no máximo uma rodada de ajuste.
         8. Em cada pasta de variação, grave `legenda.txt` com a legenda do post (2–4 linhas + 3–5 hashtags do nicho).
+        9. Agende todas as variações prontas num comando só: `.bulk-maker/bin/carousel-render --agendar "<saída>/variacao-NN" ... --agenda .bulk-maker/agenda.json`. Ele encaixa cada uma no próximo horário livre pelas regras da agenda e leva a legenda junto; não calcule datas você mesmo. Diga ao usuário em 1 linha quando cada uma vai ao ar.
 
         ## Economia (obrigatório)
         Cada imagem que você abre é reenviada em todas as mensagens seguintes e custa caro. Abra o mínimo: folhas em vez de fotos soltas, a folha de revisão em vez dos slides. Não explore pastas fora do estado do lote, não leia arquivos que não sejam do lote, não crie miniaturas, montagens ou scripts próprios. Junte ações: grave todos os planos e renderize tudo de uma vez. Respostas curtas.
@@ -61,6 +63,9 @@ enum AgentSession {
 
         \(drawingGuide(output: nil))
 
+        ## Agenda de posts
+        `.bulk-maker/agenda.json` guarda as regras (`rules`: `maxPerDay`, `times` em "HH:mm", `weekdays` 1 = domingo … 7 = sábado, `startDate` "yyyy-MM-dd") e os posts agendados (`posts`). Se o usuário pedir outro limite, horário ou dia ("quero 3 por dia", "não posta domingo"), edite só `rules` e confirme em 1 linha. Para tirar ou mover um post, edite o item dele em `posts`. Nunca apague posts que o usuário não mencionou.
+
         ## Regras
         - Gere exatamente o número de variações pedido. Cada variação é o carrossel inteiro, na pasta `<saída>/variacao-NN` que a mensagem de gerar indicar (sem indicação, use a próxima livre).
         - Nunca mexa em variações que já existem na saída: são rodadas anteriores que o usuário quer comparar. Se ele pedir para refazer uma específica, aí sim substitua só ela.
@@ -72,7 +77,7 @@ enum AgentSession {
     /// Human summary of the batch as the app sees it right now. No timestamps, so it only changes
     /// when something the AI must know about changes.
     static func state(photos: URL?, desired: URL?, csv: URL?, output: URL?, variations: Int,
-                      design: DesignPreferences, custom: Bool) -> String {
+                      design: DesignPreferences, custom: Bool, agenda: PostAgenda.Rules = .init()) -> String {
         let fileManager = FileManager.default
         func visibleFiles(_ folder: URL) -> [URL] {
             ((try? fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isRegularFileKey],
@@ -131,8 +136,18 @@ enum AgentSession {
         - Saída: \(outputLine)
         - Variações pedidas: \(variations)
         - Estilo: \(styleLine)
+        - Agenda: \(agendaLine(agenda))
         - Falta escolher: \(missing.isEmpty ? "nada, pronto pra gerar" : missing.joined(separator: ", "))
         """
+    }
+
+    /// Only the rules: posts change while the AI works, and the hook would report them as the user's edits.
+    private static func agendaLine(_ rules: PostAgenda.Rules) -> String {
+        let names = [1: "dom", 2: "seg", 3: "ter", 4: "qua", 5: "qui", 6: "sex", 7: "sáb"]
+        let days = Set(rules.weekdays).count == 7 ? "todos os dias"
+            : rules.weekdays.sorted().compactMap { names[$0] }.joined(separator: ", ")
+        let times = rules.times.sorted().prefix(max(rules.maxPerDay, 0)).joined(separator: " e ")
+        return "até \(rules.maxPerDay) por dia, às \(times), \(days) (regras em `.bulk-maker/agenda.json`)"
     }
 
     /// Writes the session files next to the batch. Called on every app change through TerminalHandoff.

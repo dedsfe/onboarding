@@ -3,10 +3,11 @@ import Foundation
 
 // carousel-render <plano.json>... --saida <pasta> [--lote] [--estilo <estilo.json>] [--revisao <pasta>] [--json]
 // carousel-render --folha <pasta de fotos> --saida <pasta>
+// carousel-render --agendar <pasta da variação>... --agenda <agenda.json>
 // The AI writes the plan (photos, words, highlights); this draws every slide the same way, in milliseconds.
 // Output is terse on purpose: every character printed here is read (and paid for) by the AI.
 let arguments = Array(CommandLine.arguments.dropFirst())
-let valueFlags: Set<String> = ["--saida", "--estilo", "--revisao", "--folha"]
+let valueFlags: Set<String> = ["--saida", "--estilo", "--revisao", "--folha", "--agenda"]
 
 func value(of flag: String) -> String? {
     guard let index = arguments.firstIndex(of: flag), index + 1 < arguments.count else { return nil }
@@ -26,6 +27,8 @@ uso:
       um plano: os slides vão direto em <pasta>. Vários planos (ou --lote): cada um vai em <pasta>/<nome do plano>.
       --estilo troca o "style" dos planos pelo arquivo. --revisao grava <pasta>/<nome do plano>.jpg
       com todos os slides lado a lado. --json imprime o relatório completo em JSON.
+  carousel-render --agendar <pasta da variação>... --agenda <agenda.json>
+      coloca cada variação no próximo horário livre da agenda (regras em "rules"), com a legenda.txt dela.
 
 plano.json:
 {
@@ -34,6 +37,27 @@ plano.json:
                 "position": "top" | "middle" | "bottom" (opcional) } ]
 }
 """
+
+let positional = arguments.indices.filter { index in
+    !arguments[index].hasPrefix("--") && !(index > 0 && valueFlags.contains(arguments[index - 1]))
+}.map { arguments[$0] }
+
+if arguments.contains("--agendar") {
+    guard let agendaPath = value(of: "--agenda"), !positional.isEmpty else { fail(usage) }
+    do {
+        let agendaURL = URL(fileURLWithPath: agendaPath)
+        var agenda = try PostAgenda.load(from: agendaURL)
+        for folder in positional {
+            let post = try agenda.schedule(folder: URL(fileURLWithPath: folder, isDirectory: true))
+            print("\(URL(fileURLWithPath: folder).lastPathComponent) → \(PostAgenda.describe(date: post.date, time: post.time))")
+        }
+        try agenda.save(to: agendaURL)
+        if let next = agenda.nextFreeSlot() {
+            print("próximo horário livre: \(PostAgenda.describe(date: next.date, time: next.time))")
+        }
+    } catch { fail(error.localizedDescription) }
+    exit(0)
+}
 
 guard let outputPath = value(of: "--saida") else { fail(usage) }
 let output = URL(fileURLWithPath: outputPath)
@@ -50,9 +74,7 @@ if arguments.contains("--folha") {
     exit(0)
 }
 
-let planPaths = arguments.indices.filter { index in
-    !arguments[index].hasPrefix("--") && !(index > 0 && valueFlags.contains(arguments[index - 1]))
-}.map { arguments[$0] }
+let planPaths = positional
 guard !planPaths.isEmpty else { fail(usage) }
 
 func describe(_ style: SlideStyle) -> String {

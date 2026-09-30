@@ -1,4 +1,5 @@
 import AppKit
+import CarouselEngine
 import Foundation
 
 /// Keeps the AI workspace (`.bulk-maker`) in sync with what the user picks in the app.
@@ -81,9 +82,13 @@ enum TerminalHandoff {
         ]
         let data = try JSONSerialization.data(withJSONObject: fields, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: workspace.appendingPathComponent("trabalho.json"), options: .atomic)
+        // The agenda starts with default rules and is never overwritten: the AI and the calendar own it.
+        let agendaFile = workspace.appendingPathComponent("agenda.json")
+        let agenda = (try? PostAgenda.load(from: agendaFile)) ?? PostAgenda()
+        if !FileManager.default.fileExists(atPath: agendaFile.path) { try agenda.save(to: agendaFile) }
         try AgentSession.install(in: workspace, state: AgentSession.state(
             photos: photos, desired: desired, csv: csv, output: output, variations: variations, design: design,
-            custom: UserDefaults.standard.string(forKey: DesignPreferences.modeKey) == "custom"))
+            custom: UserDefaults.standard.string(forKey: DesignPreferences.modeKey) == "custom", agenda: agenda.rules))
     }
 
     /// The native renderer ships next to the app binary (run-mac.sh); under `swift test` it sits

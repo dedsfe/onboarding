@@ -15,19 +15,23 @@
 		26D32689D50D11BE3E031CAC /* ContactSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56D38B34F152AA440BEBC66F /* ContactSheet.swift */; };
 		308F87113EB7807E82E54B8A /* TemplateCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78DECE481410886878E05A9D /* TemplateCatalog.swift */; };
 		31EAC359F517756ACBA77C74 /* DesignPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 446B4E1D10024900E15D4467 /* DesignPreferences.swift */; };
+		3B87BC703B87B68007FA7D27 /* PostAgenda.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F8A322B373324F4166AB4AE /* PostAgenda.swift */; };
 		42220422D1F356BAD69425F0 /* CSVDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DFBCDE4D6253555A0C5F0B2 /* CSVDocument.swift */; };
 		4E89339B194C8AD630A87C21 /* OutputCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 06005C10B9113B23D011FC46 /* OutputCatalog.swift */; };
 		5321E0F053B4F4A8076C3D69 /* CalendarPrototypeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36F3F3CA046E84F3A5853EC5 /* CalendarPrototypeView.swift */; };
 		59013002A4C9EB6538989E9C /* BatchSelectionBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 680B5DC2E15C3573876FB31D /* BatchSelectionBridge.swift */; };
+		5F7ED75C269A68416FFA9639 /* obras-nga.json in Resources */ = {isa = PBXBuildFile; fileRef = 7B8F3C759E8F1ACA3FA1FE49 /* obras-nga.json */; };
 		60C1F8D71BD5E610B57808E6 /* PhotoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C2DD3A3851FBA08B7AA764E /* PhotoCatalog.swift */; };
 		613F05ED3DB39242BDD9038A /* fundo-canvas.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 1B62A6B9B70800A123145A99 /* fundo-canvas.jpg */; };
 		74B9A8A465170D71C31E35BD /* CanvasScrollMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8571C86388A48E539B94D3A5 /* CanvasScrollMonitor.swift */; };
 		783452C92B85916278173666 /* design-kit.md in Resources */ = {isa = PBXBuildFile; fileRef = 445EEA293E41DDCE22FA74D1 /* design-kit.md */; };
 		7A06267728D17CF93EA1BD8D /* EmbeddedTerminal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8F91A67D2FA580282A4C221 /* EmbeddedTerminal.swift */; };
 		7A1D8DE980C902BE69BF4CFF /* CanvasBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 543990C7B96D24B9B1F5CAA9 /* CanvasBackground.swift */; };
+		7D1B85E12FE11C79E82182B5 /* ModalStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8F219383FCE2CBABE458FFC /* ModalStyle.swift */; };
 		87C11E26F8C93C757793D084 /* libCarouselEngine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 56DA2B272397F8F9113234F9 /* libCarouselEngine.a */; };
 		9DAF49F2FC7E1DA20D1E772C /* DesignEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5C730FB70C61217A4E579AE /* DesignEditor.swift */; };
 		A12BF75EAE7745753CF03B87 /* TerminalHandoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31F5787D2124D5B88F9E0F5C /* TerminalHandoff.swift */; };
+		A258904808154222451F6EF7 /* ArtworkBrowser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6DA59D094A173E7BD209615C /* ArtworkBrowser.swift */; };
 		A403329330E035CB4B59751F /* BatchOutputValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 921641B402CEF5F17F661067 /* BatchOutputValidator.swift */; };
 		A9E6ECA4D2334AECCA89D741 /* SlidePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1479B8C06159DD83EE7CEC30 /* SlidePlan.swift */; };
 		AF47CA1EC10673593D6C0975 /* modelo-ugc.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 74206F84DA71CCA32D5B535A /* modelo-ugc.jpg */; };
@@ -92,15 +96,19 @@
 		543990C7B96D24B9B1F5CAA9 /* CanvasBackground.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasBackground.swift; sourceTree = "<group>"; };
 		56D38B34F152AA440BEBC66F /* ContactSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactSheet.swift; sourceTree = "<group>"; };
 		56DA2B272397F8F9113234F9 /* libCarouselEngine.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libCarouselEngine.a; sourceTree = BUILT_PRODUCTS_DIR; };
+		5F8A322B373324F4166AB4AE /* PostAgenda.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostAgenda.swift; sourceTree = "<group>"; };
 		680B5DC2E15C3573876FB31D /* BatchSelectionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchSelectionBridge.swift; sourceTree = "<group>"; };
+		6DA59D094A173E7BD209615C /* ArtworkBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkBrowser.swift; sourceTree = "<group>"; };
 		74206F84DA71CCA32D5B535A /* modelo-ugc.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "modelo-ugc.jpg"; sourceTree = "<group>"; };
 		78DECE481410886878E05A9D /* TemplateCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateCatalog.swift; sourceTree = "<group>"; };
+		7B8F3C759E8F1ACA3FA1FE49 /* obras-nga.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "obras-nga.json"; sourceTree = "<group>"; };
 		8571C86388A48E539B94D3A5 /* CanvasScrollMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasScrollMonitor.swift; sourceTree = "<group>"; };
 		89B0C44FFAB0E6DCC2946A42 /* BundleModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleModule.swift; sourceTree = "<group>"; };
 		921641B402CEF5F17F661067 /* BatchOutputValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchOutputValidator.swift; sourceTree = "<group>"; };
 		B8F91A67D2FA580282A4C221 /* EmbeddedTerminal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTerminal.swift; sourceTree = "<group>"; };
 		C5C730FB70C61217A4E579AE /* DesignEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignEditor.swift; sourceTree = "<group>"; };
 		CC9CA09E6424C29AAD92A35A /* SlideRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideRenderer.swift; sourceTree = "<group>"; };
+		D8F219383FCE2CBABE458FFC /* ModalStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModalStyle.swift; sourceTree = "<group>"; };
 		E3F15EC703965CEE6D119F5E /* BulkMakerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkMakerApp.swift; sourceTree = "<group>"; };
 		EDA5879D78679A109377C4C7 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -132,6 +140,7 @@
 				445EEA293E41DDCE22FA74D1 /* design-kit.md */,
 				1B62A6B9B70800A123145A99 /* fundo-canvas.jpg */,
 				74206F84DA71CCA32D5B535A /* modelo-ugc.jpg */,
+				7B8F3C759E8F1ACA3FA1FE49 /* obras-nga.json */,
 				459129C6A00960317823D171 /* templates.json */,
 			);
 			path = Resources;
@@ -179,6 +188,7 @@
 			isa = PBXGroup;
 			children = (
 				56D38B34F152AA440BEBC66F /* ContactSheet.swift */,
+				5F8A322B373324F4166AB4AE /* PostAgenda.swift */,
 				1479B8C06159DD83EE7CEC30 /* SlidePlan.swift */,
 				CC9CA09E6424C29AAD92A35A /* SlideRenderer.swift */,
 			);
@@ -190,6 +200,7 @@
 			isa = PBXGroup;
 			children = (
 				390EF860C38F6BD5AD355022 /* AgentSession.swift */,
+				6DA59D094A173E7BD209615C /* ArtworkBrowser.swift */,
 				921641B402CEF5F17F661067 /* BatchOutputValidator.swift */,
 				680B5DC2E15C3573876FB31D /* BatchSelectionBridge.swift */,
 				E3F15EC703965CEE6D119F5E /* BulkMakerApp.swift */,
@@ -200,6 +211,7 @@
 				C5C730FB70C61217A4E579AE /* DesignEditor.swift */,
 				446B4E1D10024900E15D4467 /* DesignPreferences.swift */,
 				B8F91A67D2FA580282A4C221 /* EmbeddedTerminal.swift */,
+				D8F219383FCE2CBABE458FFC /* ModalStyle.swift */,
 				06005C10B9113B23D011FC46 /* OutputCatalog.swift */,
 				3C2DD3A3851FBA08B7AA764E /* PhotoCatalog.swift */,
 				78DECE481410886878E05A9D /* TemplateCatalog.swift */,
@@ -328,6 +340,7 @@
 				783452C92B85916278173666 /* design-kit.md in Resources */,
 				613F05ED3DB39242BDD9038A /* fundo-canvas.jpg in Resources */,
 				AF47CA1EC10673593D6C0975 /* modelo-ugc.jpg in Resources */,
+				5F7ED75C269A68416FFA9639 /* obras-nga.json in Resources */,
 				258E0CAA4D24F8D42DEA5234 /* templates.json in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -359,6 +372,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0DF3514087C78B9F14EE8881 /* AgentSession.swift in Sources */,
+				A258904808154222451F6EF7 /* ArtworkBrowser.swift in Sources */,
 				A403329330E035CB4B59751F /* BatchOutputValidator.swift in Sources */,
 				59013002A4C9EB6538989E9C /* BatchSelectionBridge.swift in Sources */,
 				2259AB8DFA25E97FC5ED63C7 /* BulkMakerApp.swift in Sources */,
@@ -370,6 +384,7 @@
 				9DAF49F2FC7E1DA20D1E772C /* DesignEditor.swift in Sources */,
 				31EAC359F517756ACBA77C74 /* DesignPreferences.swift in Sources */,
 				7A06267728D17CF93EA1BD8D /* EmbeddedTerminal.swift in Sources */,
+				7D1B85E12FE11C79E82182B5 /* ModalStyle.swift in Sources */,
 				4E89339B194C8AD630A87C21 /* OutputCatalog.swift in Sources */,
 				60C1F8D71BD5E610B57808E6 /* PhotoCatalog.swift in Sources */,
 				308F87113EB7807E82E54B8A /* TemplateCatalog.swift in Sources */,
@@ -390,6 +405,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				26D32689D50D11BE3E031CAC /* ContactSheet.swift in Sources */,
+				3B87BC703B87B68007FA7D27 /* PostAgenda.swift in Sources */,
 				A9E6ECA4D2334AECCA89D741 /* SlidePlan.swift in Sources */,
 				BA246CA8FE238AAB169DA045 /* SlideRenderer.swift in Sources */,
 			);
