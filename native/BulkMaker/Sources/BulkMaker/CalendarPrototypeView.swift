@@ -18,6 +18,7 @@ struct CalendarPrototypeView: View {
     @State private var showRules = false
     /// Slide files of each scheduled folder, listed once per agenda change instead of on every redraw.
     @State private var slidesByFolder: [String: [URL]] = [:]
+    @State private var planStamps: [String: Date?] = [:]
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let calendar: Calendar = {
@@ -62,6 +63,15 @@ struct CalendarPrototypeView: View {
     }
 
     private func reloadAgenda() {
+        // Every render rewrites the variation's .plano.json: a newer one means its slides were redone.
+        for folder in agenda.posts.map(\.folder) {
+            let rendered = (try? URL(fileURLWithPath: folder).appendingPathComponent(".plano.json")
+                .resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            if rendered != planStamps[folder] {
+                planStamps[folder] = rendered
+                slidesByFolder[folder] = CalendarPreview.slides(in: URL(fileURLWithPath: folder))
+            }
+        }
         let stamp = (try? Self.agendaFile.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
         guard stamp != agendaStamp else { return }
         agendaStamp = stamp
