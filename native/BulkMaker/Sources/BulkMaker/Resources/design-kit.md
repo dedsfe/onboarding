@@ -1,6 +1,6 @@
 # Direção de arte para carrosséis
 
-Este guia complementa `contexto.md`. O objetivo é entregar slides prontos para publicar, não apenas um plano de design. Compare cada decisão com os exemplos em "Resultados desejados". Se os exemplos forem inconsistentes, mantenha uma direção visual por variação.
+Este guia complementa `sessao.md`. O objetivo é entregar slides prontos para publicar, não apenas um plano de design. Compare cada decisão com os exemplos em "Resultados desejados". Se os exemplos forem inconsistentes, mantenha uma direção visual por variação.
 
 ## Antes de desenhar
 

@@ -25,9 +25,6 @@ private struct BatchFlowView: View {
     @State private var lastOutputScan = Date.distantPast
     @State private var outputScanSequence = 0
     @State private var errorMessage: String?
-    @State private var pendingOverwrite: BatchRunRequest?
-    @State private var overwriteFileCount = 0
-    @State private var showOverwriteConfirmation = false
     @State private var lastSelectionData: Data?
     @State private var desiredCatalog: PhotoCatalog?
     @State private var showTerminalPanel = false
@@ -56,7 +53,6 @@ private struct BatchFlowView: View {
     @State private var panStart: CGSize?
     @State private var terminalDragStart: Double?
     @StateObject private var tabs = TerminalTabs()
-    @StateObject private var batchRunner = BackgroundBatchRunner()
 
     var body: some View {
         HStack(spacing: 0) {
@@ -99,16 +95,6 @@ private struct BatchFlowView: View {
         )) {
             Button("OK") { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
-        .alert("Substituir arquivos existentes?", isPresented: $showOverwriteConfirmation,
-               presenting: pendingOverwrite) { request in
-            Button("Cancelar", role: .cancel) { pendingOverwrite = nil }
-            Button("Substituir e gerar", role: .destructive) {
-                pendingOverwrite = nil
-                launchBatch(request, overwriteApproved: true)
-            }
-        } message: { request in
-            Text("A pasta de saída já contém \(overwriteFileCount) arquivo(s) nas \(request.variations) pastas de variação desta geração. A IA poderá substituir esses arquivos.")
-        }
     }
 
     private var terminalPanel: some View {
@@ -380,7 +366,7 @@ private struct BatchFlowView: View {
                      state: copyState, pick: importCSV, drop: { loadCSV($0) })
                 .offset(x: 572)
             AgentNode(missing: missingInputs, variations: $variations,
-                      selectedAgentRaw: $selectedAgentRaw, runner: batchRunner,
+                      selectedAgentRaw: $selectedAgentRaw,
                       generate: startBackgroundBatch,
                       openDesign: { withAnimation(.snappy(duration: 0.25)) { showDesignEditor = true } })
                 .offset(x: 286, y: 236)
@@ -501,16 +487,15 @@ private struct BatchFlowView: View {
                                       output: output, variations: variations,
                                       cli: AgentCLI(rawValue: selectedAgentRaw) ?? .claude)
         // Each run goes to the next free variacao-NN, so nothing is replaced and runs sit side by side.
-        launchBatch(request, overwriteApproved: false)
+        launchBatch(request)
     }
 
     /// "Gerar" opens the chosen AI in the terminal panel, so the user watches the batch and can step in.
-    private func launchBatch(_ request: BatchRunRequest, overwriteApproved: Bool) {
+    private func launchBatch(_ request: BatchRunRequest) {
         do {
             _ = try TerminalHandoff.prepare(photos: request.photos, desired: request.desired,
                                             csv: request.csv, output: request.output,
-                                            variations: request.variations,
-                                            overwriteApproved: overwriteApproved)
+                                            variations: request.variations)
             lastSelectionData = try Data(contentsOf: BatchSelectionBridge.fileURL)
             // Plans and review sheets from the previous run would be re-rendered by the `variacao-*` glob.
             let workspace = TerminalHandoff.projectDirectory.appendingPathComponent(".bulk-maker", isDirectory: true)
@@ -793,7 +778,6 @@ private struct AgentNode: View {
     @Binding var variations: Int
     @Binding var selectedAgentRaw: String
     @AppStorage(ClaudeModel.storageKey) private var claudeModel = ClaudeModel.sonnet.rawValue
-    @ObservedObject var runner: BackgroundBatchRunner
     let generate: () -> Void
     let openDesign: () -> Void
     @State private var isHovering = false
@@ -858,7 +842,6 @@ private struct AgentNode: View {
             .padding(.horizontal, 12)
             .background(RoundedRectangle(cornerRadius: 14).fill(.white.opacity(0.14)))
             Spacer(minLength: 0)
-            statusLine
             actionButton
         }
         .padding(16).frame(width: 256, height: 264, alignment: .topLeading)
@@ -884,7 +867,6 @@ private struct AgentNode: View {
             control()
         }
         .frame(height: 38)
-        .disabled(runner.status == .running)
     }
 
     private func stepButton(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
@@ -901,15 +883,7 @@ private struct AgentNode: View {
     }
 
     @ViewBuilder private var actionButton: some View {
-        if runner.status == .running {
-            HStack(spacing: 10) {
-                ProgressView().controlSize(.small)
-                Text("Gerando…").font(.system(size: 13, weight: .semibold))
-                Spacer(minLength: 0)
-                Button("Parar", action: runner.cancel).buttonStyle(.glass)
-            }
-            .frame(height: 34)
-        } else if isReady {
+        if isReady {
             Button(action: generate) {
                 Label(variations == 1 ? "Gerar 1 variação" : "Gerar \(variations) variações", systemImage: "sparkles")
                     .font(.system(size: 13, weight: .semibold))
@@ -924,27 +898,6 @@ private struct AgentNode: View {
                 .lineLimit(1)
                 .frame(maxWidth: .infinity).frame(height: 34)
                 .background(Capsule().fill(.white.opacity(0.14)))
-        }
-    }
-
-    @ViewBuilder private var statusLine: some View {
-        switch runner.status {
-        case .idle, .running:
-            EmptyView()
-        case .completed:
-            Label("Pronto · confira a Saída", systemImage: "checkmark.circle.fill")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.green)
-        case .failed(let message):
-            Label(message, systemImage: "exclamationmark.triangle.fill")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.orange)
-                .lineLimit(1)
-                .help(message)
-        case .cancelled:
-            Label("Interrompido", systemImage: "stop.circle")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.secondary)
         }
     }
 }

@@ -62,48 +62,6 @@ struct DesignPreferences: Equatable {
         )
     }
 
-    var instructions: String {
-        let title = titleFont.trimmingCharacters(in: .whitespacesAndNewlines)
-        let body = bodyFont.trimmingCharacters(in: .whitespacesAndNewlines)
-        let weightInstruction = Int(titleWeight).map { "títulos com peso \($0)" } ?? "peso dos títulos derivado das referências"
-        let sizeInstruction = Int(titleSize).map { "títulos com cerca de \($0)px num slide de 1080px de largura" } ?? "tamanho dos títulos derivado das referências"
-        let colorInstruction = textColor == "auto" ? "cor do texto derivada das referências" : "texto na cor \(textColor), garantindo contraste"
-        let borderInstruction: String
-        switch Int(borders) {
-        case .some(0): borderInstruction = "sem bordas decorativas; use espaço e contraste"
-        case .some(let px): borderInstruction = "bordas de \(px)px, coerentes entre slides"
-        case .none: borderInstruction = "bordas somente se a direção visual pedir"
-        }
-        let backgroundInstruction: String
-        switch backgrounds {
-        case "photos": backgroundInstruction = "priorize as fotos de origem; não use a biblioteca local sem necessidade"
-        case "library": backgroundInstruction = "considere a biblioteca local quando uma imagem complementar fizer sentido; confirme o conteúdo da pasta"
-        case "plain": backgroundInstruction = "prefira superfícies simples; fotos apenas quando essenciais à narrativa"
-        default: backgroundInstruction = "escolha fundos conforme as referências e o assunto"
-        }
-        let strokeInstruction: String
-        switch Int(strokeWidth) {
-        case .some(0): strokeInstruction = "sem contorno"
-        case .some(let px): strokeInstruction = "contorno de \(px)px na cor \(strokeColor == "auto" ? "que der mais contraste com o texto" : strokeColor), estilo legenda do TikTok"
-        case .none: strokeInstruction = "use contorno só se as referências usarem"
-        }
-        return """
-        - Fonte dos títulos: \(title.isEmpty ? "escolha pela referência" : title). Confirme disponibilidade antes de renderizar.
-        - Fonte do corpo: \(body.isEmpty ? "escolha pela referência" : body). Confirme disponibilidade antes de renderizar.
-        - Peso: \(weightInstruction).
-        - Tamanho: \(sizeInstruction).
-        - Cor: \(colorInstruction).
-        - Acabamento: \(borderInstruction).
-        - Fundos: \(backgroundInstruction).
-        - Contorno do texto: \(strokeInstruction).
-        - Posição do texto no slide: \(["top": "no topo", "middle": "no meio", "bottom": "embaixo, acima da legenda do TikTok"][position] ?? "derivada das referências"). Respeite a área dos botões laterais e da legenda do TikTok.
-        - Caixa: \(["upper": "título em CAIXA ALTA", "normal": "título em caixa normal (frase)"][textCase] ?? "derivada das referências").
-        - Destaque: \(highlight == "auto" ? "destaque palavras só se as referências fizerem isso" : "destaque 1–2 palavras-chave por slide na cor \(highlight)").
-        - Alinhamento do texto: \(["leading": "à esquerda", "center": "centralizado", "trailing": "à direita"][align] ?? "derivado das referências").
-        Essas são preferências do usuário para este lote. Se alguma prejudicar a legibilidade ou não puder ser renderizada, adapte com critério e explique a adaptação.
-        """
-    }
-
     /// What carousel-render receives through --estilo. Every "auto" stays nil so the renderer decides;
     /// in "Com a IA" mode `current` is all auto, so the file is just `{}`.
     var slideStyle: SlideStyle {

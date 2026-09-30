@@ -68,7 +68,7 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
                           execName: "-zsh",
                           currentDirectory: TerminalHandoff.projectDirectory.path)
         if cli == nil {
-            view.feed(text: "The Carousel Maker · contexto: .bulk-maker/contexto.md\r\nUse o + para abrir Claude ou Codex já com o contexto do lote.\r\n\r\n")
+            view.feed(text: "The Carousel Maker\r\nUse o + para abrir Claude ou Codex já por dentro do lote.\r\n\r\n")
         }
         return view
     }
