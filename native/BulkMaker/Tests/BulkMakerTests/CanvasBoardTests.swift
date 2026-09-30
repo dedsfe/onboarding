@@ -162,6 +162,19 @@ final class CanvasBoardTests: XCTestCase {
         XCTAssertLessThan(try color(at: CGPoint(x: 400, y: 450)).r, 50)
         XCTAssertLessThan(try color(at: CGPoint(x: 150, y: 300)).r, 50)
 
+        // Zoomed out, a relayout (the selection toolbar appearing, a window resize) must keep the images
+        // where the handles are; setting the world layer's frame once slid them to the corner.
+        view.zoomOut()
+        for _ in 0..<12 { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertEqual(view.scale, 1 / 1.4, accuracy: 0.001)
+        view.needsLayout = true
+        view.layoutSubtreeIfNeeded()
+        XCTAssertGreaterThan(try color(at: CGPoint(x: 400, y: 300)).r, 200)
+        XCTAssertGreaterThan(try color(at: CGPoint(x: 400 + 190 / 1.4, y: 300 + 90 / 1.4)).r, 200)
+        XCTAssertLessThan(try color(at: CGPoint(x: 400 + 215 / 1.4, y: 300)).r, 50)
+        view.actualSize()
+        for _ in 0..<12 { try await Task.sleep(for: .milliseconds(50)) }
+
         // Selecting must not paint over the image (it once filled the selection with white).
         view.selectAll(nil)
         let selected = try color(at: CGPoint(x: 400, y: 300))

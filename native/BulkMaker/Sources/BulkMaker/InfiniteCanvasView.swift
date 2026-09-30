@@ -125,7 +125,11 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         super.layout()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        for sublayer in [grid, world, groupOutline, guides, handles, marquee] as [CALayer] { sublayer.frame = bounds }
+        for sublayer in [grid, groupOutline, guides, handles, marquee] as [CALayer] { sublayer.frame = bounds }
+        // Never `frame` here: the world layer carries the pan/zoom transform, and setting a transformed
+        // layer's frame moves it so the images slid away from their handles after any relayout.
+        world.bounds = CGRect(origin: .zero, size: bounds.size)
+        world.position = .zero
         dropGlow.frame = bounds.insetBy(dx: 14, dy: 14)
         CATransaction.commit()
         if !hasPlacedViewport, bounds.width > 0 {
