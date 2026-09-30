@@ -50,6 +50,14 @@ final class CanvasBoard {
 
     func url(of item: CanvasItem) -> URL { media.appendingPathComponent(item.file) }
 
+    /// Another board's images, read only: no orphan cleanup, so an open canvas's undo never loses a file.
+    nonisolated static func savedItems(in directory: URL) -> [(item: CanvasItem, url: URL)] {
+        guard let data = try? Data(contentsOf: directory.appendingPathComponent("board.json")),
+              let items = try? JSONDecoder().decode([CanvasItem].self, from: data) else { return [] }
+        let media = directory.appendingPathComponent("media", isDirectory: true)
+        return items.map { ($0, media.appendingPathComponent($0.file)) }
+    }
+
     // MARK: - Editing
 
     func setFrame(_ frame: CGRect, of id: UUID) {
@@ -194,7 +202,7 @@ final class CanvasBoard {
         pasteboard.writeObjects(pasteboardItems(for: items))
     }
 
-    static func pngData(of url: URL) -> Data? {
+    nonisolated static func pngData(of url: URL) -> Data? {
         guard let image = displayImage(of: url, maxPixel: 4096) else { return nil }
         return NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:])
     }

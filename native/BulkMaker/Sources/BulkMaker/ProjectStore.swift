@@ -10,6 +10,16 @@ struct Project: Codable, Equatable {
     var created = Date()
     /// Photos, references, CSV and output, as the batch screen last had them for this project.
     var selection: BatchSelection?
+    /// Where photos and references come from when they mix Finder and canvas.
+    var photoSources: InputSources?
+    var desiredSources: InputSources?
+
+    func sources(for kind: InputKind) -> InputSources? {
+        switch kind {
+        case .photos: return photoSources
+        case .desired: return desiredSources
+        }
+    }
 }
 
 /// A project on disk: a real folder with `projeto.json`, its own canvas and, by default, its output.
@@ -24,6 +34,10 @@ struct ProjectFolder: Identifiable, Equatable {
     var file: URL { folder.appendingPathComponent("projeto.json") }
     /// The project's posting calendar, saved here while another project is open.
     var agendaFile: URL { folder.appendingPathComponent("agenda.json") }
+    /// Where mixed sources are gathered for the batch (`Entradas/Fotos`, `Entradas/Resultado desejado`).
+    func inputsFolder(_ kind: InputKind) -> URL {
+        folder.appendingPathComponent("Entradas", isDirectory: true).appendingPathComponent(kind.title, isDirectory: true)
+    }
 }
 
 /// The user's projects: one folder each under `~/Documents/The Carousel Maker`. The batch screen reads its
@@ -127,6 +141,17 @@ final class ProjectStore {
         Self.save(renamed)
         replace(renamed)
         if renamed.id == current.id { current = renamed; remember() }
+    }
+
+    func setSources(_ sources: InputSources, for kind: InputKind) {
+        var updated = current
+        switch kind {
+        case .photos: updated.project.photoSources = sources
+        case .desired: updated.project.desiredSources = sources
+        }
+        Self.save(updated)
+        replace(updated)
+        current = updated
     }
 
     func reveal(_ target: ProjectFolder) {

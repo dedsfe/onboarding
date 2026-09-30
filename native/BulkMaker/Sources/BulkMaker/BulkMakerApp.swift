@@ -85,6 +85,7 @@ private struct BatchFlowView: View {
                 .transition(.opacity)
             }
         }
+        .overlay { InputPickerHost() }
         .ignoresSafeArea(.container, edges: .top)
         .onAppear(perform: importSelectionIfChanged)
         .modifier(TerminalShortcuts(isAvailable: page == .batch && !showDesignEditor, isOpen: showTerminalPanel,
@@ -455,8 +456,9 @@ private struct BatchFlowView: View {
         panel.canCreateDirectories = true
         return panel.runModal() == .OK ? panel.url : nil
     }
-    private func choosePhotos() { chooseFolder().map(setPhotos) }
-    private func chooseDesired() { chooseFolder().map(setDesired) }
+    // Photos and references can mix Mac folders, loose files and canvas images; the picker hands back one folder.
+    private func choosePhotos() { InputPickerCenter.shared.present(.photos, completion: setPhotos) }
+    private func chooseDesired() { InputPickerCenter.shared.present(.desired, completion: setDesired) }
     private func chooseOutput() { chooseFolder().map(setOutput) }
     private func setPhotos(_ url: URL) {
         guard url.hasDirectoryPath else { return }
