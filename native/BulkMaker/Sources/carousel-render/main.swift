@@ -5,10 +5,11 @@ import Foundation
 // carousel-render --folha <pasta de fotos> --saida <pasta>
 // carousel-render --agendar <pasta da variação>... --agenda <agenda.json>
 // carousel-render --mover <pasta> --para "yyyy-MM-dd HH:mm" | --desagendar <pasta>... | --listar  (+ --agenda)
+// carousel-render --canvas-add <imagens>... | --canvas-listar  (+ --canvas <pasta do canvas>)
 // The AI writes the plan (photos, words, highlights); this draws every slide the same way, in milliseconds.
 // Output is terse on purpose: every character printed here is read (and paid for) by the AI.
 let arguments = Array(CommandLine.arguments.dropFirst())
-let valueFlags: Set<String> = ["--saida", "--estilo", "--revisao", "--folha", "--agenda", "--para"]
+let valueFlags: Set<String> = ["--saida", "--estilo", "--revisao", "--folha", "--agenda", "--para", "--canvas"]
 
 func value(of flag: String) -> String? {
     guard let index = arguments.firstIndex(of: flag), index + 1 < arguments.count else { return nil }
@@ -34,6 +35,10 @@ uso:
   carousel-render --desagendar <pasta da variação>... --agenda <agenda.json>
   carousel-render --listar --agenda <agenda.json>
       move, tira da agenda (os arquivos ficam) ou lista os próximos posts.
+  carousel-render --canvas-add <imagem>... --canvas <pasta do canvas>
+      copia as imagens pro canvas do projeto, em fila à direita do que já está lá (o app mostra na hora).
+  carousel-render --canvas-listar --canvas <pasta do canvas>
+      lista as imagens do canvas (caminho e tamanho).
 
 Cada render grava <pasta da variação>/.plano.json com o estilo aplicado. Para refazer um post:
 edite esse arquivo e rode  carousel-render "<pasta>/.plano.json" --saida "<pasta>"
@@ -49,6 +54,25 @@ plano.json:
 let positional = arguments.indices.filter { index in
     !arguments[index].hasPrefix("--") && !(index > 0 && valueFlags.contains(arguments[index - 1]))
 }.map { arguments[$0] }
+
+if arguments.contains("--canvas-add") || arguments.contains("--canvas-listar") {
+    guard let canvasPath = value(of: "--canvas") else { fail(usage) }
+    let canvas = URL(fileURLWithPath: canvasPath, isDirectory: true)
+    do {
+        if arguments.contains("--canvas-add") {
+            guard !positional.isEmpty else { fail(usage) }
+            let added = try CanvasFolder.add(positional.map { URL(fileURLWithPath: $0) }, to: canvas)
+            print("\(added.count) \(added.count == 1 ? "imagem nova" : "imagens novas") no canvas (agora são \(CanvasFolder.entries(in: canvas).count))")
+        } else {
+            let entries = CanvasFolder.entries(in: canvas)
+            for entry in entries {
+                print("\(CanvasFolder.mediaURL(of: entry, in: canvas).path) · \(Int(entry.width))×\(Int(entry.height))")
+            }
+            print("\(entries.count) \(entries.count == 1 ? "imagem" : "imagens") no canvas")
+        }
+    } catch { fail(error.localizedDescription) }
+    exit(0)
+}
 
 let agendaModes = ["--agendar", "--mover", "--desagendar", "--listar"]
 if let mode = agendaModes.first(where: arguments.contains), mode != "--agendar" {

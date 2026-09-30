@@ -43,6 +43,7 @@
 		B98E7BF77E92252CAFB7CF3F /* StyleControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B41A0088228FA064B0CB061 /* StyleControls.swift */; };
 		BA246CA8FE238AAB169DA045 /* SlideRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9CA09E6424C29AAD92A35A /* SlideRenderer.swift */; };
 		BD12A9B2303ADF84E06095FD /* SlideEditorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA17650753683D61153E93C3 /* SlideEditorPanel.swift */; };
+		BE6EC3EA4A649388B9B4E469 /* CanvasFolder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E8AEAA7B1F33BFDC3B56447 /* CanvasFolder.swift */; };
 		C38CF5592577E97951C13D68 /* BundleModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B0C44FFAB0E6DCC2946A42 /* BundleModule.swift */; };
 		C66F3BA2788C61FA79FC2D98 /* InputSources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B8B0D8BCB1DC75721A4A73C /* InputSources.swift */; };
 		CFD0014346F31C59DE20DFB4 /* CanvasPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB1D3CC7A073F997E8C16642 /* CanvasPage.swift */; };
@@ -114,6 +115,7 @@
 		5F8A322B373324F4166AB4AE /* PostAgenda.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostAgenda.swift; sourceTree = "<group>"; };
 		680B5DC2E15C3573876FB31D /* BatchSelectionBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchSelectionBridge.swift; sourceTree = "<group>"; };
 		6DA59D094A173E7BD209615C /* ArtworkBrowser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkBrowser.swift; sourceTree = "<group>"; };
+		6E8AEAA7B1F33BFDC3B56447 /* CanvasFolder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasFolder.swift; sourceTree = "<group>"; };
 		74206F84DA71CCA32D5B535A /* modelo-ugc.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "modelo-ugc.jpg"; sourceTree = "<group>"; };
 		78DECE481410886878E05A9D /* TemplateCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TemplateCatalog.swift; sourceTree = "<group>"; };
 		7B8F3C759E8F1ACA3FA1FE49 /* obras-nga.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "obras-nga.json"; sourceTree = "<group>"; };
@@ -211,6 +213,7 @@
 		CD4CE0F47E5404D1FDED8613 /* CarouselEngine */ = {
 			isa = PBXGroup;
 			children = (
+				6E8AEAA7B1F33BFDC3B56447 /* CanvasFolder.swift */,
 				56D38B34F152AA440BEBC66F /* ContactSheet.swift */,
 				5F8A322B373324F4166AB4AE /* PostAgenda.swift */,
 				1479B8C06159DD83EE7CEC30 /* SlidePlan.swift */,
@@ -452,6 +455,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BE6EC3EA4A649388B9B4E469 /* CanvasFolder.swift in Sources */,
 				26D32689D50D11BE3E031CAC /* ContactSheet.swift in Sources */,
 				3B87BC703B87B68007FA7D27 /* PostAgenda.swift in Sources */,
 				A9E6ECA4D2334AECCA89D741 /* SlidePlan.swift in Sources */,

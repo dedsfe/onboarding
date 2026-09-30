@@ -23,6 +23,14 @@ struct CanvasPage: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
             }
         }
+        .overlay(alignment: .top) {
+            if let arrival = controller.arrival {
+                arrivalNotice(arrival)
+                    .padding(.top, 76)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.spring(response: 0.4, dampingFraction: 0.8), value: controller.arrival?.id)
         .overlay(alignment: .bottom) {
             HStack(alignment: .bottom) {
                 HStack(spacing: 10) {
@@ -91,6 +99,31 @@ struct CanvasPage: View {
         .padding(.leading, 6).padding(.trailing, 12)
         .padding(4)
         .glassEffect(.regular, in: .capsule)
+    }
+
+    /// "The AI put N images on the canvas", with a jump to them; fades on its own.
+    private func arrivalNotice(_ arrival: CanvasController.Arrival) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: "sparkles").font(.system(size: 15, weight: .semibold))
+            Text(arrival.ids.count == 1 ? "1 imagem nova da IA" : "\(arrival.ids.count) imagens novas da IA")
+                .font(.system(size: 14, weight: .semibold))
+            Button {
+                controller.view?.reveal(arrival.ids)
+                controller.arrival = nil
+            } label: {
+                Text("Ver").font(.system(size: 13, weight: .bold))
+                    .padding(.horizontal, 14).frame(height: 28)
+                    .background(Capsule().fill(.white))
+                    .foregroundStyle(.black)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.leading, 16).padding(.trailing, 6).frame(height: 40)
+        .glassEffect(.regular, in: .capsule)
+        .task(id: arrival.id) {
+            try? await Task.sleep(for: .seconds(8))
+            if controller.arrival?.id == arrival.id { controller.arrival = nil }
+        }
     }
 
     private var importButton: some View {
@@ -177,6 +210,13 @@ final class CanvasController {
     var zoom: CGFloat = 1
     var isEmpty = true
     var selectionCount = 0
+    /// The latest images the AI added while the canvas was open.
+    var arrival: Arrival?
+
+    struct Arrival: Equatable {
+        let id = UUID()
+        let ids: [UUID]
+    }
 }
 
 private struct InfiniteCanvasRepresentable: NSViewRepresentable {
@@ -193,6 +233,7 @@ private struct InfiniteCanvasRepresentable: NSViewRepresentable {
             if controller.isEmpty != isEmpty { controller.isEmpty = isEmpty }
         }
         view.onSelectionChange = { [weak controller] count in controller?.selectionCount = count }
+        view.onExternalAdd = { [weak controller] ids in controller?.arrival = .init(ids: ids) }
         controller.view = view
         return view
     }

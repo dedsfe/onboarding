@@ -12,6 +12,8 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
     var onViewportChange: ((CGFloat, Bool) -> Void)?
     /// Tells SwiftUI how many images are selected, for the selection toolbar.
     var onSelectionChange: ((Int) -> Void)?
+    /// Images someone else (the AI) put on this board while it was open.
+    var onExternalAdd: (([UUID]) -> Void)?
 
     private let grid = DotGridLayer()
     private let world = CALayer()
@@ -41,6 +43,7 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
     private var lastMouse: CGPoint?
     private var isResizing = false
     private var viewportAnimation: Timer?
+    private var diskWatch: Timer?
 
     private enum Corner: CaseIterable { case topLeft, topRight, bottomLeft, bottomRight }
     private enum Drag {
@@ -106,6 +109,23 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.makeFirstResponder(self)
+        diskWatch?.invalidate()
+        diskWatch = nil
+        guard window != nil else { return }
+        // The AI adds images with `carousel-render --canvas-add`; they show up here within a second.
+        diskWatch = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self, case .none = self.drag else { return }
+            let added = self.board.reloadIfChangedOnDisk()
+            if !added.isEmpty { self.onExternalAdd?(added) }
+        }
+    }
+
+    /// Glides to the given images and selects them (the "Ver" of the new-images notice).
+    func reveal(_ ids: [UUID]) {
+        let frames = board.items.filter { ids.contains($0.id) }.map(\.frame)
+        guard let first = frames.first else { return }
+        selection = Set(ids).intersection(board.items.map(\.id))
+        focus(on: frames.dropFirst().reduce(first) { $0.union($1) }, maxScale: 1, animated: true)
     }
 
     override func viewDidChangeBackingProperties() {

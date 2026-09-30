@@ -35,6 +35,12 @@ final class CanvasBoard {
     let directory: URL
     private(set) var items: [CanvasItem] = []
     var onChange: (() -> Void)?
+    /// Every item this board has seen (loaded, added or deleted here). Anything on disk outside this set was
+    /// put there by someone else (the AI's `carousel-render --canvas-add`) and must survive our next save.
+    private var knownIDs = Set<UUID>()
+    /// Images that came from outside and the user has not deleted here: undo never takes them away.
+    private var externalIDs = Set<UUID>()
+    private var diskStamp: Date?
 
     var media: URL { directory.appendingPathComponent("media", isDirectory: true) }
     private var boardFile: URL { directory.appendingPathComponent("board.json") }
@@ -42,9 +48,9 @@ final class CanvasBoard {
     init(directory: URL = CanvasBoard.defaultDirectory) {
         self.directory = directory
         try? FileManager.default.createDirectory(at: media, withIntermediateDirectories: true)
-        if let data = try? Data(contentsOf: boardFile), let saved = try? JSONDecoder().decode([CanvasItem].self, from: data) {
-            items = saved
-        }
+        items = readDisk() ?? []
+        knownIDs = Set(items.map(\.id))
+        diskStamp = stamp()
         removeOrphanFiles()
     }
 
@@ -67,6 +73,7 @@ final class CanvasBoard {
 
     func remove(_ ids: Set<UUID>) {
         items.removeAll { ids.contains($0.id) }
+        externalIDs.subtract(ids)
         changed()
     }
 
@@ -90,9 +97,25 @@ final class CanvasBoard {
         return add(sources, around: center)
     }
 
+    /// Picks up images added from outside the app. Returns the ids that are new to this board.
+    @discardableResult
+    func reloadIfChangedOnDisk() -> [UUID] {
+        let current = stamp()
+        guard current != diskStamp, let disk = readDisk() else { return [] }
+        diskStamp = current
+        let fresh = disk.map(\.id).filter { !knownIDs.contains($0) }
+        guard disk != items else { return fresh }
+        items = disk
+        knownIDs.formUnion(fresh)
+        externalIDs.formUnion(fresh)
+        onChange?()
+        return fresh
+    }
+
     /// Undo and redo put a whole earlier list back; deleted files stay on disk until the next launch.
     func replaceItems(_ snapshot: [CanvasItem]) {
-        items = snapshot
+        let inSnapshot = Set(snapshot.map(\.id))
+        items = snapshot + items.filter { externalIDs.contains($0.id) && !inSnapshot.contains($0.id) }
         changed()
     }
 
@@ -157,6 +180,7 @@ final class CanvasBoard {
             x += added[index].width + gap
         }
         items.append(contentsOf: added)
+        knownIDs.formUnion(added.map(\.id))
         changed()
         return added
     }
@@ -227,9 +251,25 @@ final class CanvasBoard {
     // MARK: - Disk
 
     private func save() {
+        // Images the AI added since our last read go on top instead of being overwritten.
+        if let disk = readDisk() {
+            let incoming = disk.filter { !knownIDs.contains($0.id) }
+            items.append(contentsOf: incoming)
+            knownIDs.formUnion(incoming.map(\.id))
+            externalIDs.formUnion(incoming.map(\.id))
+        }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try? encoder.encode(items).write(to: boardFile, options: .atomic)
+        diskStamp = stamp()
+    }
+
+    private func readDisk() -> [CanvasItem]? {
+        (try? Data(contentsOf: boardFile)).flatMap { try? JSONDecoder().decode([CanvasItem].self, from: $0) }
+    }
+
+    private func stamp() -> Date? {
+        (try? URL(fileURLWithPath: boardFile.path).resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
     }
 
     /// Files no item uses anymore (deleted before the app closed, when undo is gone).

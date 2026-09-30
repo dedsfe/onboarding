@@ -51,6 +51,7 @@ final class ProjectStore {
     nonisolated static let currentKey = "currentProject"
     /// Name and folder of the open project, readable off the main actor (the AI state is written there).
     nonisolated static let summaryKey = "currentProjectSummary"
+    nonisolated static let canvasKey = "currentProjectCanvas"
 
     let root: URL
     private let selectionFile: URL
@@ -67,6 +68,7 @@ final class ProjectStore {
     }
 
     nonisolated static var currentSummary: String? { UserDefaults.standard.string(forKey: summaryKey) }
+    nonisolated static var currentCanvas: String? { UserDefaults.standard.string(forKey: canvasKey) }
 
     init(root: URL = ProjectStore.defaultRoot, selectionFile: URL = BatchSelectionBridge.fileURL,
          legacyCanvas: URL = CanvasBoard.defaultDirectory, defaults: UserDefaults = .standard) {
@@ -167,6 +169,7 @@ final class ProjectStore {
     private func remember() {
         defaults.set(current.id.uuidString, forKey: Self.currentKey)
         defaults.set("\(current.name) (`\(current.folder.path)`)", forKey: Self.summaryKey)
+        defaults.set(current.canvasDirectory.path, forKey: Self.canvasKey)
     }
 
     private static func scan(_ root: URL) -> [ProjectFolder] {
