@@ -62,6 +62,26 @@ final class CanvasBoard {
         changed()
     }
 
+    /// Later in the list draws on top.
+    func bringToFront(_ ids: Set<UUID>) {
+        items = items.filter { !ids.contains($0.id) } + items.filter { ids.contains($0.id) }
+        changed()
+    }
+
+    func sendToBack(_ ids: Set<UUID>) {
+        items = items.filter { ids.contains($0.id) } + items.filter { !ids.contains($0.id) }
+        changed()
+    }
+
+    /// Image files picked in an open panel, laid out like a paste.
+    func importFiles(_ urls: [URL], around center: CGPoint) -> [CanvasItem] {
+        let sources = urls.filter(Self.isImportable).compactMap { url -> (data: Data, type: UTType)? in
+            guard let data = try? Data(contentsOf: url), let type = UTType(filenameExtension: url.pathExtension) else { return nil }
+            return (data, type)
+        }
+        return add(sources, around: center)
+    }
+
     /// Undo and redo put a whole earlier list back; deleted files stay on disk until the next launch.
     func replaceItems(_ snapshot: [CanvasItem]) {
         items = snapshot

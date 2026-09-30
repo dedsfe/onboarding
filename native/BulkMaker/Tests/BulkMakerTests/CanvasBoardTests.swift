@@ -162,4 +162,47 @@ final class CanvasBoardTests: XCTestCase {
         XCTAssertLessThan(try color(at: CGPoint(x: 400, y: 450)).r, 50)
         XCTAssertLessThan(try color(at: CGPoint(x: 150, y: 300)).r, 50)
     }
+
+    func testClickSelectsDragMovesAndTheWindowNeverTakesTheClick() async throws {
+        let source = pasteboard()
+        let item = NSPasteboardItem()
+        item.setData(try imageData(.png, width: 400, height: 200), forType: .png)
+        source.writeObjects([item])
+        let board = CanvasBoard(directory: directory)
+        let added = board.importImages(from: source, around: .zero)[0]
+
+        let view = InfiniteCanvasView(board: board)
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled],
+                              backing: .buffered, defer: false)
+        window.isMovableByWindowBackground = true
+        window.contentView = view
+        view.frame = CGRect(x: 0, y: 0, width: 800, height: 600)
+        view.layoutSubtreeIfNeeded()
+        view.actualSize()
+        XCTAssertFalse(view.mouseDownCanMoveWindow)
+
+        // Window coordinates are bottom-left; view (400, 300) is the image's middle.
+        func event(_ type: NSEvent.EventType, x: CGFloat, y: CGFloat) -> NSEvent {
+            NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: 600 - y), modifierFlags: [], timestamp: 0,
+                               windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+        }
+        view.mouseDown(with: event(.leftMouseDown, x: 400, y: 300))
+        XCTAssertEqual(view.selection, [added.id])
+        view.mouseDragged(with: event(.leftMouseDragged, x: 450, y: 320))
+        view.mouseUp(with: event(.leftMouseUp, x: 450, y: 320))
+        XCTAssertEqual(board.items[0].x, added.x + 50, accuracy: 0.01)
+        XCTAssertEqual(board.items[0].y, added.y + 20, accuracy: 0.01)
+
+        // Click on empty space clears; the bottom-right handle resizes keeping proportions.
+        view.mouseDown(with: event(.leftMouseDown, x: 60, y: 60))
+        view.mouseUp(with: event(.leftMouseUp, x: 60, y: 60))
+        XCTAssertTrue(view.selection.isEmpty)
+        view.mouseDown(with: event(.leftMouseDown, x: 450, y: 320))
+        view.mouseUp(with: event(.leftMouseUp, x: 450, y: 320))
+        view.mouseDown(with: event(.leftMouseDown, x: 650, y: 420))  // image now ends at (650, 420)
+        view.mouseDragged(with: event(.leftMouseDragged, x: 750, y: 420))
+        view.mouseUp(with: event(.leftMouseUp, x: 750, y: 420))
+        XCTAssertEqual(board.items[0].width, 500, accuracy: 0.01)
+        XCTAssertEqual(board.items[0].height, 250, accuracy: 0.01)
+    }
 }

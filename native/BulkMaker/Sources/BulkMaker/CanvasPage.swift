@@ -20,6 +20,19 @@ struct CanvasPage: View {
             }
         }
         .overlay(alignment: .bottomTrailing) { zoomControls.padding(20) }
+        .overlay(alignment: .bottomLeading) { importButton.padding(20) }
+    }
+
+    private var importButton: some View {
+        Button { controller.view?.importImages(nil) } label: {
+            Label("Importar", systemImage: "plus")
+                .font(.system(size: 13, weight: .semibold))
+                .padding(.horizontal, 8).frame(height: 28)
+        }
+        .buttonStyle(.plain)
+        .padding(4)
+        .glassEffect(.regular, in: .capsule)
+        .help("Escolher imagens do Mac")
     }
 
     private var zoomControls: some View {
