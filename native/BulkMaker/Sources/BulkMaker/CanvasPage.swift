@@ -5,12 +5,15 @@ import SwiftUI
 /// with a selection toolbar and zoom controls.
 struct CanvasPage: View {
     @State private var controller = CanvasController()
+    /// 0 = wallpaper sharp like the other pages, 1 = fully frosted; the user picks with the slider.
+    @AppStorage("canvasBackdropBlur") private var backdropBlur = 1.0
 
     var body: some View {
         ZStack {
             // Frosted wallpaper: the page keeps the app's look while images stay the loudest thing on it.
             Rectangle().fill(.ultraThinMaterial)
                 .overlay(Color.black.opacity(0.28))
+                .opacity(backdropBlur)
                 .ignoresSafeArea()
             InfiniteCanvasRepresentable(controller: controller)
             if controller.isEmpty {
@@ -20,7 +23,10 @@ struct CanvasPage: View {
         }
         .overlay(alignment: .bottom) {
             HStack(alignment: .bottom) {
-                importButton
+                HStack(spacing: 10) {
+                    importButton
+                    blurControl
+                }
                 Spacer(minLength: 12)
                 if controller.selectionCount > 0 {
                     selectionBar
@@ -62,6 +68,27 @@ struct CanvasPage: View {
         .font(.system(size: 14, weight: .semibold))
         .padding(.horizontal, 12).frame(height: 32)
         .background(Capsule().fill(.white.opacity(0.12)))
+    }
+
+    /// Frosted ↔ sharp wallpaper behind the canvas.
+    private var blurControl: some View {
+        HStack(spacing: 8) {
+            Button { withAnimation(.easeOut(duration: 0.25)) { backdropBlur = backdropBlur > 0 ? 0 : 1 } } label: {
+                Image(systemName: backdropBlur > 0 ? "drop.halffull" : "drop")
+                    .font(.system(size: 14, weight: .semibold))
+                    .frame(width: 26, height: 30)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(backdropBlur > 0 ? "Desligar o borrão do fundo" : "Ligar o borrão do fundo")
+            Slider(value: $backdropBlur, in: 0...1)
+                .frame(width: 110)
+                .controlSize(.small)
+                .help("Borrão do fundo")
+        }
+        .padding(.leading, 6).padding(.trailing, 12)
+        .padding(4)
+        .glassEffect(.regular, in: .capsule)
     }
 
     private var importButton: some View {
