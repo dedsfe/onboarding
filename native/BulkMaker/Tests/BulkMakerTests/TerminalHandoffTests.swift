@@ -46,6 +46,7 @@ final class TerminalHandoffTests: XCTestCase {
         XCTAssertTrue(session.contains("## Economia (obrigatório)"))
         XCTAssertTrue(session.contains("legenda.txt"))
         XCTAssertTrue(session.contains("## Mudar o estilo de um post ou de um slide"))
+        XCTAssertTrue(session.contains("Cada projeto tem o próprio calendário"))
         XCTAssertTrue(designGuide.contains("Tipografia e acabamento"))
         XCTAssertTrue(designGuide.contains("carousel-render"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: workspace.appendingPathComponent("biblioteca-fundos").path))

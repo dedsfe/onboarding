@@ -65,6 +65,7 @@ enum AgentSession {
         \(drawingGuide(output: nil))
 
         ## Agenda de posts (o calendário do app)
+        Cada projeto tem o próprio calendário; `.bulk-maker/agenda.json` é sempre o do projeto aberto (linha "Projeto" do estado). Se o projeto mudar no meio do trabalho, não agende nada da rodada anterior no calendário novo: pergunte antes.
         `.bulk-maker/agenda.json` guarda as regras (`rules`: `maxPerDay`, `times` em "HH:mm", `weekdays` 1 = domingo … 7 = sábado, `startDate` "yyyy-MM-dd") e os posts agendados. O calendário do app mostra essa agenda e se atualiza sozinho. Use sempre os comandos, nunca edite `posts` à mão:
         - Ver o que está agendado: `.bulk-maker/bin/carousel-render --listar --agenda .bulk-maker/agenda.json`
         - Mover: `... --mover "<pasta da variação>" --para "yyyy-MM-dd HH:mm" --agenda .bulk-maker/agenda.json` (recusa horário ocupado ou passado; se recusar, diga o motivo e sugira o próximo livre)

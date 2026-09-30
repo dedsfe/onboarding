@@ -1,3 +1,4 @@
+import CarouselEngine
 import XCTest
 @testable import BulkMaker
 
@@ -87,5 +88,27 @@ final class ProjectStoreTests: XCTestCase {
         let state = AgentSession.state(photos: nil, desired: nil, csv: nil, output: nil, variations: 1,
                                        design: DesignPreferences(), custom: false, project: "Loja (`/tmp/Loja`)")
         XCTAssertTrue(state.contains("- Projeto: Loja (`/tmp/Loja`)\n- Fotos:"))
+    }
+
+    func testEachProjectHasItsOwnCalendar() throws {
+        let live = base.appendingPathComponent(".bulk-maker/agenda.json")
+        let rules = PostAgenda.Rules(maxPerDay: 3, times: ["09:00", "12:00", "19:00"])
+        let postA = PostAgenda.Post(folder: "/tmp/a/variacao-01", date: "2026-10-01", time: "12:00", caption: "a")
+        try PostAgenda(rules: rules, posts: [postA]).save(to: live)
+        let store = makeStore()
+        let first = store.current
+
+        // A new project starts with an empty calendar and the same posting rules.
+        let second = store.create(named: "Loja")
+        XCTAssertEqual(try PostAgenda.load(from: live).posts, [])
+        XCTAssertEqual(try PostAgenda.load(from: live).rules, rules)
+
+        let postB = PostAgenda.Post(folder: "/tmp/b/variacao-01", date: "2026-10-02", time: "19:00", caption: "b")
+        try PostAgenda(rules: rules, posts: [postB]).save(to: live)
+        store.open(first)
+        XCTAssertEqual(try PostAgenda.load(from: live).posts.map(\.id), [postA.id])
+        store.open(second)
+        XCTAssertEqual(try PostAgenda.load(from: live).posts.map(\.id), [postB.id])
+        XCTAssertEqual(try PostAgenda.load(from: first.agendaFile).posts.map(\.id), [postA.id])
     }
 }

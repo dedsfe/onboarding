@@ -1,4 +1,5 @@
 import AppKit
+import CarouselEngine
 import Foundation
 import Observation
 
@@ -21,11 +22,14 @@ struct ProjectFolder: Identifiable, Equatable {
     var canvasDirectory: URL { folder.appendingPathComponent("Canvas", isDirectory: true) }
     var defaultOutput: URL { folder.appendingPathComponent("Saída", isDirectory: true) }
     var file: URL { folder.appendingPathComponent("projeto.json") }
+    /// The project's posting calendar, saved here while another project is open.
+    var agendaFile: URL { folder.appendingPathComponent("agenda.json") }
 }
 
 /// The user's projects: one folder each under `~/Documents/The Carousel Maker`. The batch screen reads its
-/// inputs from `.bulk-maker/selecao.json`, so switching projects saves that file into the project being left
-/// and writes the next project's selection in its place; the screen picks it up on its next poll.
+/// inputs from `.bulk-maker/selecao.json` and the calendar (and the AI) its posts from `.bulk-maker/agenda.json`,
+/// so switching projects saves both files into the project being left and puts the next project's in their
+/// place; the screen and the calendar pick them up on their next poll.
 @MainActor @Observable
 final class ProjectStore {
     static let shared = ProjectStore()
@@ -36,6 +40,8 @@ final class ProjectStore {
 
     let root: URL
     private let selectionFile: URL
+    /// The live calendar everything reads and writes: always the open project's.
+    private var liveAgenda: URL { selectionFile.deletingLastPathComponent().appendingPathComponent("agenda.json") }
     private let legacyCanvas: URL
     private let defaults: UserDefaults
     private(set) var projects: [ProjectFolder] = []
@@ -94,11 +100,20 @@ final class ProjectStore {
         leaving.project.selection = Self.readSelection(selectionFile) ?? leaving.project.selection
         Self.save(leaving)
         replace(leaving)
+        let leavingAgenda = try? PostAgenda.load(from: liveAgenda)
+        if let data = try? Data(contentsOf: liveAgenda) { try? data.write(to: leaving.agendaFile, options: .atomic) }
 
         let selection = fresh.project.selection ?? BatchSelection(photos: nil, desired: nil, csv: nil, output: nil)
         if let data = try? BatchSelectionBridge.data(for: selection) {
             try? FileManager.default.createDirectory(at: selectionFile.deletingLastPathComponent(), withIntermediateDirectories: true)
             try? data.write(to: selectionFile, options: .atomic)
+        }
+        // Written, not copied: a fresh modification date is how the calendar notices the swap.
+        if let data = try? Data(contentsOf: fresh.agendaFile) {
+            try? data.write(to: liveAgenda, options: .atomic)
+        } else {
+            // A project without a calendar yet starts empty, with the posting rules of the one being left.
+            try? PostAgenda(rules: leavingAgenda?.rules ?? .init()).save(to: liveAgenda)
         }
         current = fresh
         remember()
