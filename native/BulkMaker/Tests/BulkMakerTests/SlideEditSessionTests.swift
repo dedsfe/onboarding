@@ -66,4 +66,16 @@ final class SlideEditSessionTests: XCTestCase {
         XCTAssertEqual(session.slide(0)?.text, "a IA mudou")
         XCTAssertEqual(session.revision, 1)
     }
+
+    func testAnEmptySlideIsNeverSaved() async throws {
+        let folder = try makePost()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let session = SlideEditSession(folder: folder)
+        session.setText("   ", at: 0)
+        try await Task.sleep(for: .milliseconds(400))
+        XCTAssertEqual(try plan(in: folder).slides[0].text, "primeira frase")
+        session.setText("de volta", at: 0)
+        for _ in 0..<100 where session.images[0] == nil { try await Task.sleep(for: .milliseconds(50)) }
+        XCTAssertEqual(try plan(in: folder).slides[0].text, "de volta")
+    }
 }

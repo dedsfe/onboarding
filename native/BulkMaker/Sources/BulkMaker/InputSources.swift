@@ -49,14 +49,17 @@ enum InputAssembler {
     }
 
     /// The folder to hand the batch: the single Finder folder itself, or `target` rebuilt with every chosen
-    /// file. Files are hard-linked (no extra disk space) and copied only across disks.
+    /// file. Files are hard-linked (no extra disk space) and copied only across disks. The new folder is built
+    /// beside the old one and swapped in at the end, so the batch never sees it half made (and a source that is
+    /// the old folder itself can still be read).
     static func assemble(_ sources: InputSources, kind: InputKind, into target: URL,
                          canvasMedia: [UUID: URL]) throws -> URL {
         if let single = sources.singleFolder { return single }
         let fileManager = FileManager.default
-        let targetPath = target.standardizedFileURL.path
-        try? fileManager.removeItem(at: target)
-        try fileManager.createDirectory(at: target, withIntermediateDirectories: true)
+        let building = target.deletingLastPathComponent().appendingPathComponent(".\(target.lastPathComponent)-montando",
+                                                                               isDirectory: true)
+        try? fileManager.removeItem(at: building)
+        try fileManager.createDirectory(at: building, withIntermediateDirectories: true)
 
         var used = Set<String>()
         func add(_ source: URL, name preferred: String) throws {
@@ -71,7 +74,7 @@ enum InputAssembler {
                 suffix += 1
             }
             used.insert(name.lowercased())
-            let destination = target.appendingPathComponent(name)
+            let destination = building.appendingPathComponent(name)
             if convert {
                 guard let png = CanvasBoard.pngData(of: source) else { return }
                 try png.write(to: destination, options: .atomic)
@@ -81,10 +84,7 @@ enum InputAssembler {
         }
 
         for folder in sources.folders {
-            let url = URL(fileURLWithPath: folder)
-            // Never read the folder being rebuilt (it was just emptied).
-            guard !url.standardizedFileURL.path.hasPrefix(targetPath) else { continue }
-            for file in files(in: url, kind: kind) { try add(file, name: file.lastPathComponent) }
+            for file in files(in: URL(fileURLWithPath: folder), kind: kind) { try add(file, name: file.lastPathComponent) }
         }
         for path in sources.files {
             let url = URL(fileURLWithPath: path)
@@ -94,6 +94,11 @@ enum InputAssembler {
         for (index, id) in sources.canvasItems.enumerated() {
             guard let media = canvasMedia[id], fileManager.fileExists(atPath: media.path) else { continue }
             try add(media, name: String(format: "canvas-%02d.%@", index + 1, media.pathExtension))
+        }
+        if fileManager.fileExists(atPath: target.path) {
+            _ = try fileManager.replaceItemAt(target, withItemAt: building)
+        } else {
+            try fileManager.moveItem(at: building, to: target)
         }
         return target
     }

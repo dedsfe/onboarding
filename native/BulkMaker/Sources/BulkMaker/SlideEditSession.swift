@@ -163,7 +163,10 @@ final class SlideEditSession {
     }
 
     private func flush(first: Int) async {
-        guard let plan else { return }
+        // A slide without words cannot be drawn by anyone (the AI's next render would fail on it):
+        // keep the edit on screen and save once there are words again.
+        guard let plan, !plan.slides.contains(where: { $0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+        else { return }
         do {
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]

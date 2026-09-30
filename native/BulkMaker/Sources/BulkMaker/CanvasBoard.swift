@@ -272,11 +272,16 @@ final class CanvasBoard {
         (try? URL(fileURLWithPath: boardFile.path).resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
     }
 
-    /// Files no item uses anymore (deleted before the app closed, when undo is gone).
+    /// Files no item uses anymore (deleted before the app closed, when undo is gone). Only old ones: a file
+    /// that just arrived may be the AI's `--canvas-add` between copying the image and saving the list.
     private func removeOrphanFiles() {
         let used = Set(items.map(\.file))
+        let cutoff = Date().addingTimeInterval(-600)
         for name in (try? FileManager.default.contentsOfDirectory(atPath: media.path)) ?? [] where !used.contains(name) {
-            try? FileManager.default.removeItem(at: media.appendingPathComponent(name))
+            let file = media.appendingPathComponent(name)
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+            if let modified, modified > cutoff { continue }
+            try? FileManager.default.removeItem(at: file)
         }
     }
 }

@@ -93,4 +93,21 @@ final class InputSourcesTests: XCTestCase {
         XCTAssertNil(reopened.current.project.desiredSources)
         XCTAssertEqual(reopened.current.inputsFolder(.desired).lastPathComponent, "Resultado desejado")
     }
+
+    func testRebuildCanReadTheFolderItReplaces() throws {
+        let canvasID = UUID()
+        let media = try image("x.png", in: base.appendingPathComponent("media"))
+        let target = base.appendingPathComponent("Projeto/Entradas/Fotos")
+        let loose = try image("a.png", in: base.appendingPathComponent("Solta"))
+        _ = try InputAssembler.assemble(InputSources(files: [loose.path], canvasItems: [canvasID]), kind: .photos,
+                                        into: target, canvasMedia: [canvasID: media])
+        // The assembled folder itself chosen as a source (e.g. project file lost) plus one more canvas image.
+        let other = UUID()
+        let media2 = try image("y.png", in: base.appendingPathComponent("media"))
+        _ = try InputAssembler.assemble(InputSources(folders: [target.path], canvasItems: [other]), kind: .photos,
+                                        into: target, canvasMedia: [other: media2])
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: target.path).sorted(),
+                       ["a.png", "canvas-01 2.png", "canvas-01.png"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: base.appendingPathComponent("Projeto/Entradas/.Fotos-montando").path))
+    }
 }

@@ -40,13 +40,13 @@ struct ProjectFolder: Identifiable, Equatable {
     }
 }
 
-/// The user's projects: one folder each under `~/Documents/The Carousel Maker`. The batch screen reads its
+/// The user's projects: one folder each under `~/The Carousel Maker`. The batch screen reads its
 /// inputs from `.bulk-maker/selecao.json` and the calendar (and the AI) its posts from `.bulk-maker/agenda.json`,
 /// so switching projects saves both files into the project being left and puts the next project's in their
 /// place; the screen and the calendar pick them up on their next poll.
 @MainActor @Observable
 final class ProjectStore {
-    static let shared = ProjectStore()
+    static let shared = ProjectStore(movingFrom: ProjectStore.documentsRoot)
 
     nonisolated static let currentKey = "currentProject"
     /// Name and folder of the open project, readable off the main actor (the AI state is written there).
@@ -62,7 +62,14 @@ final class ProjectStore {
     private(set) var projects: [ProjectFolder] = []
     private(set) var current: ProjectFolder
 
+    /// In the home folder, not Documents: Documents syncs with iCloud, and "Optimize Mac Storage" takes files
+    /// off the Mac when the disk fills up, exactly when a batch needs its photos, canvas and slides.
     nonisolated static var defaultRoot: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("The Carousel Maker", isDirectory: true)
+    }
+
+    /// Where the first version kept projects; the shared store moves them out once.
+    nonisolated static var documentsRoot: URL {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("The Carousel Maker", isDirectory: true)
     }
@@ -70,13 +77,20 @@ final class ProjectStore {
     nonisolated static var currentSummary: String? { UserDefaults.standard.string(forKey: summaryKey) }
     nonisolated static var currentCanvas: String? { UserDefaults.standard.string(forKey: canvasKey) }
 
-    init(root: URL = ProjectStore.defaultRoot, selectionFile: URL = BatchSelectionBridge.fileURL,
+    /// `oldRoot`: a folder of projects to move here first (only the shared store passes it, so tests never
+    /// touch the user's real projects).
+    init(root: URL = ProjectStore.defaultRoot, movingFrom oldRoot: URL? = nil,
+         selectionFile: URL = BatchSelectionBridge.fileURL,
          legacyCanvas: URL = CanvasBoard.defaultDirectory, defaults: UserDefaults = .standard) {
         self.root = root
         self.selectionFile = selectionFile
         self.legacyCanvas = legacyCanvas
         self.defaults = defaults
         try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        if let oldRoot {
+            let live = selectionFile.deletingLastPathComponent().appendingPathComponent("agenda.json")
+            Self.moveProjects(from: oldRoot, to: root, alsoRewriting: [selectionFile, live])
+        }
         var found = Self.scan(root)
         if found.isEmpty {
             // First launch with projects: what the app had becomes the first one, canvas included.
@@ -170,6 +184,37 @@ final class ProjectStore {
         defaults.set(current.id.uuidString, forKey: Self.currentKey)
         defaults.set("\(current.name) (`\(current.folder.path)`)", forKey: Self.summaryKey)
         defaults.set(current.canvasDirectory.path, forKey: Self.canvasKey)
+    }
+
+    /// Moves every project folder from `oldRoot` into `root` (only when `root` has none yet) and points every
+    /// saved path at the new place: the projects' own files plus the live selection and calendar.
+    static func moveProjects(from oldRoot: URL, to root: URL, alsoRewriting extra: [URL]) {
+        let fileManager = FileManager.default
+        let old = scan(oldRoot)
+        guard !old.isEmpty, scan(root).isEmpty, oldRoot.standardizedFileURL != root.standardizedFileURL else { return }
+        var moved: [URL] = []
+        for project in old {
+            let destination = root.appendingPathComponent(project.folder.lastPathComponent, isDirectory: true)
+            guard !fileManager.fileExists(atPath: destination.path),
+                  (try? fileManager.moveItem(at: project.folder, to: destination)) != nil else { continue }
+            moved.append(destination)
+        }
+        let from = oldRoot.standardizedFileURL.path, to = root.standardizedFileURL.path
+        let files = moved.flatMap { [$0.appendingPathComponent("projeto.json"), $0.appendingPathComponent("agenda.json")] } + extra
+        for file in files {
+            guard var text = try? String(contentsOf: file, encoding: .utf8) else { continue }
+            // JSON written by some encoders escapes slashes; rewrite both spellings.
+            let rewritten = text.replacingOccurrences(of: from + "/", with: to + "/")
+                .replacingOccurrences(of: from.replacingOccurrences(of: "/", with: "\\/") + "\\/",
+                                      with: to.replacingOccurrences(of: "/", with: "\\/") + "\\/")
+            guard rewritten != text else { continue }
+            text = rewritten
+            try? text.write(to: file, atomically: true, encoding: .utf8)
+        }
+        // The old folder is left only if something could not move.
+        if ((try? fileManager.contentsOfDirectory(atPath: oldRoot.path)) ?? []).allSatisfy({ $0.hasPrefix(".") }) {
+            try? fileManager.removeItem(at: oldRoot)
+        }
     }
 
     private static func scan(_ root: URL) -> [ProjectFolder] {

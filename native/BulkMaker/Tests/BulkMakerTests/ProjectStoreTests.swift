@@ -111,4 +111,30 @@ final class ProjectStoreTests: XCTestCase {
         XCTAssertEqual(try PostAgenda.load(from: live).posts.map(\.id), [postB.id])
         XCTAssertEqual(try PostAgenda.load(from: first.agendaFile).posts.map(\.id), [postA.id])
     }
+
+    func testProjectsMoveOutOfICloudDocumentsWithTheirPaths() throws {
+        // A project made by the first version, under a Documents-like folder, with its own output and calendar.
+        let oldRoot = base.appendingPathComponent("Documents/The Carousel Maker")
+        let oldStore = ProjectStore(root: oldRoot, selectionFile: selectionFile, legacyCanvas: legacyCanvas, defaults: defaults)
+        let made = oldStore.create(named: "Loja")
+        let post = PostAgenda.Post(folder: made.defaultOutput.appendingPathComponent("variacao-01").path,
+                                   date: "2026-10-01", time: "12:00", caption: "")
+        let live = base.appendingPathComponent(".bulk-maker/agenda.json")
+        try PostAgenda(posts: [post]).save(to: live)
+        XCTAssertTrue(try String(contentsOf: selectionFile, encoding: .utf8).contains("Documents"))
+
+        let store = ProjectStore(root: root, movingFrom: oldRoot, selectionFile: selectionFile,
+                                 legacyCanvas: legacyCanvas, defaults: defaults)
+        XCTAssertEqual(Set(store.projects.map(\.name)), ["Meu primeiro projeto", "Loja"])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: oldRoot.path))
+        let moved = try XCTUnwrap(store.projects.first { $0.name == "Loja" })
+        XCTAssertEqual(moved.folder.deletingLastPathComponent().standardizedFileURL, root.standardizedFileURL)
+        // /var and /private/var are the same folder on macOS; compare real paths.
+        func real(_ path: String?) -> String? { path.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath().path } }
+        let output = real(moved.defaultOutput.path)
+        XCTAssertEqual(real(moved.project.selection?.output), output)
+        XCTAssertEqual(real(try readSelection().output), output)
+        XCTAssertEqual(real(try PostAgenda.load(from: live).posts.first?.folder), output.map { $0 + "/variacao-01" })
+        XCTAssertEqual(store.current.id, moved.id)
+    }
 }

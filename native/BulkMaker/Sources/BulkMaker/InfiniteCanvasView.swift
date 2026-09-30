@@ -329,12 +329,17 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
     }
 
     /// Decodes each image at about the size it covers on screen (Retina), and again only when it grows past that.
+    /// Only what is on screen (plus a margin) gets sharp, capped at 2048 px (16 MB): zooming into a board of
+    /// big photos must not decode all of them at full size on an 8 GB Mac. The rest stays a small preview.
     private func refreshResolution() {
         let backing = window?.backingScaleFactor ?? 2
+        let visible = CGRect(origin: toWorld(.zero), size: CGSize(width: bounds.width / scale, height: bounds.height / scale))
+            .insetBy(dx: -bounds.width / scale * 0.5, dy: -bounds.height / scale * 0.5)
         for item in board.items {
-            let needed = min(max(item.width, item.height) * Double(scale) * Double(backing), 4096)
+            let onScreen = bounds.isEmpty || item.frame.intersects(visible)
+            let needed = onScreen ? min(max(item.width, item.height) * Double(scale) * Double(backing), 2048) : 256
             let wanted = max(256, Int(pow(2, ceil(log2(max(needed, 1))))))
-            if let have = decoded[item.id], have >= min(wanted, 4096) { continue }
+            if let have = decoded[item.id], have >= wanted { continue }
             decoded[item.id] = wanted
             let url = board.url(of: item), id = item.id
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -635,6 +640,7 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
             refreshResolution()
         case .pan:
             (isSpaceDown ? NSCursor.openHand : NSCursor.arrow).set()
+            refreshResolution()
         default:
             break
         }
@@ -657,6 +663,10 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
             offset.x += event.scrollingDeltaX * factor
             offset.y += event.scrollingDeltaY * factor
             applyTransform()
+            // Images panned into view get sharp; cheap when nothing new needs decoding.
+            if event.phase == .ended || event.momentumPhase == .ended || !event.hasPreciseScrollingDeltas {
+                refreshResolution()
+            }
         }
     }
 

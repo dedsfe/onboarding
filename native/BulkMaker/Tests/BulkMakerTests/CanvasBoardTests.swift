@@ -115,6 +115,11 @@ final class CanvasBoardTests: XCTestCase {
         let second = board.importImages(from: source, around: .zero)[0]
         board.remove([second.id])
 
+        // A fresh unused file may be the AI's image mid-add: it stays. An old one goes.
+        XCTAssertEqual(CanvasBoard(directory: directory).items, [first])
+        XCTAssertEqual(Set(try FileManager.default.contentsOfDirectory(atPath: board.media.path)), [first.file, second.file])
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-3600)],
+                                              ofItemAtPath: board.url(of: second).path)
         let reopened = CanvasBoard(directory: directory)
         XCTAssertEqual(reopened.items, [first])
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: reopened.media.path), [first.file])
