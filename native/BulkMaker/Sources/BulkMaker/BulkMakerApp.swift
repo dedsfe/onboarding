@@ -87,7 +87,8 @@ private struct BatchFlowView: View {
         }
         .ignoresSafeArea(.container, edges: .top)
         .onAppear(perform: importSelectionIfChanged)
-        .modifier(TerminalShortcuts(isActive: showTerminalPanel && page == .batch, tabs: tabs))
+        .modifier(TerminalShortcuts(isAvailable: page == .batch && !showDesignEditor, isOpen: showTerminalPanel,
+                                    tabs: tabs, toggle: toggleTerminal))
         .onChange(of: desiredURL, initial: true) { _, url in desiredCatalog = url.flatMap { try? PhotoCatalog(directory: $0) } }
         .onChange(of: outputURL, initial: true) { _, _ in
             outputCatalog = nil
@@ -185,19 +186,21 @@ private struct BatchFlowView: View {
 
     /// The only open/close control for the terminal; it sits at the window corner so it never moves.
     private var terminalToggle: some View {
-        Button {
-            if showTerminalPanel {
-                withAnimation(.snappy(duration: 0.24)) { showTerminalPanel = false }
-            } else {
-                openTerminal()
-            }
-        } label: {
+        Button(action: toggleTerminal) {
             Image(systemName: showTerminalPanel ? "sidebar.right" : "terminal")
                 .frame(width: 20, height: 20)
         }
         .buttonStyle(.glass)
         .keyboardShortcut("`", modifiers: .control)
-        .help(showTerminalPanel ? "Esconder Terminal (⌃`)" : "Mostrar Terminal (⌃`)")
+        .help(showTerminalPanel ? "Esconder Terminal (⌘S)" : "Mostrar Terminal (⌘S)")
+    }
+
+    private func toggleTerminal() {
+        if showTerminalPanel {
+            withAnimation(.snappy(duration: 0.24)) { showTerminalPanel = false }
+        } else {
+            openTerminal()
+        }
     }
 
     private var topNav: some View {
