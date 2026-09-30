@@ -42,4 +42,25 @@ final class SlideStyleTests: XCTestCase {
         XCTAssertEqual(try SlideRenderer.render(plain, style: post, format: .tiktok).1.position, "bottom")
         XCTAssertEqual(try SlideRenderer.render(own, style: post, format: .tiktok).1.position, "top")
     }
+
+    func testPostStyleReachesSlidesThatOverrodeTheSameField() {
+        var plan = CarouselPlan(style: SlideStyle(color: "#FFFFFF"), slides: [
+            SlidePlan(photo: "/a.jpg", text: "um", position: .top, style: SlideStyle(color: "#FF0000", textCase: .upper)),
+            SlidePlan(photo: "/b.jpg", text: "dois", style: SlideStyle(color: "#00FF00"))
+        ])
+        plan.setPostStyle(SlideStyle(color: "#FFD60A", position: .bottom))
+        XCTAssertEqual(plan.style, SlideStyle(color: "#FFD60A", position: .bottom))
+        XCTAssertEqual(plan.slides[0].style, SlideStyle(textCase: .upper))
+        XCTAssertNil(plan.slides[0].position)
+        XCTAssertNil(plan.slides[1].style)
+    }
+
+    func testSlideStyleReplacesTheLegacyPositionAndEmptyFollowsThePost() {
+        var plan = CarouselPlan(slides: [SlidePlan(photo: "/a.jpg", text: "um", position: .top)])
+        plan.setSlideStyle(SlideStyle(position: .middle), at: 0)
+        XCTAssertNil(plan.slides[0].position)
+        XCTAssertEqual(plan.slides[0].style?.position, .middle)
+        plan.setSlideStyle(SlideStyle(), at: 0)
+        XCTAssertNil(plan.slides[0].style)
+    }
 }

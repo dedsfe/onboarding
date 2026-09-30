@@ -125,4 +125,66 @@ public struct SlideStyle: Codable, Sendable, Equatable {
                           position: override.position ?? position, align: override.align ?? align,
                           textCase: override.textCase ?? textCase)
     }
+
+    public enum Field: CaseIterable, Sendable {
+        case font, weight, size, color, strokeWidth, strokeColor, highlightColor, position, align, textCase
+    }
+
+    /// Fields whose value differs between the two styles.
+    public func changedFields(from other: SlideStyle) -> [Field] {
+        Field.allCases.filter { field in
+            switch field {
+            case .font: return font != other.font
+            case .weight: return weight != other.weight
+            case .size: return size != other.size
+            case .color: return color != other.color
+            case .strokeWidth: return strokeWidth != other.strokeWidth
+            case .strokeColor: return strokeColor != other.strokeColor
+            case .highlightColor: return highlightColor != other.highlightColor
+            case .position: return position != other.position
+            case .align: return align != other.align
+            case .textCase: return textCase != other.textCase
+            }
+        }
+    }
+
+    public mutating func clear(_ field: Field) {
+        switch field {
+        case .font: font = nil
+        case .weight: weight = nil
+        case .size: size = nil
+        case .color: color = nil
+        case .strokeWidth: strokeWidth = nil
+        case .strokeColor: strokeColor = nil
+        case .highlightColor: highlightColor = nil
+        case .position: position = nil
+        case .align: align = nil
+        case .textCase: textCase = nil
+        }
+    }
+
+    public var isEmpty: Bool { self == SlideStyle() }
+}
+
+extension CarouselPlan {
+    /// Sets the post's style so it reaches every slide: fields that changed are dropped from the slides'
+    /// own styles (and a changed position from their `position`), otherwise those slides would keep them.
+    public mutating func setPostStyle(_ style: SlideStyle) {
+        let changed = style.changedFields(from: self.style)
+        self.style = style
+        for index in slides.indices {
+            if changed.contains(.position) { slides[index].position = nil }
+            guard var own = slides[index].style else { continue }
+            changed.forEach { own.clear($0) }
+            slides[index].style = own.isEmpty ? nil : own
+        }
+    }
+
+    /// Sets one slide's own style; an empty one is removed so the slide follows the post again.
+    public mutating func setSlideStyle(_ style: SlideStyle, at index: Int) {
+        guard slides.indices.contains(index) else { return }
+        // The editor's position lives in the style; the legacy per-slide field would win over it.
+        if style.position != slides[index].style?.position { slides[index].position = nil }
+        slides[index].style = style.isEmpty ? nil : style
+    }
 }

@@ -36,10 +36,13 @@
 		A9E6ECA4D2334AECCA89D741 /* SlidePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1479B8C06159DD83EE7CEC30 /* SlidePlan.swift */; };
 		AF47CA1EC10673593D6C0975 /* modelo-ugc.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 74206F84DA71CCA32D5B535A /* modelo-ugc.jpg */; };
 		B871B9C101F692C1F887EC81 /* TerminalShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31BEEA0F60878B6A007F1C98 /* TerminalShortcuts.swift */; };
+		B98E7BF77E92252CAFB7CF3F /* StyleControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8B41A0088228FA064B0CB061 /* StyleControls.swift */; };
 		BA246CA8FE238AAB169DA045 /* SlideRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9CA09E6424C29AAD92A35A /* SlideRenderer.swift */; };
+		BD12A9B2303ADF84E06095FD /* SlideEditorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA17650753683D61153E93C3 /* SlideEditorPanel.swift */; };
 		C38CF5592577E97951C13D68 /* BundleModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B0C44FFAB0E6DCC2946A42 /* BundleModule.swift */; };
 		D0E6093FBBD597CF78383528 /* AsciiArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0758A121C0C41744AB9D2801 /* AsciiArt.swift */; };
 		DE5039B4CEE89A9F98F4A329 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA5879D78679A109377C4C7 /* main.swift */; };
+		E649DB89A88C48C1119658D1 /* SlideEditSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B92EC0834393056C2C5407F6 /* SlideEditSession.swift */; };
 		EF9FCEE3EA08245D2846AA69 /* libCarouselEngine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 56DA2B272397F8F9113234F9 /* libCarouselEngine.a */; };
 /* End PBXBuildFile section */
 
@@ -108,11 +111,14 @@
 		7B8F3C759E8F1ACA3FA1FE49 /* obras-nga.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "obras-nga.json"; sourceTree = "<group>"; };
 		8571C86388A48E539B94D3A5 /* CanvasScrollMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasScrollMonitor.swift; sourceTree = "<group>"; };
 		89B0C44FFAB0E6DCC2946A42 /* BundleModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleModule.swift; sourceTree = "<group>"; };
+		8B41A0088228FA064B0CB061 /* StyleControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StyleControls.swift; sourceTree = "<group>"; };
 		921641B402CEF5F17F661067 /* BatchOutputValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchOutputValidator.swift; sourceTree = "<group>"; };
 		B8F91A67D2FA580282A4C221 /* EmbeddedTerminal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTerminal.swift; sourceTree = "<group>"; };
+		B92EC0834393056C2C5407F6 /* SlideEditSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideEditSession.swift; sourceTree = "<group>"; };
 		C5C730FB70C61217A4E579AE /* DesignEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignEditor.swift; sourceTree = "<group>"; };
 		CC9CA09E6424C29AAD92A35A /* SlideRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideRenderer.swift; sourceTree = "<group>"; };
 		D8F219383FCE2CBABE458FFC /* ModalStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModalStyle.swift; sourceTree = "<group>"; };
+		DA17650753683D61153E93C3 /* SlideEditorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideEditorPanel.swift; sourceTree = "<group>"; };
 		E3F15EC703965CEE6D119F5E /* BulkMakerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkMakerApp.swift; sourceTree = "<group>"; };
 		EDA5879D78679A109377C4C7 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -219,6 +225,9 @@
 				D8F219383FCE2CBABE458FFC /* ModalStyle.swift */,
 				06005C10B9113B23D011FC46 /* OutputCatalog.swift */,
 				3C2DD3A3851FBA08B7AA764E /* PhotoCatalog.swift */,
+				DA17650753683D61153E93C3 /* SlideEditorPanel.swift */,
+				B92EC0834393056C2C5407F6 /* SlideEditSession.swift */,
+				8B41A0088228FA064B0CB061 /* StyleControls.swift */,
 				78DECE481410886878E05A9D /* TemplateCatalog.swift */,
 				31F5787D2124D5B88F9E0F5C /* TerminalHandoff.swift */,
 				31BEEA0F60878B6A007F1C98 /* TerminalShortcuts.swift */,
@@ -394,6 +403,9 @@
 				7D1B85E12FE11C79E82182B5 /* ModalStyle.swift in Sources */,
 				4E89339B194C8AD630A87C21 /* OutputCatalog.swift in Sources */,
 				60C1F8D71BD5E610B57808E6 /* PhotoCatalog.swift in Sources */,
+				E649DB89A88C48C1119658D1 /* SlideEditSession.swift in Sources */,
+				BD12A9B2303ADF84E06095FD /* SlideEditorPanel.swift in Sources */,
+				B98E7BF77E92252CAFB7CF3F /* StyleControls.swift in Sources */,
 				308F87113EB7807E82E54B8A /* TemplateCatalog.swift in Sources */,
 				A12BF75EAE7745753CF03B87 /* TerminalHandoff.swift in Sources */,
 				B871B9C101F692C1F887EC81 /* TerminalShortcuts.swift in Sources */,

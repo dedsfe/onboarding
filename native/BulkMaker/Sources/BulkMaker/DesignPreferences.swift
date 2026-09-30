@@ -84,6 +84,17 @@ struct DesignPreferences: Equatable {
     }
 }
 
+extension DesignPreferences {
+    /// The editor's view of a renderer style: every nil field reads as "auto".
+    init(style: SlideStyle) {
+        self.init(titleFont: style.font ?? "", titleWeight: style.weight.map(String.init) ?? "auto",
+                  titleSize: style.size.map { String(Int($0)) } ?? "auto", textColor: style.color ?? "auto",
+                  align: style.align?.rawValue ?? "auto", strokeWidth: style.strokeWidth.map { String(Int($0)) } ?? "auto",
+                  strokeColor: style.strokeColor ?? "auto", position: style.position?.rawValue ?? "auto",
+                  textCase: style.textCase?.rawValue ?? "auto", highlight: style.highlightColor ?? "auto")
+    }
+}
+
 /// A full-width slider in the inspector style: label left, value right, the fill is the track.
 struct SliderRow: View {
     let title: String
