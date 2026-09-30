@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0367EA45334DBFF01BA77FE7 /* InfiniteCanvasView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24624077DA0A4C8DEA8F456B /* InfiniteCanvasView.swift */; };
 		0DF3514087C78B9F14EE8881 /* AgentSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 390EF860C38F6BD5AD355022 /* AgentSession.swift */; };
+		1C7395638E8BD01916C2A38E /* CanvasBoard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E79BE585068590DE27F1EC /* CanvasBoard.swift */; };
 		215FBAA16B8A111CB7100069 /* carousel-render in Embed Dependencies */ = {isa = PBXBuildFile; fileRef = 25C05CC9B712466662F36E01 /* carousel-render */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		222FB28AC95279AFD66988B3 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 2ABF89E4899F89005788E7B6 /* SwiftTerm */; };
 		2259AB8DFA25E97FC5ED63C7 /* BulkMakerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3F15EC703965CEE6D119F5E /* BulkMakerApp.swift */; };
@@ -40,6 +42,7 @@
 		BA246CA8FE238AAB169DA045 /* SlideRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9CA09E6424C29AAD92A35A /* SlideRenderer.swift */; };
 		BD12A9B2303ADF84E06095FD /* SlideEditorPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA17650753683D61153E93C3 /* SlideEditorPanel.swift */; };
 		C38CF5592577E97951C13D68 /* BundleModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B0C44FFAB0E6DCC2946A42 /* BundleModule.swift */; };
+		CFD0014346F31C59DE20DFB4 /* CanvasPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB1D3CC7A073F997E8C16642 /* CanvasPage.swift */; };
 		D0E6093FBBD597CF78383528 /* AsciiArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0758A121C0C41744AB9D2801 /* AsciiArt.swift */; };
 		DE5039B4CEE89A9F98F4A329 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA5879D78679A109377C4C7 /* main.swift */; };
 		E649DB89A88C48C1119658D1 /* SlideEditSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B92EC0834393056C2C5407F6 /* SlideEditSession.swift */; };
@@ -89,6 +92,7 @@
 		0758A121C0C41744AB9D2801 /* AsciiArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsciiArt.swift; sourceTree = "<group>"; };
 		1479B8C06159DD83EE7CEC30 /* SlidePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidePlan.swift; sourceTree = "<group>"; };
 		1B62A6B9B70800A123145A99 /* fundo-canvas.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "fundo-canvas.jpg"; sourceTree = "<group>"; };
+		24624077DA0A4C8DEA8F456B /* InfiniteCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfiniteCanvasView.swift; sourceTree = "<group>"; };
 		25C05CC9B712466662F36E01 /* carousel-render */ = {isa = PBXFileReference; includeInIndex = 0; path = "carousel-render"; sourceTree = BUILT_PRODUCTS_DIR; };
 		31BEEA0F60878B6A007F1C98 /* TerminalShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalShortcuts.swift; sourceTree = "<group>"; };
 		31F5787D2124D5B88F9E0F5C /* TerminalHandoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalHandoff.swift; sourceTree = "<group>"; };
@@ -115,11 +119,13 @@
 		921641B402CEF5F17F661067 /* BatchOutputValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchOutputValidator.swift; sourceTree = "<group>"; };
 		B8F91A67D2FA580282A4C221 /* EmbeddedTerminal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTerminal.swift; sourceTree = "<group>"; };
 		B92EC0834393056C2C5407F6 /* SlideEditSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideEditSession.swift; sourceTree = "<group>"; };
+		C4E79BE585068590DE27F1EC /* CanvasBoard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasBoard.swift; sourceTree = "<group>"; };
 		C5C730FB70C61217A4E579AE /* DesignEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignEditor.swift; sourceTree = "<group>"; };
 		CC9CA09E6424C29AAD92A35A /* SlideRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideRenderer.swift; sourceTree = "<group>"; };
 		D8F219383FCE2CBABE458FFC /* ModalStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModalStyle.swift; sourceTree = "<group>"; };
 		DA17650753683D61153E93C3 /* SlideEditorPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideEditorPanel.swift; sourceTree = "<group>"; };
 		E3F15EC703965CEE6D119F5E /* BulkMakerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkMakerApp.swift; sourceTree = "<group>"; };
+		EB1D3CC7A073F997E8C16642 /* CanvasPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasPage.swift; sourceTree = "<group>"; };
 		EDA5879D78679A109377C4C7 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -217,11 +223,14 @@
 				E3F15EC703965CEE6D119F5E /* BulkMakerApp.swift */,
 				36F3F3CA046E84F3A5853EC5 /* CalendarPrototypeView.swift */,
 				543990C7B96D24B9B1F5CAA9 /* CanvasBackground.swift */,
+				C4E79BE585068590DE27F1EC /* CanvasBoard.swift */,
+				EB1D3CC7A073F997E8C16642 /* CanvasPage.swift */,
 				8571C86388A48E539B94D3A5 /* CanvasScrollMonitor.swift */,
 				3DFBCDE4D6253555A0C5F0B2 /* CSVDocument.swift */,
 				C5C730FB70C61217A4E579AE /* DesignEditor.swift */,
 				446B4E1D10024900E15D4467 /* DesignPreferences.swift */,
 				B8F91A67D2FA580282A4C221 /* EmbeddedTerminal.swift */,
+				24624077DA0A4C8DEA8F456B /* InfiniteCanvasView.swift */,
 				D8F219383FCE2CBABE458FFC /* ModalStyle.swift */,
 				06005C10B9113B23D011FC46 /* OutputCatalog.swift */,
 				3C2DD3A3851FBA08B7AA764E /* PhotoCatalog.swift */,
@@ -396,10 +405,13 @@
 				42220422D1F356BAD69425F0 /* CSVDocument.swift in Sources */,
 				5321E0F053B4F4A8076C3D69 /* CalendarPrototypeView.swift in Sources */,
 				7A1D8DE980C902BE69BF4CFF /* CanvasBackground.swift in Sources */,
+				1C7395638E8BD01916C2A38E /* CanvasBoard.swift in Sources */,
+				CFD0014346F31C59DE20DFB4 /* CanvasPage.swift in Sources */,
 				74B9A8A465170D71C31E35BD /* CanvasScrollMonitor.swift in Sources */,
 				9DAF49F2FC7E1DA20D1E772C /* DesignEditor.swift in Sources */,
 				31EAC359F517756ACBA77C74 /* DesignPreferences.swift in Sources */,
 				7A06267728D17CF93EA1BD8D /* EmbeddedTerminal.swift in Sources */,
+				0367EA45334DBFF01BA77FE7 /* InfiniteCanvasView.swift in Sources */,
 				7D1B85E12FE11C79E82182B5 /* ModalStyle.swift in Sources */,
 				4E89339B194C8AD630A87C21 /* OutputCatalog.swift in Sources */,
 				60C1F8D71BD5E610B57808E6 /* PhotoCatalog.swift in Sources */,
