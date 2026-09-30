@@ -166,6 +166,7 @@ do {
             var line = String(format: "  %02d · %dpx · %d linhas · %@", index + 1, Int(report.fontSize), report.lines, report.position)
             let notes = report.notes.filter { !$0.hasPrefix("posição automática") }
             if !notes.isEmpty { line += " · " + notes.joined(separator: "; ") }
+            if let own = plan.slides[index].style { line += " · estilo do slide: \(describe(own))" }
             print(line)
         }
     }

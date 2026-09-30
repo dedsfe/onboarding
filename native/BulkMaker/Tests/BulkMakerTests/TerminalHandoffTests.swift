@@ -45,6 +45,7 @@ final class TerminalHandoffTests: XCTestCase {
         XCTAssertTrue(session.contains("--lote --estilo .bulk-maker/estilo.json --saida \"<saída>\" --revisao .bulk-maker/revisao"))
         XCTAssertTrue(session.contains("## Economia (obrigatório)"))
         XCTAssertTrue(session.contains("legenda.txt"))
+        XCTAssertTrue(session.contains("## Mudar o estilo de um post ou de um slide"))
         XCTAssertTrue(designGuide.contains("Tipografia e acabamento"))
         XCTAssertTrue(designGuide.contains("carousel-render"))
         XCTAssertTrue(FileManager.default.fileExists(atPath: workspace.appendingPathComponent("biblioteca-fundos").path))

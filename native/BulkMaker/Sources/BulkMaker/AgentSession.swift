@@ -76,6 +76,14 @@ enum AgentSession {
         Quando o estado tiver "Aberto na tela", o usuário está vendo esse post no celular de prévia do calendário. "Esse post", "essa imagem", "esse slide", "aqui" = o post e o slide dessa linha. Aja direto nele, sem perguntar qual.
         Trocar a foto de um slide: gere a folha das fotos (`--folha`), escolha outra coerente com o texto, troque só o `photo` daquele slide no `.plano.json` e refaça. Se o pedido for "que não cubra o rosto", escolha foto com área livre onde o texto fica ou ajuste o `position` desse slide. Confira na folha de revisão antes de dizer que ficou.
 
+        ## Mudar o estilo de um post ou de um slide
+        "Deixa o texto desse post amarelo com contorno preto" ou "só esse slide em caixa alta": mude o `style` no `.plano.json` do post da linha "Aberto na tela" e refaça como em "Refazer" abaixo (sem `--estilo`, que trocaria o estilo do post inteiro pelo do app).
+        - Post inteiro: altere só os campos pedidos no `style` do topo do plano.
+        - Um slide: ponha um `style` dentro daquele slide (`slides[N-1]`, N = o slide da linha) só com os campos pedidos, ex.: `"style": { "textCase": "upper" }`. Cada campo do slide vence o do post; o resto vem do post. Para o slide voltar ao estilo do post, apague o `style` dele.
+        - Campos: `font` (família instalada), `weight` (100–900), `size` (px, o renderizador reduz se não couber), `color`, `strokeColor` e `highlightColor` ("#RRGGBB"), `strokeWidth` (px; 0 = sem contorno), `position` ("top" | "middle" | "bottom"), `align` ("leading" | "center" | "trailing"), `textCase` ("upper" | "normal").
+        - Cores por nome viram hex: amarelo #FFD60A, preto #000000, branco #FFFFFF, vermelho #FF3B30. Contorno sem espessura dita = 6.
+        - O relatório mostra "estilo do slide" nos slides com estilo próprio: confira por ele, sem abrir imagem.
+
         ## Refazer ou alterar um post que já existe
         Cada pasta de variação tem um `.plano.json` escondido com fotos, textos, destaques e o estilo usados. Para trocar foto, texto ou destaque de um post: edite esse arquivo e rode `.bulk-maker/bin/carousel-render "<pasta>/.plano.json" --saida "<pasta>" --revisao .bulk-maker/revisao` (sem `--estilo`, para manter o visual original; com `--estilo .bulk-maker/estilo.json` só se o usuário pedir o estilo novo). Os slides são substituídos no lugar, o post continua agendado no mesmo horário e o calendário mostra a versão nova. Atualize a `legenda.txt` se o texto mudar.
 

@@ -51,8 +51,10 @@ public enum SlideRenderer {
         }
     }
 
-    public static func render(_ slide: SlidePlan, style: SlideStyle, format: SlideFormat,
+    /// `style` is the plan's style; the slide's own `style` wins field by field on top of it.
+    public static func render(_ slide: SlidePlan, style planStyle: SlideStyle, format: SlideFormat,
                               index: Int = 1) throws -> (CGImage, RenderReport) {
+        let style = planStyle.overridden(by: slide.style)
         let text = (style.textCase == .upper ? slide.text.uppercased() : slide.text)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw RenderError.emptyText(index) }

@@ -29,12 +29,16 @@ public struct SlidePlan: Codable, Sendable {
     public var highlight: [String]
     /// Per-slide override of the style's position.
     public var position: TextPosition?
+    /// Per-slide style: each field it sets wins over the plan's style, the rest comes from the plan.
+    public var style: SlideStyle?
 
-    public init(photo: String, text: String, highlight: [String] = [], position: TextPosition? = nil) {
+    public init(photo: String, text: String, highlight: [String] = [], position: TextPosition? = nil,
+                style: SlideStyle? = nil) {
         self.photo = photo
         self.text = text
         self.highlight = highlight
         self.position = position
+        self.style = style
     }
 
     public init(from decoder: Decoder) throws {
@@ -43,6 +47,7 @@ public struct SlidePlan: Codable, Sendable {
         text = try container.decode(String.self, forKey: .text)
         highlight = try container.decodeIfPresent([String].self, forKey: .highlight) ?? []
         position = try container.decodeIfPresent(TextPosition.self, forKey: .position)
+        style = try container.decodeIfPresent(SlideStyle.self, forKey: .style)
     }
 }
 
@@ -108,5 +113,16 @@ public struct SlideStyle: Codable, Sendable, Equatable {
         self.position = position
         self.align = align
         self.textCase = textCase
+    }
+
+    /// This style with every field `override` sets replaced by it: the plan's style under a slide's style.
+    public func overridden(by override: SlideStyle?) -> SlideStyle {
+        guard let override else { return self }
+        return SlideStyle(font: override.font ?? font, weight: override.weight ?? weight, size: override.size ?? size,
+                          color: override.color ?? color, strokeWidth: override.strokeWidth ?? strokeWidth,
+                          strokeColor: override.strokeColor ?? strokeColor,
+                          highlightColor: override.highlightColor ?? highlightColor,
+                          position: override.position ?? position, align: override.align ?? align,
+                          textCase: override.textCase ?? textCase)
     }
 }
