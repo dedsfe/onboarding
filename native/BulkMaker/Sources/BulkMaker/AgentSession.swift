@@ -98,7 +98,8 @@ enum AgentSession {
     /// Human summary of the batch as the app sees it right now. No timestamps, so it only changes
     /// when something the AI must know about changes.
     static func state(photos: URL?, desired: URL?, csv: URL?, output: URL?, variations: Int,
-                      design: DesignPreferences, custom: Bool, agenda: PostAgenda.Rules = .init()) -> String {
+                      design: DesignPreferences, custom: Bool, agenda: PostAgenda.Rules = .init(),
+                      project: String? = nil) -> String {
         let fileManager = FileManager.default
         func visibleFiles(_ folder: URL) -> [URL] {
             ((try? fileManager.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isRegularFileKey],
@@ -151,7 +152,7 @@ enum AgentSession {
 
         return """
         # Estado do lote (escrito pelo app)
-        - Fotos: \(photoLine)
+        \(project.map { "- Projeto: \($0)\n" } ?? "")- Fotos: \(photoLine)
         - Resultados desejados: \(desiredLine)
         - CSV: \(csvLine)
         - Saída: \(outputLine)

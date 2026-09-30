@@ -26,6 +26,7 @@
 		60C1F8D71BD5E610B57808E6 /* PhotoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C2DD3A3851FBA08B7AA764E /* PhotoCatalog.swift */; };
 		613F05ED3DB39242BDD9038A /* fundo-canvas.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 1B62A6B9B70800A123145A99 /* fundo-canvas.jpg */; };
 		74B9A8A465170D71C31E35BD /* CanvasScrollMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8571C86388A48E539B94D3A5 /* CanvasScrollMonitor.swift */; };
+		751F2C175C8D5305982BB8DC /* ProjectSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FC04EB2D22E27FDDD98F195 /* ProjectSwitcher.swift */; };
 		783452C92B85916278173666 /* design-kit.md in Resources */ = {isa = PBXBuildFile; fileRef = 445EEA293E41DDCE22FA74D1 /* design-kit.md */; };
 		7A06267728D17CF93EA1BD8D /* EmbeddedTerminal.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8F91A67D2FA580282A4C221 /* EmbeddedTerminal.swift */; };
 		7A1D8DE980C902BE69BF4CFF /* CanvasBackground.swift in Sources */ = {isa = PBXBuildFile; fileRef = 543990C7B96D24B9B1F5CAA9 /* CanvasBackground.swift */; };
@@ -47,6 +48,7 @@
 		DE5039B4CEE89A9F98F4A329 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA5879D78679A109377C4C7 /* main.swift */; };
 		E649DB89A88C48C1119658D1 /* SlideEditSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B92EC0834393056C2C5407F6 /* SlideEditSession.swift */; };
 		EF9FCEE3EA08245D2846AA69 /* libCarouselEngine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 56DA2B272397F8F9113234F9 /* libCarouselEngine.a */; };
+		F76A8D1FBE7A33C5C80BA337 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9299CF955D5B6756982D60A9 /* ProjectStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -116,7 +118,9 @@
 		8571C86388A48E539B94D3A5 /* CanvasScrollMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasScrollMonitor.swift; sourceTree = "<group>"; };
 		89B0C44FFAB0E6DCC2946A42 /* BundleModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BundleModule.swift; sourceTree = "<group>"; };
 		8B41A0088228FA064B0CB061 /* StyleControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StyleControls.swift; sourceTree = "<group>"; };
+		8FC04EB2D22E27FDDD98F195 /* ProjectSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectSwitcher.swift; sourceTree = "<group>"; };
 		921641B402CEF5F17F661067 /* BatchOutputValidator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchOutputValidator.swift; sourceTree = "<group>"; };
+		9299CF955D5B6756982D60A9 /* ProjectStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectStore.swift; sourceTree = "<group>"; };
 		B8F91A67D2FA580282A4C221 /* EmbeddedTerminal.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedTerminal.swift; sourceTree = "<group>"; };
 		B92EC0834393056C2C5407F6 /* SlideEditSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideEditSession.swift; sourceTree = "<group>"; };
 		C4E79BE585068590DE27F1EC /* CanvasBoard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasBoard.swift; sourceTree = "<group>"; };
@@ -234,6 +238,8 @@
 				D8F219383FCE2CBABE458FFC /* ModalStyle.swift */,
 				06005C10B9113B23D011FC46 /* OutputCatalog.swift */,
 				3C2DD3A3851FBA08B7AA764E /* PhotoCatalog.swift */,
+				9299CF955D5B6756982D60A9 /* ProjectStore.swift */,
+				8FC04EB2D22E27FDDD98F195 /* ProjectSwitcher.swift */,
 				DA17650753683D61153E93C3 /* SlideEditorPanel.swift */,
 				B92EC0834393056C2C5407F6 /* SlideEditSession.swift */,
 				8B41A0088228FA064B0CB061 /* StyleControls.swift */,
@@ -415,6 +421,8 @@
 				7D1B85E12FE11C79E82182B5 /* ModalStyle.swift in Sources */,
 				4E89339B194C8AD630A87C21 /* OutputCatalog.swift in Sources */,
 				60C1F8D71BD5E610B57808E6 /* PhotoCatalog.swift in Sources */,
+				F76A8D1FBE7A33C5C80BA337 /* ProjectStore.swift in Sources */,
+				751F2C175C8D5305982BB8DC /* ProjectSwitcher.swift in Sources */,
 				E649DB89A88C48C1119658D1 /* SlideEditSession.swift in Sources */,
 				BD12A9B2303ADF84E06095FD /* SlideEditorPanel.swift in Sources */,
 				B98E7BF77E92252CAFB7CF3F /* StyleControls.swift in Sources */,

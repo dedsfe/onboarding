@@ -90,7 +90,8 @@ enum TerminalHandoff {
         if !FileManager.default.fileExists(atPath: agendaFile.path) { try agenda.save(to: agendaFile) }
         try AgentSession.install(in: workspace, state: AgentSession.state(
             photos: photos, desired: desired, csv: csv, output: output, variations: variations, design: design,
-            custom: UserDefaults.standard.string(forKey: DesignPreferences.modeKey) == "custom", agenda: agenda.rules))
+            custom: UserDefaults.standard.string(forKey: DesignPreferences.modeKey) == "custom", agenda: agenda.rules,
+            project: ProjectStore.currentSummary))
     }
 
     /// The native renderer ships next to the app binary (run-mac.sh); under `swift test` it sits

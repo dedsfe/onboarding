@@ -35,7 +35,7 @@ private struct BatchFlowView: View {
     @State private var showArtworks = false
     @Namespace private var navSelection
 
-    private enum Page { case batch, calendar, settings }
+    private enum Page { case batch, canvas, calendar, settings }
     private struct BatchRunRequest {
         let photos: URL
         let desired: URL
@@ -206,7 +206,7 @@ private struct BatchFlowView: View {
     private var topNav: some View {
         HStack(spacing: 4) {
             navButton("Criar em lote", icon: "square.stack.3d.up", page: .batch)
-            comingSoonNavIcon("Canvas", icon: "square.dashed")
+            navButton("Canvas", icon: "square.dashed", page: .canvas)
             navButton("Calendário", icon: "calendar", page: .calendar)
             navButton("Configurações", icon: "gearshape", page: .settings)
                 .keyboardShortcut(",", modifiers: .command)
@@ -260,9 +260,15 @@ private struct BatchFlowView: View {
             }
             .font(.system(size: 14)).padding(.horizontal, 20).frame(height: 64)
             .overlay { topNav }
+            // Clear of the window's traffic lights.
+            .overlay(alignment: .leading) { ProjectSwitcher().padding(.leading, 84) }
             .zIndex(1)
             if page == .calendar {
                 CalendarPrototypeView(outputFolder: outputURL)
+                    .padding(.top, -64)
+                    .transition(.opacity)
+            } else if page == .canvas {
+                CanvasPage()
                     .padding(.top, -64)
                     .transition(.opacity)
             } else if page == .settings {

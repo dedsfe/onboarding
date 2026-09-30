@@ -15,7 +15,9 @@ struct CanvasPage: View {
                 .overlay(Color.black.opacity(0.28))
                 .opacity(backdropBlur)
                 .ignoresSafeArea()
-            InfiniteCanvasRepresentable(controller: controller)
+            // Each project has its own board; switching projects builds a fresh canvas on its folder.
+            InfiniteCanvasRepresentable(controller: controller, directory: ProjectStore.shared.current.canvasDirectory)
+                .id(ProjectStore.shared.current.id)
             if controller.isEmpty {
                 emptyState
                     .transition(.opacity.combined(with: .scale(scale: 0.96)))
@@ -179,9 +181,12 @@ final class CanvasController {
 
 private struct InfiniteCanvasRepresentable: NSViewRepresentable {
     let controller: CanvasController
+    let directory: URL
 
     func makeNSView(context: Context) -> InfiniteCanvasView {
-        let view = InfiniteCanvasView(board: CanvasBoard())
+        let view = InfiniteCanvasView(board: CanvasBoard(directory: directory))
+        // A new project starts with nothing selected; the toolbar must not keep the old count.
+        DispatchQueue.main.async { [weak controller] in controller?.selectionCount = 0 }
         view.onViewportChange = { [weak controller] zoom, isEmpty in
             guard let controller else { return }
             if controller.zoom != zoom { controller.zoom = zoom }
