@@ -35,8 +35,10 @@
 		A403329330E035CB4B59751F /* BatchOutputValidator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 921641B402CEF5F17F661067 /* BatchOutputValidator.swift */; };
 		A9E6ECA4D2334AECCA89D741 /* SlidePlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1479B8C06159DD83EE7CEC30 /* SlidePlan.swift */; };
 		AF47CA1EC10673593D6C0975 /* modelo-ugc.jpg in Resources */ = {isa = PBXBuildFile; fileRef = 74206F84DA71CCA32D5B535A /* modelo-ugc.jpg */; };
+		B871B9C101F692C1F887EC81 /* TerminalShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31BEEA0F60878B6A007F1C98 /* TerminalShortcuts.swift */; };
 		BA246CA8FE238AAB169DA045 /* SlideRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC9CA09E6424C29AAD92A35A /* SlideRenderer.swift */; };
 		C38CF5592577E97951C13D68 /* BundleModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B0C44FFAB0E6DCC2946A42 /* BundleModule.swift */; };
+		D0E6093FBBD597CF78383528 /* AsciiArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0758A121C0C41744AB9D2801 /* AsciiArt.swift */; };
 		DE5039B4CEE89A9F98F4A329 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA5879D78679A109377C4C7 /* main.swift */; };
 		EF9FCEE3EA08245D2846AA69 /* libCarouselEngine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 56DA2B272397F8F9113234F9 /* libCarouselEngine.a */; };
 /* End PBXBuildFile section */
@@ -81,9 +83,11 @@
 
 /* Begin PBXFileReference section */
 		06005C10B9113B23D011FC46 /* OutputCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutputCatalog.swift; sourceTree = "<group>"; };
+		0758A121C0C41744AB9D2801 /* AsciiArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsciiArt.swift; sourceTree = "<group>"; };
 		1479B8C06159DD83EE7CEC30 /* SlidePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidePlan.swift; sourceTree = "<group>"; };
 		1B62A6B9B70800A123145A99 /* fundo-canvas.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "fundo-canvas.jpg"; sourceTree = "<group>"; };
 		25C05CC9B712466662F36E01 /* carousel-render */ = {isa = PBXFileReference; includeInIndex = 0; path = "carousel-render"; sourceTree = BUILT_PRODUCTS_DIR; };
+		31BEEA0F60878B6A007F1C98 /* TerminalShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalShortcuts.swift; sourceTree = "<group>"; };
 		31F5787D2124D5B88F9E0F5C /* TerminalHandoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalHandoff.swift; sourceTree = "<group>"; };
 		36F3F3CA046E84F3A5853EC5 /* CalendarPrototypeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarPrototypeView.swift; sourceTree = "<group>"; };
 		390EF860C38F6BD5AD355022 /* AgentSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSession.swift; sourceTree = "<group>"; };
@@ -201,6 +205,7 @@
 			children = (
 				390EF860C38F6BD5AD355022 /* AgentSession.swift */,
 				6DA59D094A173E7BD209615C /* ArtworkBrowser.swift */,
+				0758A121C0C41744AB9D2801 /* AsciiArt.swift */,
 				921641B402CEF5F17F661067 /* BatchOutputValidator.swift */,
 				680B5DC2E15C3573876FB31D /* BatchSelectionBridge.swift */,
 				E3F15EC703965CEE6D119F5E /* BulkMakerApp.swift */,
@@ -216,6 +221,7 @@
 				3C2DD3A3851FBA08B7AA764E /* PhotoCatalog.swift */,
 				78DECE481410886878E05A9D /* TemplateCatalog.swift */,
 				31F5787D2124D5B88F9E0F5C /* TerminalHandoff.swift */,
+				31BEEA0F60878B6A007F1C98 /* TerminalShortcuts.swift */,
 				2E7AF6BADD69D78D439AA4C9 /* Resources */,
 			);
 			name = BulkMaker;
@@ -373,6 +379,7 @@
 			files = (
 				0DF3514087C78B9F14EE8881 /* AgentSession.swift in Sources */,
 				A258904808154222451F6EF7 /* ArtworkBrowser.swift in Sources */,
+				D0E6093FBBD597CF78383528 /* AsciiArt.swift in Sources */,
 				A403329330E035CB4B59751F /* BatchOutputValidator.swift in Sources */,
 				59013002A4C9EB6538989E9C /* BatchSelectionBridge.swift in Sources */,
 				2259AB8DFA25E97FC5ED63C7 /* BulkMakerApp.swift in Sources */,
@@ -389,6 +396,7 @@
 				60C1F8D71BD5E610B57808E6 /* PhotoCatalog.swift in Sources */,
 				308F87113EB7807E82E54B8A /* TemplateCatalog.swift in Sources */,
 				A12BF75EAE7745753CF03B87 /* TerminalHandoff.swift in Sources */,
+				B871B9C101F692C1F887EC81 /* TerminalShortcuts.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

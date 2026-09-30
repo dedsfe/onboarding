@@ -28,11 +28,11 @@ private struct BatchFlowView: View {
     @State private var lastSelectionData: Data?
     @State private var desiredCatalog: PhotoCatalog?
     @State private var showTerminalPanel = false
-    // Decoded once and kept in state; reloading the JPEG on every body pass made panning drop frames.
-    @State private var backgroundImage = CanvasBackground.load()
-    @State private var backgroundIsCustom = CanvasBackground.isCustom
+    // Decoded once in the store; reloading the JPEG on every body pass made panning drop frames.
+    @StateObject private var wallpapers = WallpaperStore()
     @State private var page: Page = ProcessInfo.processInfo.arguments.contains("--calendar-preview") ? .calendar : .batch
     @State private var showDesignEditor = false
+    @State private var showArtworks = false
     @Namespace private var navSelection
 
     private enum Page { case batch, calendar, settings }
@@ -77,8 +77,17 @@ private struct BatchFlowView: View {
                 .transition(.opacity)
             }
         }
+        .overlay {
+            if showArtworks {
+                ArtworkBrowser(wallpapers: wallpapers) {
+                    withAnimation(.snappy(duration: 0.25)) { showArtworks = false }
+                }
+                .transition(.opacity)
+            }
+        }
         .ignoresSafeArea(.container, edges: .top)
         .onAppear(perform: importSelectionIfChanged)
+        .modifier(TerminalShortcuts(isActive: showTerminalPanel && page == .batch, tabs: tabs))
         .onChange(of: desiredURL, initial: true) { _, url in desiredCatalog = url.flatMap { try? PhotoCatalog(directory: $0) } }
         .onChange(of: outputURL, initial: true) { _, _ in
             outputCatalog = nil
@@ -250,14 +259,14 @@ private struct BatchFlowView: View {
             .overlay { topNav }
             .zIndex(1)
             if page == .calendar {
-                CalendarPrototypeView(outputFolder: outputURL, background: backgroundImage)
+                CalendarPrototypeView(outputFolder: outputURL)
                     .padding(.top, -64)
                     .transition(.opacity)
             } else if page == .settings {
                 // Scrolls under the floating nav instead of being cut off below it.
-                SettingsPage(background: backgroundImage, isCustom: backgroundIsCustom,
-                             choose: chooseBackground, drop: setBackground, reset: resetBackground,
-                             openBackgroundLibrary: openBackgroundLibrary)
+                SettingsPage(wallpapers: wallpapers, choose: chooseBackgrounds, add: addBackgrounds,
+                             openBackgroundLibrary: openBackgroundLibrary,
+                             openArtworks: { withAnimation(.snappy(duration: 0.25)) { showArtworks = true } })
                     .padding(.top, -64)
                     .transition(.opacity)
             } else {
@@ -305,13 +314,18 @@ private struct BatchFlowView: View {
     }
 
     private var canvasBackground: some View {
-        Group {
-            if let image = backgroundImage {
-                Image(nsImage: image).resizable().scaledToFill()
-            } else {
-                Color(nsColor: .textBackgroundColor)
+        ZStack {
+            Color(nsColor: .textBackgroundColor)
+            if let image = wallpapers.image {
+                Color.clear
+                    .overlay { Image(nsImage: image).resizable().scaledToFill() }
+                    .clipped()
+                    .id(ObjectIdentifier(image))
+                    .transition(.opacity)
             }
         }
+        // Slow crossfade, like the macOS desktop when the picture changes.
+        .animation(.easeInOut(duration: 0.9), value: wallpapers.image)
         .ignoresSafeArea()
     }
 
@@ -397,23 +411,23 @@ private struct BatchFlowView: View {
          outputURL == nil ? "Saída" : nil].compactMap { $0 }
     }
 
-    private func chooseBackground() {
+    private func chooseBackgrounds() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        setBackground(url)
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Adicionar"
+        guard panel.runModal() == .OK else { return }
+        addBackgrounds(panel.urls)
     }
-    private func setBackground(_ url: URL) {
-        do {
-            try CanvasBackground.importImage(from: url)
-            backgroundImage = CanvasBackground.load()
-            backgroundIsCustom = true
-        } catch { errorMessage = "Não deu pra usar essa imagem como fundo." }
-    }
-    private func resetBackground() {
-        CanvasBackground.reset()
-        backgroundImage = CanvasBackground.load()
-        backgroundIsCustom = false
+    private func addBackgrounds(_ urls: [URL]) {
+        Task {
+            let failed = await wallpapers.add(urls)
+            if failed > 0 {
+                errorMessage = failed == urls.count
+                    ? "Não deu pra usar essas imagens como fundo."
+                    : "\(failed) de \(urls.count) imagens não puderam ser usadas como fundo."
+            }
+        }
     }
 
     private func openBackgroundLibrary() {
