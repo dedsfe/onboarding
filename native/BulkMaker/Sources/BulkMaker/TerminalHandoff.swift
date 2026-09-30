@@ -3,11 +3,24 @@ import Foundation
 
 /// Prepares a readable handoff next to the project and opens a real macOS Terminal session there.
 enum TerminalHandoff {
-    static var projectDirectory: URL {
-        var url = URL(fileURLWithPath: #filePath)
-        for _ in 0..<5 { url.deleteLastPathComponent() }
-        return url
-    }
+    /// Where the app keeps its batch workspace (`.bulk-maker`) and runs the AI sessions. It lives in
+    /// Application Support, so the app works on any Mac without its source code next to it.
+    static let projectDirectory: URL = {
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("The Carousel Maker", isDirectory: true)
+        let workspace = root.appendingPathComponent(".bulk-maker", isDirectory: true)
+        try? FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        // Dev builds used to keep the workspace in the repo; carry the last folder selection over once.
+        var legacy = URL(fileURLWithPath: #filePath)
+        for _ in 0..<5 { legacy.deleteLastPathComponent() }
+        let oldSelection = legacy.appendingPathComponent(".bulk-maker/selecao.json")
+        let newSelection = workspace.appendingPathComponent("selecao.json")
+        if !FileManager.default.fileExists(atPath: newSelection.path),
+           FileManager.default.fileExists(atPath: oldSelection.path) {
+            try? FileManager.default.copyItem(at: oldSelection, to: newSelection)
+        }
+        return root
+    }()
 
     static func context(photos: URL?, desired: URL?, csv: URL?, output: URL?, variations: Int = 1,
                         workspaceRoot: URL? = nil, design: DesignPreferences = .current,

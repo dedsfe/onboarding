@@ -21,8 +21,9 @@ final class TerminalHandoffTests: XCTestCase {
         XCTAssertTrue(text.contains("legenda.txt"))
         XCTAssertFalse(text.contains("renderizador invisível"))
         XCTAssertEqual(TerminalHandoff.shellQuote("a'b"), "'a'\\''b'")
+        XCTAssertTrue(TerminalHandoff.projectDirectory.path.hasSuffix("Application Support/The Carousel Maker"))
         XCTAssertTrue(FileManager.default.fileExists(
-            atPath: TerminalHandoff.projectDirectory.appendingPathComponent("native/BulkMaker/Package.swift").path))
+            atPath: TerminalHandoff.projectDirectory.appendingPathComponent(".bulk-maker").path))
     }
 
     func testDesignChoicesReachTheAgentContext() {
