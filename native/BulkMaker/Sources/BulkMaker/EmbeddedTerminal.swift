@@ -20,7 +20,8 @@ enum AgentCLI: String {
                 + "--settings \(TerminalHandoff.shellQuote(AgentSession.claudeSettings(workspace: workspace))) \(TerminalHandoff.shellQuote(prompt))"
         case .codex:
             let quoted = String(decoding: (try? JSONEncoder().encode(AgentSession.codexInstructions)) ?? Data(), as: UTF8.self)
-            return reset + "exec codex \(AgentSession.codexCostFlags.map(TerminalHandoff.shellQuote).joined(separator: " ")) -c \(TerminalHandoff.shellQuote("developer_instructions=" + quoted)) \(TerminalHandoff.shellQuote(prompt))"
+            let home = TerminalHandoff.shellQuote(AgentSession.codexHome().path)
+            return reset + "CODEX_HOME=\(home) exec codex \(AgentSession.codexCostFlags.map(TerminalHandoff.shellQuote).joined(separator: " ")) -c \(TerminalHandoff.shellQuote("developer_instructions=" + quoted)) \(TerminalHandoff.shellQuote(prompt))"
         }
     }
 }

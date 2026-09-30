@@ -56,6 +56,7 @@ enum AgentSession {
         - Na primeira mensagem da sessão, responda com UMA linha de situação tirada do estado do lote (fotos, referências, variações, estilo, o que falta) e UMA pergunta, por exemplo: "12 fotos, 4 referências, 3 variações, estilo com a IA. Mando gerar?". Se faltar algo obrigatório, pergunte só por isso.
         - Não comece a gerar sem o ok do usuário, a menos que ele já tenha pedido.
         - Durante a geração, avise só marcos curtos ("variação 1 pronta") e, no fim, onde estão os arquivos.
+        - Para perguntar algo, escreva a pergunta e encerre a resposta. Nunca use ferramentas de esperar resposta ou de pausa (sleep, input assíncrono): cada espera reenvia a conversa inteira e custa caro.
 
         ## Estado do lote: sempre o atual
         O app reescreve `.bulk-maker/estado.md` a cada mudança (pastas, CSV, variações, estilo) e ele chega junto das mensagens do usuário. Ele é a verdade: nunca use caminhos, números ou estilo de uma leitura anterior. Se um aviso disser que o lote mudou no meio do trabalho, pare, diga em 1 linha o que mudou e pergunte se refaz o que já foi feito com a versão nova.
@@ -70,6 +71,10 @@ enum AgentSession {
         - Tirar da agenda (os arquivos ficam): `... --desagendar "<pasta>" --agenda .bulk-maker/agenda.json`
         - Mudar regras ("quero 3 por dia", "não posta domingo"): edite só `rules` no JSON e confirme em 1 linha. Posts já agendados não mudam sozinhos; pergunte se quer remanejar.
         Nunca tire ou mova posts que o usuário não mencionou. "O post de quinta" = rode `--listar` e ache pela data.
+
+        ## Post aberto na tela
+        Quando o estado tiver "Aberto na tela", o usuário está vendo esse post no celular de prévia do calendário. "Esse post", "essa imagem", "esse slide", "aqui" = o post e o slide dessa linha. Aja direto nele, sem perguntar qual.
+        Trocar a foto de um slide: gere a folha das fotos (`--folha`), escolha outra coerente com o texto, troque só o `photo` daquele slide no `.plano.json` e refaça. Se o pedido for "que não cubra o rosto", escolha foto com área livre onde o texto fica ou ajuste o `position` desse slide. Confira na folha de revisão antes de dizer que ficou.
 
         ## Refazer ou alterar um post que já existe
         Cada pasta de variação tem um `.plano.json` escondido com fotos, textos, destaques e o estilo usados. Para trocar foto, texto ou destaque de um post: edite esse arquivo e rode `.bulk-maker/bin/carousel-render "<pasta>/.plano.json" --saida "<pasta>" --revisao .bulk-maker/revisao` (sem `--estilo`, para manter o visual original; com `--estilo .bulk-maker/estilo.json` só se o usuário pedir o estilo novo). Os slides são substituídos no lugar, o post continua agendado no mesmo horário e o calendário mostra a versão nova. Atualize a `legenda.txt` se o texto mudar.
@@ -160,21 +165,48 @@ enum AgentSession {
 
     /// The calendar changed the rules: refresh the agenda line of the live state so the hook tells the AI.
     static func updateAgendaRules(_ rules: PostAgenda.Rules, workspace: URL) {
+        patchState(line: "- Agenda:", value: agendaLine(rules), workspace: workspace)
+    }
+
+    /// The post open in the calendar's phone preview (nil when closed), right under the agenda line.
+    static func updateOpenPost(_ description: String?, workspace: URL) {
+        let file = workspace.appendingPathComponent("aberto.md")
+        if let description { try? description.write(to: file, atomically: true, encoding: .utf8) }
+        else { try? FileManager.default.removeItem(at: file) }
+        patchState(line: "- Aberto na tela:", value: description, workspace: workspace)
+    }
+
+    /// Every app refresh rebuilds the state from scratch; the open post must come back with it.
+    private static func withOpenPost(_ state: String, workspace: URL) -> String {
+        guard !state.contains("- Aberto na tela:"),
+              let open = try? String(contentsOf: workspace.appendingPathComponent("aberto.md"), encoding: .utf8) else { return state }
+        var lines = state.components(separatedBy: "\n")
+        let anchor = lines.firstIndex { $0.hasPrefix("- Agenda:") }.map { $0 + 1 } ?? lines.count
+        lines.insert("- Aberto na tela: \(open)", at: anchor)
+        return lines.joined(separator: "\n")
+    }
+
+    private static func patchState(line prefix: String, value: String?, workspace: URL) {
         let stateFile = workspace.appendingPathComponent("estado.md")
         guard let state = try? String(contentsOf: stateFile, encoding: .utf8) else { return }
-        let lines = state.components(separatedBy: "\n").map { $0.hasPrefix("- Agenda:") ? "- Agenda: \(agendaLine(rules))" : $0 }
+        var lines = state.components(separatedBy: "\n").filter { !$0.hasPrefix(prefix) }
+        if let value {
+            let anchor = lines.firstIndex { $0.hasPrefix("- Agenda:") }.map { $0 + 1 } ?? lines.count
+            lines.insert("\(prefix) \(value)", at: anchor)
+        }
         try? install(in: workspace, state: lines.joined(separator: "\n"))
     }
 
     /// Writes the session files next to the batch. Called on every app change through TerminalHandoff.
-    static func install(in workspace: URL, state: String) throws {
+    static func install(in workspace: URL, state rawState: String) throws {
+        let state = withOpenPost(rawState, workspace: workspace)
         try instructions.write(to: workspace.appendingPathComponent("sessao.md"), atomically: true, encoding: .utf8)
         let stateFile = workspace.appendingPathComponent("estado.md")
         if (try? String(contentsOf: stateFile, encoding: .utf8)) != state {
             try state.write(to: stateFile, atomically: true, encoding: .utf8)
         }
         // Pre-escaped PostToolUse payload, so the hook script never has to build JSON in the shell.
-        let notice = "O usuário mudou o lote no app enquanto você trabalhava. Use este estado, não o anterior; pare, diga em 1 linha o que mudou e pergunte se refaz o que já foi feito.\n\n" + state
+        let notice = "O estado mudou no app enquanto você trabalhava (pastas, estilo, agenda ou post aberto na tela). Use este, não o anterior. Se a mudança afeta o que você está fazendo, pare, diga em 1 linha o que mudou e pergunte se refaz; se só mudou o post aberto na tela, siga.\n\n" + state
         let payload: [String: Any] = ["hookSpecificOutput": ["hookEventName": "PostToolUse", "additionalContext": notice]]
         try JSONSerialization.data(withJSONObject: payload)
             .write(to: workspace.appendingPathComponent("estado-aviso.json"), options: .atomic)
@@ -213,6 +245,31 @@ enum AgentSession {
         ["--model", ClaudeModel.current.rawValue, "--effort", "medium", "--tools", "Bash,Read,Write,Edit"]
     }
     static let codexCostFlags = ["-c", "model_reasoning_effort=\"medium\""]
+
+    /// A clean Codex home for batch sessions: the user's login, without their global AGENTS.md (~22k tokens),
+    /// skills and MCP servers, which Codex re-sends on every call. Measured: 43.7k → 19.7k input per call.
+    static func codexHome(root: URL = TerminalHandoff.projectDirectory) -> URL {
+        let fileManager = FileManager.default
+        let home = root.appendingPathComponent("codex-home", isDirectory: true)
+        try? fileManager.createDirectory(at: home, withIntermediateDirectories: true)
+        let userHome = fileManager.homeDirectoryForCurrentUser.appendingPathComponent(".codex", isDirectory: true)
+        let auth = home.appendingPathComponent("auth.json")
+        if (try? fileManager.destinationOfSymbolicLink(atPath: auth.path)) == nil {
+            try? fileManager.removeItem(at: auth)
+            try? fileManager.createSymbolicLink(at: auth, withDestinationURL: userHome.appendingPathComponent("auth.json"))
+        }
+        // No model line: Codex's default for the account. The user's pinned model only works with the
+        // newer runtime their main home uses, and fails (HTTP 400) from a separate home.
+        let config = """
+        model_reasoning_effort = "medium"
+
+        [projects.\"\(root.path)\"]
+        trust_level = "trusted"
+
+        """
+        try? config.write(to: home.appendingPathComponent("config.toml"), atomically: true, encoding: .utf8)
+        return home
+    }
 
     static let codexInstructions = "Esta sessão foi aberta pelo app The Carousel Maker. Leia agora e siga `.bulk-maker/sessao.md`. Antes de cada resposta e antes de rodar o renderizador, releia `.bulk-maker/estado.md`: o usuário muda o lote no app a qualquer momento e esse arquivo é sempre a verdade."
 

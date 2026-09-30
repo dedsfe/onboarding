@@ -29,4 +29,7 @@ cat > "$app_dir/Contents/Info.plist" <<'PLIST'
 PLIST
 
 codesign --force --deep --sign - "$app_dir"
-open -n -a "$app_dir"
+# One instance only: an old copy left running keeps rewriting the AI workspace with old code.
+pkill -f "$app_dir/Contents/MacOS/BulkMaker" 2>/dev/null || true
+while pgrep -f "$app_dir/Contents/MacOS/BulkMaker" >/dev/null; do sleep 0.2; done
+open -a "$app_dir"

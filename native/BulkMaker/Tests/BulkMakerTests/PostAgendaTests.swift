@@ -93,4 +93,21 @@ final class PostAgendaTests: XCTestCase {
         XCTAssertTrue(AgentSession.instructions.contains(".plano.json"))
         XCTAssertTrue(AgentSession.instructions.contains("--mover"))
     }
+
+    func testOpenPostLineFollowsTheCalendarViewer() throws {
+        let workspace = FileManager.default.temporaryDirectory.appendingPathComponent("open-post-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: workspace, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: workspace) }
+        try AgentSession.install(in: workspace, state: AgentSession.state(
+            photos: nil, desired: nil, csv: nil, output: nil, variations: 1, design: DesignPreferences(), custom: false))
+        let stateFile = workspace.appendingPathComponent("estado.md")
+        AgentSession.updateOpenPost("post de qui 01/10 12:00 em `/tmp/v1`, slide 2 de 5", workspace: workspace)
+        AgentSession.updateOpenPost("post de qui 01/10 12:00 em `/tmp/v1`, slide 3 de 5", workspace: workspace)
+        let open = try String(contentsOf: stateFile, encoding: .utf8).components(separatedBy: "\n")
+        XCTAssertEqual(open.filter { $0.hasPrefix("- Aberto na tela:") }, ["- Aberto na tela: post de qui 01/10 12:00 em `/tmp/v1`, slide 3 de 5"])
+        XCTAssertEqual(open.firstIndex { $0.hasPrefix("- Aberto na tela:") }, open.firstIndex { $0.hasPrefix("- Agenda:") }.map { $0 + 1 })
+        AgentSession.updateOpenPost(nil, workspace: workspace)
+        XCTAssertFalse(try String(contentsOf: stateFile, encoding: .utf8).contains("Aberto na tela"))
+        XCTAssertTrue(AgentSession.instructions.contains("\"essa imagem\""))
+    }
 }

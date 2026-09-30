@@ -16,6 +16,8 @@ enum TerminalHandoff {
         for _ in 0..<5 { legacy.deleteLastPathComponent() }
         let oldSelection = legacy.appendingPathComponent(".bulk-maker/selecao.json")
         let newSelection = workspace.appendingPathComponent("selecao.json")
+        // A post "open on screen" only lasts while this process shows it.
+        try? FileManager.default.removeItem(at: workspace.appendingPathComponent("aberto.md"))
         if !FileManager.default.fileExists(atPath: newSelection.path),
            FileManager.default.fileExists(atPath: oldSelection.path) {
             try? FileManager.default.copyItem(at: oldSelection, to: newSelection)
