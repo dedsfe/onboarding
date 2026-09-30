@@ -112,6 +112,13 @@ struct CanvasPage: View {
                 .monospacedDigit()
                 .padding(.horizontal, 12)
             Divider().frame(height: 18)
+            toolbarButton("arrow.down.right.and.arrow.up.left", "Diminuir (-)") { controller.view?.shrinkSelection(nil) }
+            toolbarButton("arrow.up.left.and.arrow.down.right", "Aumentar (=)") { controller.view?.growSelection(nil) }
+            if controller.selectionCount > 1 {
+                toolbarButton("arrow.up.and.down.square", "Igualar altura") { controller.view?.matchHeights(nil) }
+                toolbarButton("rectangle.split.3x1", "Organizar em linha") { controller.view?.arrangeInRow(nil) }
+            }
+            Divider().frame(height: 18)
             toolbarButton("doc.on.doc", "Copiar (⌘C)") { controller.view?.copy(nil) }
             toolbarButton("plus.square.on.square", "Duplicar (⌘D)") { controller.view?.duplicate(nil) }
             toolbarButton("square.3.layers.3d.top.filled", "Trazer pra frente") { controller.view?.bringToFront(nil) }

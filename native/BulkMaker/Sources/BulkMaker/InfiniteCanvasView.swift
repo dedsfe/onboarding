@@ -47,7 +47,8 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         case none
         case pan(start: CGPoint, origin: CGPoint)
         case move(start: CGPoint, frames: [UUID: CGRect], before: [CanvasItem], started: Bool)
-        case resize(id: UUID, corner: Corner, frame: CGRect, before: [CanvasItem])
+        /// One image or a whole selection, scaled together from the corner opposite the handle.
+        case resize(start: CGPoint, corner: Corner, box: CGRect, frames: [UUID: CGRect], before: [CanvasItem])
         case marquee(start: CGPoint, base: Set<UUID>)
     }
     private var drag = Drag.none
@@ -245,9 +246,14 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
 
     // MARK: - Layers
 
+    /// Set before a command that changes sizes or places (buttons, arrange): the images glide there.
+    private var glideNextSync = false
+
     private func syncLayers(animated: Bool) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        let glide = glideNextSync
+        glideNextSync = false
         let ids = Set(board.items.map(\.id))
         for (id, layer) in layers where !ids.contains(id) {
             layers[id] = nil
@@ -267,7 +273,16 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
                     arrivals += 1
                 }
             }
-            layer.place(item.frame)
+            if glide {
+                CATransaction.begin()
+                CATransaction.setDisableActions(false)
+                CATransaction.setAnimationDuration(0.26)
+                CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(controlPoints: 0.2, 0.9, 0.3, 1))
+                layer.place(item.frame)
+                CATransaction.commit()
+            } else {
+                layer.place(item.frame)
+            }
             layer.zPosition = CGFloat(index)
         }
         CATransaction.commit()
@@ -320,8 +335,8 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         let moving = !lifted.isEmpty
 
         let handlePath = CGMutablePath()
-        if selected.count == 1, let item = selected.first, !moving {
-            for corner in Corner.allCases { handlePath.addEllipse(in: handleRect(corner, of: item.frame)) }
+        if let box = selectionBox, !moving {
+            for corner in Corner.allCases { handlePath.addEllipse(in: handleRect(corner, of: box)) }
         }
         handles.path = handlePath
 
@@ -363,9 +378,17 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         }
     }
 
+    /// Everything selected, in canvas units.
+    private var selectionBox: CGRect? {
+        let frames = board.items.filter { selection.contains($0.id) }.map(\.frame)
+        guard let first = frames.first else { return nil }
+        return frames.dropFirst().reduce(first) { $0.union($1) }
+    }
+
     private func handleRect(_ corner: Corner, of frame: CGRect) -> CGRect {
-        // Handles sit on the selection ring, which runs a few points outside the image.
-        let ring = toView(frame).insetBy(dx: -ItemLayer.ringGap, dy: -ItemLayer.ringGap)
+        // Handles sit on the selection ring (one image) or the dashed group box (several).
+        let gap = selection.count > 1 ? 6 : ItemLayer.ringGap
+        let ring = toView(frame).insetBy(dx: -gap, dy: -gap)
         let center = point(of: corner, in: ring), size = Self.handleSize
         return CGRect(x: center.x - size / 2, y: center.y - size / 2, width: size, height: size)
     }
@@ -375,10 +398,9 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         return board.items.last { $0.frame.contains(world) }
     }
 
-    private func handle(at point: CGPoint) -> (CanvasItem, Corner)? {
-        guard selection.count == 1, let item = board.items.first(where: { selection.contains($0.id) }) else { return nil }
-        let corner = Corner.allCases.first { handleRect($0, of: item.frame).insetBy(dx: -6, dy: -6).contains(point) }
-        return corner.map { (item, $0) }
+    private func handle(at point: CGPoint) -> Corner? {
+        guard let box = selectionBox else { return nil }
+        return Corner.allCases.first { handleRect($0, of: box).insetBy(dx: -6, dy: -6).contains(point) }
     }
 
     private func resizeCursor(_ corner: Corner) -> NSCursor {
@@ -443,7 +465,7 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         let point = convert(event.locationInWindow, from: nil)
         lastMouse = point
         if isSpaceDown { return }
-        if let (_, corner) = handle(at: point) {
+        if let corner = handle(at: point) {
             resizeCursor(corner).set()
             hovered = nil
         } else {
@@ -466,9 +488,10 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
             NSCursor.closedHand.set()
             return
         }
-        if let (item, corner) = handle(at: point) {
+        if let corner = handle(at: point), let box = selectionBox {
             isResizing = true
-            drag = .resize(id: item.id, corner: corner, frame: item.frame, before: board.items)
+            let frames = Dictionary(uniqueKeysWithValues: board.items.filter { selection.contains($0.id) }.map { ($0.id, $0.frame) })
+            drag = .resize(start: point, corner: corner, box: box, frames: frames, before: board.items)
             updateOverlay()
             return
         }
@@ -540,19 +563,22 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
             }
             CATransaction.commit()
             updateOverlay()
-        case .resize(let id, let corner, let frame, _):
-            // The opposite corner stays put and the image keeps its proportions.
-            let anchor = self.point(of: opposite(corner), in: frame)
-            let pointer = toWorld(point)
-            let width = max(abs(pointer.x - anchor.x), 16)
-            let height = width * frame.height / frame.width
-            let x = pointer.x < anchor.x ? anchor.x - width : anchor.x
-            let y = (corner == .topLeft || corner == .topRight) ? anchor.y - height : anchor.y
-            let resized = CGRect(x: x, y: y, width: width, height: height)
-            board.setFrame(resized, of: id)
+        case .resize(let start, let corner, let box, let frames, _):
+            // The opposite corner stays put; every image scales by the same factor, so proportions,
+            // gaps and the layout of a group all hold. Only how far the pointer moved counts, so
+            // grabbing a handle (which sits a little outside the image) never makes it jump.
+            let anchor = self.point(of: opposite(corner), in: box)
+            let moved = (point.x - start.x) / scale
+            let towardRight = corner == .topRight || corner == .bottomRight
+            let width = max(box.width + (towardRight ? moved : -moved), 16)
+            let factor = width / box.width
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            layers[id]?.place(resized)
+            for (id, frame) in frames {
+                let resized = Self.scaled(frame, by: factor, around: anchor)
+                board.setFrame(resized, of: id)
+                layers[id]?.place(resized)
+            }
             CATransaction.commit()
             updateOverlay()
         case .marquee(let start, let base):
@@ -584,7 +610,7 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
             if board.items.contains(where: { item in frames[item.id].map { $0 != item.frame } ?? false }) {
                 commit(before: before, name: "Mover")
             }
-        case .resize(_, _, _, let before):
+        case .resize(_, _, _, _, let before):
             commit(before: before, name: "Redimensionar")
             refreshResolution()
         case .pan:
@@ -633,6 +659,13 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
             add("Recortar", #selector(cut(_:)), "scissors")
             add("Duplicar", #selector(duplicate(_:)), "plus.square.on.square")
             menu.addItem(.separator())
+            add("Aumentar", #selector(growSelection(_:)), "arrow.up.left.and.arrow.down.right")
+            add("Diminuir", #selector(shrinkSelection(_:)), "arrow.down.right.and.arrow.up.left")
+            if selection.count > 1 {
+                add("Igualar altura", #selector(matchHeights(_:)), "arrow.up.and.down.square")
+                add("Organizar em linha", #selector(arrangeInRow(_:)), "rectangle.split.3x1")
+            }
+            menu.addItem(.separator())
             add("Trazer pra frente", #selector(bringToFront(_:)), "square.3.layers.3d.top.filled")
             add("Mandar pra trás", #selector(sendToBack(_:)), "square.3.layers.3d.bottom.filled")
             add("Aproximar", #selector(focusSelection(_:)), "plus.magnifyingglass")
@@ -665,6 +698,8 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         case 125: nudge(dx: 0, dy: step)
         case 126: nudge(dx: 0, dy: -step)
         case 2 where event.modifierFlags.contains(.command): duplicate(nil) // ⌘D
+        case 24 where !event.modifierFlags.contains(.command): growSelection(nil) // =
+        case 27 where !event.modifierFlags.contains(.command): shrinkSelection(nil) // -
         default: super.keyDown(with: event)
         }
     }
@@ -748,6 +783,55 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         registerUndo(before: before, name: "Mandar pra trás")
     }
 
+    static func scaled(_ frame: CGRect, by factor: CGFloat, around anchor: CGPoint) -> CGRect {
+        CGRect(x: anchor.x + (frame.minX - anchor.x) * factor, y: anchor.y + (frame.minY - anchor.y) * factor,
+               width: frame.width * factor, height: frame.height * factor)
+    }
+
+    /// Changes every selected frame at once, with one undo step, and lets the images glide to their new place.
+    private func reshapeSelection(_ name: String, _ change: ([CanvasItem]) -> [UUID: CGRect]) {
+        let selected = selectedItems
+        guard !selected.isEmpty else { return }
+        let before = board.items
+        for (id, frame) in change(selected) { board.setFrame(frame, of: id) }
+        glideNextSync = true
+        commit(before: before, name: name)
+    }
+
+    /// Bigger or smaller around the selection's center.
+    private func scaleSelection(by factor: CGFloat) {
+        guard let box = selectionBox else { return }
+        let center = CGPoint(x: box.midX, y: box.midY)
+        reshapeSelection(factor > 1 ? "Aumentar" : "Diminuir") { items in
+            Dictionary(uniqueKeysWithValues: items.map { ($0.id, Self.scaled($0.frame, by: factor, around: center)) })
+        }
+    }
+
+    @objc func growSelection(_ sender: Any?) { scaleSelection(by: 1.15) }
+    @objc func shrinkSelection(_ sender: Any?) { scaleSelection(by: 1 / 1.15) }
+
+    /// Every selected image at the height of the tallest, each keeping its top-left corner.
+    @objc func matchHeights(_ sender: Any?) {
+        reshapeSelection("Igualar altura") { items in
+            let height = items.map(\.height).max() ?? 0
+            return Dictionary(uniqueKeysWithValues: items.map { item in
+                (item.id, CGRect(x: item.x, y: item.y, width: item.width * height / item.height, height: height))
+            })
+        }
+    }
+
+    /// Left to right in their current order, tops aligned, even gaps: slides of a carousel side by side.
+    @objc func arrangeInRow(_ sender: Any?) {
+        guard let box = selectionBox else { return }
+        reshapeSelection("Organizar em linha") { items in
+            var x = box.minX
+            return Dictionary(uniqueKeysWithValues: items.sorted { $0.x < $1.x }.map { item in
+                defer { x += item.width + 24 }
+                return (item.id, CGRect(x: x, y: box.minY, width: item.width, height: item.height))
+            })
+        }
+    }
+
     @objc func focusSelection(_ sender: Any?) {
         guard let first = selectedItems.first else { return }
         focus(on: selectedItems.dropFirst().reduce(first.frame) { $0.union($1.frame) }, maxScale: 4, animated: true)
@@ -799,8 +883,11 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         switch item.action {
         case #selector(copy(_:)), #selector(cut(_:)), #selector(delete(_:)), #selector(duplicate(_:)),
              #selector(bringToFront(_:)), #selector(sendToBack(_:)), #selector(openSelection(_:)),
-             #selector(revealSelection(_:)), #selector(focusSelection(_:)):
+             #selector(revealSelection(_:)), #selector(focusSelection(_:)),
+             #selector(growSelection(_:)), #selector(shrinkSelection(_:)):
             return !selection.isEmpty
+        case #selector(matchHeights(_:)), #selector(arrangeInRow(_:)):
+            return selection.count > 1
         case #selector(selectAll(_:)):
             return !board.items.isEmpty
         default:

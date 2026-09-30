@@ -224,4 +224,55 @@ final class CanvasBoardTests: XCTestCase {
         XCTAssertEqual(board.items[0].width, 500, accuracy: 0.01)
         XCTAssertEqual(board.items[0].height, 250, accuracy: 0.01)
     }
+
+    func testGroupResizeAndGroupActionsKeepTheLayout() throws {
+        let source = pasteboard()
+        let wide = NSPasteboardItem(), small = NSPasteboardItem()
+        wide.setData(try imageData(.png, width: 400, height: 200), forType: .png)
+        small.setData(try imageData(.png, width: 200, height: 100), forType: .png)
+        source.writeObjects([wide, small])
+        let board = CanvasBoard(directory: directory)
+        let added = board.importImages(from: source, around: .zero)  // A: x -312…88, y -100…100; B: x 112…312, y -50…50
+        let a = added[0].id, b = added[1].id
+        func frame(_ id: UUID) -> CGRect { board.items.first { $0.id == id }!.frame }
+
+        let view = InfiniteCanvasView(board: board)
+        let window = NSWindow(contentRect: CGRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled],
+                              backing: .buffered, defer: false)
+        window.contentView = view
+        view.frame = CGRect(x: 0, y: 0, width: 800, height: 600)
+        view.layoutSubtreeIfNeeded()
+        XCTAssertEqual(view.scale, 1)
+        func event(_ type: NSEvent.EventType, x: CGFloat, y: CGFloat) -> NSEvent {
+            NSEvent.mouseEvent(with: type, location: CGPoint(x: x, y: 600 - y), modifierFlags: [], timestamp: 0,
+                               windowNumber: window.windowNumber, context: nil, eventNumber: 0, clickCount: 1, pressure: 1)!
+        }
+
+        // Both selected: the group box's bottom-right handle (view 712+6, 400+6) scales both by 1.25 from the top-left.
+        view.selectAll(nil)
+        view.mouseDown(with: event(.leftMouseDown, x: 718, y: 406))
+        view.mouseDragged(with: event(.leftMouseDragged, x: 874, y: 406))
+        view.mouseUp(with: event(.leftMouseUp, x: 874, y: 406))
+        XCTAssertEqual(frame(a).width, 500, accuracy: 0.01)
+        XCTAssertEqual(frame(b).width, 250, accuracy: 0.01)
+        XCTAssertEqual(frame(b).minX, 218, accuracy: 0.01)
+        XCTAssertEqual(frame(a).minX, -312, accuracy: 0.01)
+        XCTAssertEqual(frame(a).minY, -100, accuracy: 0.01)
+
+        // Bigger then smaller around the center comes back to the same place.
+        let beforeButtons = [frame(a), frame(b)]
+        view.growSelection(nil)
+        XCTAssertEqual(frame(a).width, 500 * 1.15, accuracy: 0.01)
+        view.shrinkSelection(nil)
+        XCTAssertEqual(frame(a).minX, beforeButtons[0].minX, accuracy: 0.01)
+        XCTAssertEqual(frame(b).width, beforeButtons[1].width, accuracy: 0.01)
+
+        view.matchHeights(nil)
+        XCTAssertEqual(frame(b).height, frame(a).height, accuracy: 0.01)
+        XCTAssertEqual(frame(b).width / frame(b).height, 2, accuracy: 0.01)
+
+        view.arrangeInRow(nil)
+        XCTAssertEqual(frame(a).minY, frame(b).minY, accuracy: 0.01)
+        XCTAssertEqual(frame(b).minX, frame(a).maxX + 24, accuracy: 0.01)
+    }
 }
