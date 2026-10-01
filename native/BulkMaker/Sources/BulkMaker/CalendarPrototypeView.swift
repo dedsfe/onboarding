@@ -612,7 +612,7 @@ private struct CalendarCarouselViewer: View {
     }
 }
 
-private struct CalendarPreview {
+struct CalendarPreview {
     let slides: [URL]
     var coverURL: URL? { slides.first }
 
@@ -730,7 +730,7 @@ private struct AgendaRulesEditor: View {
 
 /// A slide decoded off the main thread at the size it is shown and kept in memory,
 /// so hover and drag animations only ever redraw pixels that are already decoded.
-private struct SlideImage<Content: View>: View {
+struct SlideImage<Content: View>: View {
     let url: URL
     let maxPixel: Int
     @ViewBuilder let content: (Image) -> Content
