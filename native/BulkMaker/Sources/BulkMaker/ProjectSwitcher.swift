@@ -15,12 +15,14 @@ struct ProjectSwitcher: View {
         Button { isOpen.toggle() } label: {
             HStack(spacing: 8) {
                 Image(systemName: "folder.fill").font(.system(size: 13, weight: .semibold))
+                // Hugs the name; a long one truncates instead of stretching the pill.
                 Text(store.current.name).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                    .frame(maxWidth: 170)
                 Image(systemName: "chevron.down").font(.system(size: 10, weight: .bold))
                     .rotationEffect(.degrees(isOpen ? 180 : 0))
             }
             .padding(.horizontal, 14).frame(height: 36)
-            .frame(maxWidth: 240)
+            .fixedSize()
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
