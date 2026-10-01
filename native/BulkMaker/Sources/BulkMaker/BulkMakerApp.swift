@@ -35,7 +35,7 @@ private struct BatchFlowView: View {
     @State private var showArtworks = false
     @Namespace private var navSelection
 
-    private enum Page { case batch, canvas, calendar, settings }
+    private enum Page { case batch, canvas, calendar, post, settings }
     /// The same terminal tabs follow the user between the batch, the canvas and the calendar.
     private var pageHasTerminal: Bool { page == .batch || page == .canvas || page == .calendar }
     private struct BatchRunRequest {
@@ -211,6 +211,7 @@ private struct BatchFlowView: View {
             navButton("Criar em lote", icon: "square.stack.3d.up", page: .batch)
             navButton("Canvas", icon: "square.dashed", page: .canvas)
             navButton("Calendário", icon: "calendar", page: .calendar)
+            navButton("Postar", icon: "paperplane", page: .post)
             navButton("Configurações", icon: "gearshape", page: .settings)
                 .keyboardShortcut(",", modifiers: .command)
         }
@@ -273,6 +274,9 @@ private struct BatchFlowView: View {
             } else if page == .canvas {
                 CanvasPage(terminals: tabs)
                     .padding(.top, -64)
+                    .transition(.opacity)
+            } else if page == .post {
+                InstagramPage()
                     .transition(.opacity)
             } else if page == .settings {
                 // Scrolls under the floating nav instead of being cut off below it.
