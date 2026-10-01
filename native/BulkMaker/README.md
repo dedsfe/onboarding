@@ -17,3 +17,7 @@ zsh native/BulkMaker/run-mac.sh
 ```
 
 O CSV aceita vírgula ou ponto e vírgula, aspas, campos multilinha e UTF-8 com BOM. Ele é opcional neste fluxo.
+
+## Site
+
+A página de lista de espera fica em [`website/`](website/README.md), com headline, sub, email, @ do X e uma pintura da National Gallery of Art em ASCII no fundo. Para abrir, execute `npm start` nessa pasta e acesse http://localhost:4173.

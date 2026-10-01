@@ -11,11 +11,14 @@ struct CalendarPrototypeView: View {
     @State private var month = Calendar.current.startOfDay(for: Date())
     @State private var preview: CalendarPreview = .sample
     @State private var hoveredDay: Int?
+    /// The card under the pointer in the open fan; it grows and comes to the front.
+    @State private var focusedCard: String?
     @State private var isCarouselOpen = false
     @State private var openSlides: [URL] = []
     @State private var agenda = PostAgenda()
     @State private var agendaStamp: Date?
     @State private var showRules = false
+    @State private var shareError: String?
     /// Slide files of each scheduled folder, listed once per agenda change instead of on every redraw.
     @State private var slidesByFolder: [String: [URL]] = [:]
     @State private var planStamps: [String: Date?] = [:]
@@ -29,17 +32,23 @@ struct CalendarPrototypeView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let panelWidth = min(geometry.size.width - 72, 1020)
-            let panelHeight = min(geometry.size.height - 48, 704)
+            // The page runs under the floating nav; the panel starts below it with even margins around.
+            let navInset: CGFloat = 80
+            let margin: CGFloat = 32
+            let panelWidth = min(geometry.size.width - margin * 2, 1020)
+            let panelHeight = min(geometry.size.height - navInset - margin, 704)
 
             // No backdrop of its own: the app wallpaper from Settings shows through, like every other page.
             ZStack {
                 calendarPanel(width: panelWidth, height: panelHeight)
                     .frame(width: panelWidth, height: panelHeight)
                     .glassEffect(.regular, in: .rect(cornerRadius: 38))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, navInset).padding(.bottom, margin)
 
                 if isCarouselOpen {
-                    CalendarCarouselViewer(slides: openSlides) {
+                    CalendarCarouselViewer(slides: openSlides, onSlideChange: reportOpenPost) {
+                        reportOpenPost(nil)
                         withAnimation(.easeOut(duration: 0.2)) { isCarouselOpen = false }
                     }
                     .transition(.opacity)
@@ -56,6 +65,9 @@ struct CalendarPrototypeView: View {
         .onChange(of: outputFolder) { _, folder in preview = CalendarPreview.load(from: folder) }
         // The AI schedules from the terminal while this page is open.
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in reloadAgenda() }
+        .alert("Não deu pra enviar", isPresented: Binding(get: { shareError != nil }, set: { if !$0 { shareError = nil } })) {
+            Button("OK") { shareError = nil }
+        } message: { Text(shareError ?? "") }
     }
 
     private static var agendaFile: URL {
@@ -86,6 +98,25 @@ struct CalendarPrototypeView: View {
         slidesByFolder = Dictionary(uniqueKeysWithValues: folders.map {
             ($0, slidesByFolder[$0] ?? CalendarPreview.slides(in: URL(fileURLWithPath: $0)))
         })
+    }
+
+    /// Tells the AI which post and slide are on screen, so "troca essa imagem" has an address.
+    private func reportOpenPost(_ slide: Int?) {
+        let workspace = Self.agendaFile.deletingLastPathComponent()
+        guard let slide, let first = openSlides.first else {
+            AgentSession.updateOpenPost(nil, workspace: workspace)
+            return
+        }
+        let folder = first.deletingLastPathComponent()
+        let post = agenda.posts.first { $0.folder == folder.standardizedFileURL.path }
+        let plan = try? JSONDecoder().decode(CarouselPlan.self,
+                                             from: Data(contentsOf: folder.appendingPathComponent(".plano.json")))
+        var line = (post.map { "post de \(PostAgenda.describe(date: $0.date, time: $0.time))" } ?? "carrossel")
+            + " em `\(folder.path)`, slide \(slide + 1) de \(openSlides.count)"
+        if let planned = plan?.slides, planned.indices.contains(slide) {
+            line += " (foto `\(planned[slide].photo)`, texto \"\(planned[slide].text)\")"
+        }
+        AgentSession.updateOpenPost(line, workspace: workspace)
     }
 
     /// Load, change and save right away, so an edit here never clobbers a post the AI just added.
@@ -126,6 +157,18 @@ struct CalendarPrototypeView: View {
                         .foregroundStyle(.secondary)
                         .padding(.trailing, 12)
                 }
+                if !todayPosts.isEmpty {
+                    Button { airDrop(todayPosts) } label: {
+                        Label("Enviar hoje", systemImage: "square.and.arrow.up")
+                            .font(.system(size: 13, weight: .medium))
+                            .padding(.horizontal, 6)
+                            .frame(height: 30)
+                    }
+                    .buttonStyle(.glass)
+                    .help("Manda os carrosséis de hoje pro iPhone por AirDrop")
+                    .padding(.trailing, 8)
+                    .transition(.opacity)
+                }
                 Button { showRules = true } label: {
                     Label("\(agenda.rules.maxPerDay) por dia", systemImage: "slider.horizontal.3")
                         .font(.system(size: 13, weight: .medium))
@@ -163,10 +206,26 @@ struct CalendarPrototypeView: View {
                     }
                 }
             }
+            calendarStatus
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(height: 64)
+                .padding(.top, 12)
         }
         .padding(.horizontal, 30)
         .padding(.bottom, 24)
         .frame(width: width, height: height)
+    }
+
+    private var calendarStatus: some View {
+        let monthKey = String(PostAgenda.dayFormatter.string(from: monthStart).prefix(7))
+        let count = agenda.posts.filter { $0.date.hasPrefix(monthKey) }.count
+        let hasPreview = agenda.posts.isEmpty && preview.coverURL != nil
+        return SlidiMessage(state: count > 0 ? .happy : hasPreview ? .curious : .resting,
+                            title: count > 0 ? "\(count) \(count == 1 ? "carrossel agendado" : "carrosséis agendados") neste mês"
+                                : hasPreview ? "Prévia do seu carrossel" : "Agenda livre neste mês",
+                            detail: count > 0 ? "Abra um post para revisar seus slides."
+                                : hasPreview ? "Peça à IA para agendar quando estiver pronto."
+                                : "Os carrosséis agendados pela IA aparecem aqui.", width: 28)
     }
 
     private var monthControls: some View {
@@ -214,7 +273,34 @@ struct CalendarPrototypeView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: height)
         .overlay(alignment: .top) { Color.primary.opacity(0.10).frame(height: 0.5) }
+        .contentShape(Rectangle())
+        .contextMenu {
+            if let day, !posts(on: day).isEmpty {
+                Button("Enviar por AirDrop", systemImage: "square.and.arrow.up") { airDrop(posts(on: day)) }
+            }
+        }
         .zIndex(hoveredDay == day ? 10 : 0)
+    }
+
+    private var todayPosts: [PostAgenda.Post] {
+        let key = PostAgenda.dayFormatter.string(from: Date())
+        return agenda.posts.filter { $0.date == key }
+    }
+
+    /// Sends every slide of the day's posts, in posting order, straight to the AirDrop picker.
+    private func airDrop(_ posts: [PostAgenda.Post]) {
+        let files = posts.sorted { $0.time < $1.time }.flatMap {
+            slidesByFolder[$0.folder] ?? CalendarPreview.slides(in: URL(fileURLWithPath: $0.folder))
+        }
+        guard !files.isEmpty else {
+            shareError = "Os slides desses posts não estão mais na pasta."
+            return
+        }
+        guard let service = NSSharingService(named: .sendViaAirDrop), service.canPerform(withItems: files) else {
+            shareError = "AirDrop indisponível. Confira se o Wi-Fi e o Bluetooth estão ligados."
+            return
+        }
+        service.perform(withItems: files)
     }
 
     private static let maxFanCards = 4
@@ -235,28 +321,28 @@ struct CalendarPrototypeView: View {
     private func slideFan(for day: Int, cards: [FanCard], extra: Int) -> some View {
         let expanded = hoveredDay == day
         let isPostList = cards.contains { $0.time != nil }
+        // Post cards spread left to right in posting order; slide cards keep the cover
+        // in the middle with the next slide left and the one after right.
+        let sides: [CGFloat] = cards.indices.map {
+            isPostList ? CGFloat($0) - CGFloat(cards.count - 1) / 2 : [0, -1, 1][$0]
+        }
+        let step: CGFloat = isPostList ? 24 : 26
+        let hitWidth = expanded ? (sides.map(abs).max() ?? 0) * step * 2 + 72 : 48
         return ZStack {
             ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
-                // Post cards spread left to right in posting order; slide cards keep the cover
-                // in the middle with the next slide left and the one after right.
-                let side = isPostList ? CGFloat(index) - CGFloat(cards.count - 1) / 2 : [0, -1, 1][index]
-                Button {
-                    openSlides = card.slides
-                    withAnimation(.easeOut(duration: 0.2)) { isCarouselOpen = true }
-                } label: {
-                    fanCardFace(card, expanded: expanded)
-                }
-                .buttonStyle(.plain)
-                .rotationEffect(.degrees(Double(side) * (expanded ? (isPostList ? 9 : 12) : (isPostList ? 2.5 : 0))), anchor: .bottom)
-                .offset(x: side * (expanded ? (isPostList ? 24 : 26) : (isPostList ? 3 : 0)), y: expanded ? -8 : 0)
-                // A collapsed post list peeks out behind the first cover, so several posts read at a glance.
-                .opacity(expanded || isPostList || index == 0 ? 1 : 0)
-                .zIndex(Double(cards.count - index))
-                .help(card.time.map { "\($0) · clique para ver" } ?? "Clique para ver o carrossel")
+                let side = sides[index]
+                let isFocused = expanded && focusedCard == card.id
+                fanCardFace(card, expanded: expanded)
+                    .scaleEffect(isFocused ? 1.14 : (expanded && focusedCard != nil ? 0.96 : 1), anchor: .bottom)
+                    .rotationEffect(.degrees(Double(side) * (expanded ? (isPostList ? 9 : 12) : (isPostList ? 2.5 : 0))), anchor: .bottom)
+                    .offset(x: side * (expanded ? step : (isPostList ? 3 : 0)), y: expanded ? (isFocused ? -14 : -8) : 0)
+                    // A collapsed post list peeks out behind the first cover, so several posts read at a glance.
+                    .opacity(expanded || isPostList || index == 0 ? 1 : 0)
+                    .zIndex(isFocused ? 100 : Double(cards.count - index))
+                    .allowsHitTesting(false)
             }
         }
         .frame(width: 48, height: 62)
-        .contentShape(Rectangle())
         .overlay(alignment: .topTrailing) {
             // Only past what the fan can show.
             if extra > 0 && !expanded {
@@ -269,11 +355,47 @@ struct CalendarPrototypeView: View {
                     .offset(x: 10, y: -6)
             }
         }
-        .onHover { inside in
-            withAnimation(reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.32, dampingFraction: 0.78)) {
-                hoveredDay = inside ? day : nil
-            }
+        // One hit area for the whole fan, split into slices by distance to each card's center:
+        // overlapping, rotated cards never fight over the pointer, and the area grows with the fan
+        // so reaching the outer cards does not close it.
+        .overlay {
+            Color.clear
+                .frame(width: hitWidth, height: expanded ? 100 : 62)
+                .contentShape(Rectangle())
+                .offset(y: expanded ? -10 : 0)
+                .onContinuousHover { phase in
+                    switch phase {
+                    case .active(let point):
+                        let x = point.x - hitWidth / 2
+                        let nearest = sides.indices.min { abs(sides[$0] * step - x) < abs(sides[$1] * step - x) }
+                        let focus = expanded ? nearest.map { cards[$0].id } : nil
+                        guard hoveredDay != day || focus != focusedCard else { return }
+                        withAnimation(fanAnimation) {
+                            hoveredDay = day
+                            focusedCard = focus
+                        }
+                    case .ended:
+                        withAnimation(fanAnimation) {
+                            hoveredDay = nil
+                            focusedCard = nil
+                        }
+                    }
+                }
+                .onTapGesture {
+                    let card = cards.first { $0.id == focusedCard } ?? cards.first
+                    openSlides = card?.slides ?? []
+                    withAnimation(.easeOut(duration: 0.2)) { isCarouselOpen = true }
+                }
+                .pointerStyle(.link)
+                .help(isPostList ? "Clique no post para ver o carrossel" : "Clique para ver o carrossel")
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(isPostList ? "\(cards.count + max(extra, 0)) posts" : "Carrossel")
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var fanAnimation: Animation {
+        reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.3, dampingFraction: 0.78)
     }
 
     private func fanCardFace(_ card: FanCard, expanded: Bool) -> some View {
@@ -331,16 +453,21 @@ struct CalendarPrototypeView: View {
 
 private struct CalendarCarouselViewer: View {
     let slides: [URL]
+    var onSlideChange: (Int) -> Void = { _ in }
     let close: () -> Void
 
     @State private var selectedIndex = 0
     @State private var dragOffset: CGFloat = 0
+    /// The open post's plan, edited from the panel beside the phone.
+    @State private var session: SlideEditSession?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private static let editorWidth: CGFloat = 320
 
     var body: some View {
         GeometryReader { geometry in
             let phoneHeight = max(180, min(geometry.size.height - 132, 700,
-                                           (geometry.size.width - 160) * 19.5 / 9))
+                                           (geometry.size.width - 184 - Self.editorWidth) * 19.5 / 9))
             let phoneWidth = phoneHeight * 9 / 19.5
 
             ZStack {
@@ -355,18 +482,25 @@ private struct CalendarCarouselViewer: View {
                         navigationButton("chevron.left", direction: -1, label: "Slide anterior")
                         phone(width: phoneWidth, height: phoneHeight)
                         navigationButton("chevron.right", direction: 1, label: "Próximo slide")
+                        if let session {
+                            SlideEditorPanel(session: session, index: selectedIndex, close: close)
+                                .frame(width: Self.editorWidth, height: phoneHeight)
+                        }
                     }
                     .overlay(alignment: .topTrailing) {
-                        Button(action: close) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 12, weight: .semibold))
-                                .frame(width: 18, height: 18)
+                        // With the editor open, its ✓ closes the preview.
+                        if session == nil {
+                            Button(action: close) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .frame(width: 18, height: 18)
+                            }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.circle)
+                            .controlSize(.small)
+                            .help("Fechar prévia")
+                            .accessibilityLabel("Fechar prévia")
                         }
-                        .buttonStyle(.glass)
-                        .buttonBorderShape(.circle)
-                        .controlSize(.small)
-                        .help("Fechar prévia")
-                        .accessibilityLabel("Fechar prévia")
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     Color.clear.frame(height: 32)
@@ -375,14 +509,28 @@ private struct CalendarCarouselViewer: View {
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
+        .onChange(of: selectedIndex, initial: true) { _, index in onSlideChange(index) }
+        .onAppear {
+            if session == nil, let first = slides.first {
+                session = SlideEditSession(folder: first.deletingLastPathComponent())
+            }
+        }
+        // The AI can redo this post from the terminal while it is open.
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in session?.checkExternalChanges() }
         .onExitCommand(perform: close)
     }
 
     private func phone(width: CGFloat, height: CGFloat) -> some View {
                 ZStack {
                     HStack(spacing: 0) {
-                        ForEach(slides, id: \.self) { url in
-                            slide(at: url, width: width, height: height)
+                        ForEach(Array(slides.enumerated()), id: \.element) { index, url in
+                            // The editor's newest render wins over the file; a redo by the AI reloads the file.
+                            if let edited = session?.images[index] {
+                                slideFace(Image(nsImage: edited), width: width, height: height)
+                            } else {
+                                slide(at: url, width: width, height: height)
+                                    .id(session?.revision ?? 0)
+                            }
                         }
                     }
                     .frame(width: width, height: height, alignment: .leading)
@@ -439,19 +587,25 @@ private struct CalendarCarouselViewer: View {
 
     private func slide(at url: URL, width: CGFloat, height: CGFloat) -> some View {
         SlideImage(url: url, maxPixel: 1600) { image in
-            ZStack {
-                image
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: width, height: height)
-                    .blur(radius: 24)
-                    .overlay(.black.opacity(0.35))
+            slideFace(image, width: width, height: height)
+        }
+        .frame(width: width, height: height)
+        .clipped()
+    }
 
-                image
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: width, height: height)
-            }
+    private func slideFace(_ image: Image, width: CGFloat, height: CGFloat) -> some View {
+        ZStack {
+            image
+                .resizable()
+                .scaledToFill()
+                .frame(width: width, height: height)
+                .blur(radius: 24)
+                .overlay(.black.opacity(0.35))
+
+            image
+                .resizable()
+                .scaledToFit()
+                .frame(width: width, height: height)
         }
         .frame(width: width, height: height)
         .clipped()
@@ -586,7 +740,12 @@ private struct SlideImage<Content: View>: View {
         SlideImageCache.shared
     }
 
-    private var key: NSString { "\(maxPixel)|\(url.path)" as NSString }
+    /// The file date is part of the key: a slide redrawn in place (editor or AI) decodes again.
+    private var key: NSString {
+        let modified = (try? URL(fileURLWithPath: url.path).resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate?.timeIntervalSinceReferenceDate ?? 0
+        return "\(maxPixel)|\(url.path)|\(modified)" as NSString
+    }
 
     var body: some View {
         Group {

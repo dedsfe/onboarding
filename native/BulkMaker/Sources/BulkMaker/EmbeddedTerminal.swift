@@ -1,4 +1,5 @@
 import AppKit
+import CarouselEngine
 import SwiftTerm
 import SwiftUI
 
@@ -34,6 +35,8 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
     var onExit: ((TerminalSession) -> Void)?
     private(set) var view: LocalProcessTerminalView?
     @Published private(set) var generation = 0
+    /// Changes on restart, so an interrupted run cannot leave Slidi spinning in a new session.
+    private(set) var activityID = UUID()
     private var pendingCLI: AgentCLI?
     private var pendingPrompt = ""
 
@@ -58,6 +61,7 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
         environment["TERM"] = "xterm-256color"
         environment["COLORTERM"] = "truecolor"
         environment["LANG"] = environment["LANG"] ?? "pt_BR.UTF-8"
+        environment[CanvasFolder.generationSessionKey] = activityID.uuidString
         let cli = pendingCLI
         let prompt = pendingPrompt
         pendingCLI = nil
@@ -83,6 +87,7 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
     func restart() {
         view?.terminate()
         view = nil
+        activityID = UUID()
         generation += 1
     }
 

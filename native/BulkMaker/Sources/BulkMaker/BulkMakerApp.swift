@@ -36,6 +36,8 @@ private struct BatchFlowView: View {
     @Namespace private var navSelection
 
     private enum Page { case batch, canvas, calendar, settings }
+    /// The same terminal tabs follow the user between the batch, the canvas and the calendar.
+    private var pageHasTerminal: Bool { page == .batch || page == .canvas || page == .calendar }
     private struct BatchRunRequest {
         let photos: URL
         let desired: URL
@@ -57,7 +59,7 @@ private struct BatchFlowView: View {
     var body: some View {
         HStack(spacing: 0) {
             mainPane.clipped()
-            if showTerminalPanel && page == .batch {
+            if showTerminalPanel && pageHasTerminal {
                 Rectangle().fill(Color(nsColor: .separatorColor)).frame(width: 1)
                     .overlay { terminalResizeHandle }
                     .zIndex(1)
@@ -66,7 +68,7 @@ private struct BatchFlowView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .overlay(alignment: .topTrailing) { if page == .batch { terminalToggle.padding(.top, 14).padding(.trailing, 16) } }
+        .overlay(alignment: .topTrailing) { if pageHasTerminal { terminalToggle.padding(.top, 14).padding(.trailing, 16) } }
         .background { canvasBackground }
         .overlay {
             if showDesignEditor {
@@ -88,7 +90,7 @@ private struct BatchFlowView: View {
         .overlay { InputPickerHost() }
         .ignoresSafeArea(.container, edges: .top)
         .onAppear(perform: importSelectionIfChanged)
-        .modifier(TerminalShortcuts(isAvailable: page == .batch && !showDesignEditor, isOpen: showTerminalPanel,
+        .modifier(TerminalShortcuts(isAvailable: pageHasTerminal && !showDesignEditor, isOpen: showTerminalPanel,
                                     tabs: tabs, toggle: toggleTerminal))
         .onChange(of: desiredURL, initial: true) { _, url in desiredCatalog = url.flatMap { try? PhotoCatalog(directory: $0) } }
         .onChange(of: outputURL, initial: true) { _, _ in
@@ -269,7 +271,7 @@ private struct BatchFlowView: View {
                     .padding(.top, -64)
                     .transition(.opacity)
             } else if page == .canvas {
-                CanvasPage()
+                CanvasPage(terminals: tabs)
                     .padding(.top, -64)
                     .transition(.opacity)
             } else if page == .settings {
@@ -798,7 +800,7 @@ private struct NodeHeader: View {
 }
 
 /// The hub card: lights up once every required input is in, so the next step is obvious.
-private struct AgentNode: View {
+struct AgentNode: View {
     let missing: [String]
     @Binding var variations: Int
     @Binding var selectedAgentRaw: String
@@ -811,7 +813,8 @@ private struct AgentNode: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            NodeHeader(title: "CLI + IA", icon: "sparkles", isReady: isReady)
+            SlidiMessage(state: isReady ? .happy : .thinking, title: "CLI + IA",
+                         detail: isReady ? "Tudo pronto para criar" : "Escolha as entradas", width: 32)
             VStack(spacing: 0) {
                 controlRow("IA") {
                     // One menu for CLI + model: "codex" or a Claude model name.

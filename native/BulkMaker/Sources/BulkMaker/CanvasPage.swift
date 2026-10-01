@@ -1,10 +1,13 @@
 import AppKit
+import CarouselEngine
 import SwiftUI
 
 /// The Canvas page: an infinite board of images on frosted glass over the app wallpaper,
 /// with a selection toolbar and zoom controls.
 struct CanvasPage: View {
+    @ObservedObject var terminals: TerminalTabs
     @State private var controller = CanvasController()
+    @State private var isGenerating = false
     /// 0 = wallpaper sharp like the other pages, 1 = fully frosted; the user picks with the slider.
     @AppStorage("canvasBackdropBlur") private var backdropBlur = 1.0
 
@@ -19,16 +22,25 @@ struct CanvasPage: View {
             InfiniteCanvasRepresentable(controller: controller, directory: ProjectStore.shared.current.canvasDirectory)
                 .id(ProjectStore.shared.current.id)
             if controller.isEmpty {
-                emptyState
-                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                if isGenerating {
+                    SlidiGenerationStatus(compact: false)
+                } else {
+                    emptyState
+                }
             }
         }
         .overlay(alignment: .top) {
-            if let arrival = controller.arrival {
-                arrivalNotice(arrival)
-                    .padding(.top, 76)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+            VStack(spacing: 16) {
+                if isGenerating && !controller.isEmpty {
+                    SlidiGenerationStatus(compact: true)
+                }
+                if let arrival = controller.arrival {
+                    arrivalNotice(arrival)
+                        .transition(.opacity)
+                }
             }
+            .padding(.horizontal, 24)
+            .padding(.top, 80)
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.8), value: controller.arrival?.id)
         .overlay(alignment: .bottom) {
@@ -50,13 +62,21 @@ struct CanvasPage: View {
         .animation(.spring(response: 0.35, dampingFraction: 0.82), value: controller.selectionCount > 0)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: controller.isEmpty)
         .environment(\.colorScheme, .dark)
+        .task(id: ProjectStore.shared.current.canvasDirectory) {
+            let directory = ProjectStore.shared.current.canvasDirectory
+            // Notices belong to this project too; don't carry one over after switching boards.
+            controller.arrival = nil
+            while !Task.isCancelled {
+                isGenerating = CanvasFolder.isGenerating(in: directory, sessions: Set(terminals.sessions.map(\.activityID)))
+                do { try await Task.sleep(for: .milliseconds(500)) }
+                catch { return }
+            }
+        }
     }
 
     private var emptyState: some View {
         VStack(spacing: 18) {
-            Image(systemName: "photo.stack")
-                .font(.system(size: 40, weight: .medium))
-                .symbolRenderingMode(.hierarchical)
+            SlidiView(state: .idle).frame(width: 56, height: 56 * 16 / 9)
             Text("Solte suas imagens aqui").font(.system(size: 22, weight: .bold))
             HStack(spacing: 8) {
                 hintChip("⌘V", "Colar")
@@ -104,7 +124,7 @@ struct CanvasPage: View {
     /// "The AI put N images on the canvas", with a jump to them; fades on its own.
     private func arrivalNotice(_ arrival: CanvasController.Arrival) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "sparkles").font(.system(size: 15, weight: .semibold))
+            SlidiView(state: .happy).frame(width: 32, height: 32 * 16 / 9)
             Text(arrival.ids.count == 1 ? "1 imagem nova da IA" : "\(arrival.ids.count) imagens novas da IA")
                 .font(.system(size: 14, weight: .semibold))
             Button {
@@ -118,8 +138,8 @@ struct CanvasPage: View {
             }
             .buttonStyle(.plain)
         }
-        .padding(.leading, 16).padding(.trailing, 6).frame(height: 40)
-        .glassEffect(.regular, in: .capsule)
+        .padding(.horizontal, 16).padding(.vertical, 12)
+        .glassEffect(.regular, in: .rect(cornerRadius: 20))
         .task(id: arrival.id) {
             try? await Task.sleep(for: .seconds(8))
             if controller.arrival?.id == arrival.id { controller.arrival = nil }

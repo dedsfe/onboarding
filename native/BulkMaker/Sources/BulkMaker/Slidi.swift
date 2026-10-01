@@ -5,6 +5,19 @@ import SwiftUI
 
 enum SlidiState: Equatable, CaseIterable {
     case idle, happy, generating, thinking
+    case curious, resting, concerned
+
+    var label: String {
+        switch self {
+        case .idle: "Parado"
+        case .happy: "Feliz"
+        case .generating: "Gerando"
+        case .thinking: "Pensando"
+        case .curious: "Curioso"
+        case .resting: "Descansando"
+        case .concerned: "Preocupado"
+        }
+    }
 }
 
 struct SlidiView: View {
@@ -27,8 +40,14 @@ struct SlidiView: View {
             .frame(width: w, height: h)
         }
         .aspectRatio(9 / 16, contentMode: .fit)
-        .animation(.spring(response: 0.42, dampingFraction: 0.66), value: state)
-        .task(id: state) { await play() }
+        .animation(reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.66), value: state)
+        .task(id: Playback(state: state, reduceMotion: reduceMotion)) { await play() }
+        .accessibilityHidden(true)
+    }
+
+    private struct Playback: Equatable {
+        let state: SlidiState
+        let reduceMotion: Bool
     }
 
     private func face(_ w: CGFloat) -> some View {
@@ -39,18 +58,18 @@ struct SlidiView: View {
                     .frame(width: w * 0.15, height: w * 0.075)
                     .blur(radius: w * 0.022)
                     .offset(x: side * w * 0.3, y: w * 0.15)
-                eye(w).offset(x: side * w * 0.19)
+                eye(w, side: side).offset(x: side * w * 0.19)
             }
         }
         .offset(x: state == .thinking ? w * 0.02 : 0)
     }
 
-    private func eye(_ w: CGFloat) -> some View {
+    private func eye(_ w: CGFloat, side: Double) -> some View {
         let box = w * 0.4
-        let glint = state.glint
-        let spot = glint ?? SlidiState.idle.glint ?? .zero
+        let glint = state.glint(side: side)
+        let spot = glint ?? .zero
         return ZStack {
-            EyeShape(trace: state.eyeTrace, unit: w)
+            EyeShape(trace: state.eyeTrace(side: side), unit: w)
                 .fill(LinearGradient(colors: [SlidiPalette.eyeTop, SlidiPalette.eyeBottom], startPoint: .top, endPoint: .bottom))
             Circle().fill(.white)
                 .frame(width: w * 0.042, height: w * 0.042)
@@ -59,7 +78,7 @@ struct SlidiView: View {
                 .offset(x: spot.x * w, y: spot.y * w)
             if state == .generating {
                 Spinner(width: w, paused: reduceMotion)
-                    .transition(.opacity.combined(with: .scale(scale: 0.4)))
+                    .transition(.opacity)
             }
         }
         .frame(width: box, height: box)
@@ -80,19 +99,21 @@ struct SlidiView: View {
 
     /// Blinks now and then while idle or thinking; walks the lit dot along the carousel while generating.
     private func play() async {
-        withAnimation(.easeOut(duration: 0.12)) { blinking = false; litDot = 0 }
+        blinking = false
+        litDot = 0
+        guard !reduceMotion else { return }
         while !Task.isCancelled {
             switch state {
             case .generating:
                 try? await Task.sleep(for: .milliseconds(340))
                 guard !Task.isCancelled else { return }
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.72)) { litDot = (litDot + 1) % 4 }
-            case .idle, .thinking:
+            case .idle, .thinking, .curious, .concerned:
                 try? await Task.sleep(for: .seconds(Double.random(in: 2.4...5.2)))
                 guard !Task.isCancelled else { return }
                 await blink()
                 if Int.random(in: 0..<4) == 0 { await blink() }
-            case .happy:
+            case .happy, .resting:
                 return
             }
         }
@@ -101,8 +122,85 @@ struct SlidiView: View {
     private func blink() async {
         withAnimation(.easeIn(duration: 0.07)) { blinking = true }
         try? await Task.sleep(for: .milliseconds(90))
+        guard !Task.isCancelled else { return }
         withAnimation(.easeOut(duration: 0.14)) { blinking = false }
         try? await Task.sleep(for: .milliseconds(180))
+    }
+}
+
+/// Shared, bare mascot and copy. The surrounding screen owns the surface and the spacing.
+struct SlidiMessage: View {
+    let state: SlidiState
+    let title: String
+    var detail: String? = nil
+    var width: CGFloat = 40
+    var stacked = false
+
+    var body: some View {
+        Group {
+            if stacked {
+                VStack(spacing: 20) {
+                    portrait
+                    copy
+                }
+            } else {
+                HStack(spacing: 16) {
+                    portrait
+                    copy
+                }
+            }
+        }
+        .accessibilityElement(children: .combine)
+        .allowsHitTesting(false)
+    }
+
+    private var portrait: some View {
+        SlidiView(state: state).frame(width: width, height: width * 16 / 9)
+    }
+
+    private var copy: some View {
+        VStack(alignment: stacked ? .center : .leading, spacing: 6) {
+            Text(title).font(.system(size: stacked ? 18 : 14, weight: .semibold))
+            if let detail {
+                Text(detail).font(.system(size: stacked ? 14 : 12))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .multilineTextAlignment(stacked ? .center : .leading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// The mascot is the loading indicator itself, with no extra badge, tile or spinner around it.
+struct SlidiGenerationStatus: View {
+    let compact: Bool
+
+    var body: some View {
+        Group {
+            if compact {
+                HStack(spacing: 16) {
+                    SlidiView(state: .generating).frame(width: 40, height: 40 * 16 / 9)
+                    caption
+                }
+            } else {
+                VStack(spacing: 24) {
+                    SlidiView(state: .generating).frame(width: 88, height: 88 * 16 / 9)
+                    caption
+                }
+            }
+        }
+        .padding(16)
+        .foregroundStyle(.white)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("IA gerando imagens")
+    }
+
+    private var caption: some View {
+        Text("Criando suas imagens")
+            .font(.system(size: compact ? 14 : 18, weight: .semibold))
+            .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -159,7 +257,7 @@ private struct Spinner: View {
 
     var body: some View {
         TimelineView(.animation(paused: paused)) { context in
-            let turns = context.date.timeIntervalSinceReferenceDate / 0.9
+            let turns = paused ? 0 : context.date.timeIntervalSinceReferenceDate / 0.9
             Circle().trim(from: 0, to: 0.3)
                 .stroke(SlidiPalette.tiktok, style: StrokeStyle(lineWidth: width * 0.05, lineCap: .round))
                 .frame(width: width * 0.15, height: width * 0.15)
@@ -222,7 +320,7 @@ private struct EyeTrace: VectorArithmetic {
 }
 
 private extension SlidiState {
-    var eyeTrace: EyeTrace {
+    func eyeTrace(side: Double) -> EyeTrace {
         switch self {
         case .idle:
             // Tall capsule
@@ -236,15 +334,27 @@ private extension SlidiState {
         case .generating:
             // Full ring; the spinner rides on top of it
             .sampled(thickness: 0.05) { t in (0.075 * cos(.pi + 2 * .pi * t), 0.075 * sin(.pi + 2 * .pi * t)) }
+        case .curious:
+            // Unequal capsules: one eye opens wider while the other narrows inquisitively.
+            .sampled(thickness: side < 0 ? 0.17 : 0.12) { t in
+                (0.02, side < 0 ? -0.105 + 0.17 * t : -0.015 + 0.055 * t)
+            }
+        case .resting:
+            // Two gently closed eyelids, without adding a mouth or decorative sleep symbols.
+            .sampled(thickness: 0.065) { t in (-0.075 + 0.15 * t, 0.02 + 0.025 * sin(.pi * t)) }
+        case .concerned:
+            // Inward-slanting eyes communicate a problem while staying within the same face.
+            .sampled(thickness: 0.09) { t in (-0.055 + 0.11 * t, side * (-0.035 + 0.07 * t)) }
         }
     }
 
     /// Where the little shine sits on the eye, or nil when the eye is closed or a ring.
-    var glint: CGPoint? {
+    func glint(side: Double) -> CGPoint? {
         switch self {
         case .idle: CGPoint(x: 0.03, y: -0.06)
         case .thinking: CGPoint(x: 0.08, y: -0.08)
-        case .happy, .generating: nil
+        case .curious: CGPoint(x: 0.035, y: side < 0 ? -0.08 : -0.025)
+        case .happy, .generating, .resting, .concerned: nil
         }
     }
 }

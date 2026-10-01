@@ -66,9 +66,9 @@ extension View {
             .foregroundStyle(.white)
     }
 
-    /// Entry motion shared by every modal: a small scale-up with a fade.
+    /// Entry motion shared by every modal. Content remains visible before onAppear runs.
     func modalAppearance(_ appeared: Bool) -> some View {
-        scaleEffect(appeared ? 1 : 0.97).opacity(appeared ? 1 : 0)
+        scaleEffect(appeared ? 1 : 0.97)
     }
 
     /// Text-field look inside a modal panel.

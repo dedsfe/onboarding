@@ -39,6 +39,8 @@ uso:
       copia as imagens pro canvas do projeto, em fila à direita do que já está lá (o app mostra na hora).
   carousel-render --canvas-listar --canvas <pasta do canvas>
       lista as imagens do canvas (caminho e tamanho).
+  carousel-render --canvas-gerando | --canvas-finalizar --canvas <pasta do canvas>
+      avisa o app quando a IA começa/termina de criar imagens (no terminal do app).
 
 Cada render grava <pasta da variação>/.plano.json com o estilo aplicado. Para refazer um post:
 edite esse arquivo e rode  carousel-render "<pasta>/.plano.json" --saida "<pasta>"
@@ -54,6 +56,23 @@ plano.json:
 let positional = arguments.indices.filter { index in
     !arguments[index].hasPrefix("--") && !(index > 0 && valueFlags.contains(arguments[index - 1]))
 }.map { arguments[$0] }
+
+if arguments.contains("--canvas-gerando") || arguments.contains("--canvas-finalizar") {
+    guard let canvasPath = value(of: "--canvas"),
+          let rawSession = ProcessInfo.processInfo.environment[CanvasFolder.generationSessionKey],
+          let session = UUID(uuidString: rawSession) else { fail("Use esse comando no terminal do app, com --canvas <pasta do canvas>.") }
+    let canvas = URL(fileURLWithPath: canvasPath, isDirectory: true)
+    do {
+        if arguments.contains("--canvas-gerando") {
+            try CanvasFolder.beginGeneration(in: canvas, session: session)
+            print("Slidi: gerando imagens")
+        } else {
+            try CanvasFolder.endGeneration(in: canvas, session: session)
+            print("Slidi: geração encerrada")
+        }
+    } catch { fail(error.localizedDescription) }
+    exit(0)
+}
 
 if arguments.contains("--canvas-add") || arguments.contains("--canvas-listar") {
     guard let canvasPath = value(of: "--canvas") else { fail(usage) }

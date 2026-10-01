@@ -77,7 +77,9 @@ enum AgentSession {
         Cada projeto tem um canvas no app, onde o usuário junta imagens (linha "Canvas do projeto" do estado). Use sempre os comandos, nunca edite `board.json` à mão:
         - Ver o que tem: `.bulk-maker/bin/carousel-render --canvas-listar --canvas "<canvas>"` (caminho e tamanho de cada imagem; para enxergar, gere a folha de `<canvas>/media`).
         - Pôr imagens: `.bulk-maker/bin/carousel-render --canvas-add <imagem>... --canvas "<canvas>"`. Elas entram em fila à direita do que já está lá e o app mostra na hora.
+        - Antes de chamar o gerador de imagens, rode `.bulk-maker/bin/carousel-render --canvas-gerando --canvas "<canvas>"`: o Slidi aparece no app enquanto você cria. Renove esse aviso se a geração passar de 15 minutos.
         - Toda imagem que você gerar (com o gerador de imagens da sua assinatura) vai pro canvas: gere, salve o arquivo e rode `--canvas-add` com ele logo em seguida. Diga em 1 linha quantas foram.
+        - Ao terminar, inclusive se der erro ou o usuário cancelar, rode `.bulk-maker/bin/carousel-render --canvas-finalizar --canvas "<canvas>"` no MESMO canvas do aviso inicial. Não deixe o aviso ligado enquanto espera outra mensagem ou aprovação. Não use o aviso só para ler/importar imagens existentes.
 
         ## Post aberto na tela
         Quando o estado tiver "Aberto na tela", o usuário está vendo esse post no celular de prévia do calendário. "Esse post", "essa imagem", "esse slide", "aqui" = o post e o slide dessa linha. Aja direto nele, sem perguntar qual.

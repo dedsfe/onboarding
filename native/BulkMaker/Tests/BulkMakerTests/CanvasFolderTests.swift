@@ -89,5 +89,39 @@ final class CanvasFolderTests: XCTestCase {
         XCTAssertTrue(state.contains("- Canvas do projeto: `/tmp/P/Canvas`"))
         XCTAssertTrue(AgentSession.instructions.contains("--canvas-add <imagem>... --canvas"))
         XCTAssertTrue(AgentSession.instructions.contains("Toda imagem que você gerar"))
+        XCTAssertTrue(AgentSession.instructions.contains("--canvas-gerando"))
+        XCTAssertTrue(AgentSession.instructions.contains("--canvas-finalizar"))
+    }
+
+    func testGenerationIsScopedToProjectAndLiveTerminalRun() throws {
+        let first = UUID(), second = UUID()
+        let otherCanvas = base.appendingPathComponent("Other")
+        XCTAssertFalse(CanvasFolder.isGenerating(in: canvas, sessions: [first]))
+        try CanvasFolder.beginGeneration(in: canvas, session: first)
+        try CanvasFolder.beginGeneration(in: canvas, session: second)
+        XCTAssertTrue(CanvasFolder.isGenerating(in: canvas, sessions: [first, second]))
+        XCTAssertFalse(CanvasFolder.isGenerating(in: otherCanvas, sessions: [first, second]))
+        // Closed/restarted tabs and old runs from an earlier app launch no longer count.
+        XCTAssertFalse(CanvasFolder.isGenerating(in: canvas, sessions: [UUID()]))
+        try CanvasFolder.endGeneration(in: canvas, session: first)
+        XCTAssertFalse(CanvasFolder.isGenerating(in: canvas, sessions: [first]))
+        XCTAssertTrue(CanvasFolder.isGenerating(in: canvas, sessions: [second]))
+        try CanvasFolder.endGeneration(in: canvas, session: second)
+        try CanvasFolder.endGeneration(in: canvas, session: second) // cleanup is safe twice
+        XCTAssertFalse(CanvasFolder.isGenerating(in: canvas, sessions: [first, second]))
+    }
+
+    func testAbandonedGenerationExpiresAndCanBeRenewed() throws {
+        let session = UUID(), start = Date(timeIntervalSince1970: 1_000)
+        let later = start.addingTimeInterval(CanvasFolder.generationLifetime)
+        try CanvasFolder.beginGeneration(in: canvas, session: session, now: start)
+        XCTAssertTrue(CanvasFolder.isGenerating(in: canvas, sessions: [session], now: start))
+        XCTAssertFalse(CanvasFolder.isGenerating(in: canvas, sessions: [session], now: later))
+        try CanvasFolder.beginGeneration(in: canvas, session: session, now: later)
+        XCTAssertTrue(CanvasFolder.isGenerating(in: canvas, sessions: [session], now: later))
+        // A partially written or malformed marker must never strand the loading indicator.
+        let file = canvas.appendingPathComponent(".generation/\(session.uuidString).json")
+        try Data("broken".utf8).write(to: file)
+        XCTAssertFalse(CanvasFolder.isGenerating(in: canvas, sessions: [session], now: later))
     }
 }

@@ -157,12 +157,9 @@ struct InputSourcePicker: View {
                 }
             }
             if canvas.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "square.dashed").font(.system(size: 28, weight: .medium))
-                    Text("O canvas deste projeto está vazio. Cole imagens lá (⌘V) e volte aqui.")
-                        .font(.system(size: 14, weight: .medium))
-                        .multilineTextAlignment(.center)
-                }
+                SlidiMessage(state: .curious, title: "Cadê as imagens?",
+                             detail: "Cole imagens no canvas (⌘V) e volte aqui.", width: 52, stacked: true)
+                .padding(20)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -212,11 +209,10 @@ struct InputSourcePicker: View {
 
     private var footer: some View {
         HStack {
-            Text(total == 1 ? "1 arquivo no lote" : "\(total) arquivos no lote")
-                .font(.system(size: 15, weight: .semibold))
+            SlidiMessage(state: isSaving ? .thinking : error != nil ? .concerned : total > 0 ? .happy : .idle,
+                         title: isSaving ? "Juntando arquivos" : total == 1 ? "1 arquivo no lote" : "\(total) arquivos no lote",
+                         width: 28)
                 .monospacedDigit()
-                .contentTransition(.numericText())
-                .animation(.snappy, value: total)
             Spacer()
             Button(action: close) {
                 Text("Cancelar").font(.system(size: 14, weight: .semibold)).padding(.horizontal, 16).frame(height: 36)

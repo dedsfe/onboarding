@@ -27,6 +27,42 @@ public enum CanvasFolder {
     /// Longest side of a new image, in canvas units (same as pasting in the app).
     public static let defaultSide: Double = 480
 
+    /// A separate marker per terminal run: concurrent generators cannot stop each other's indicator.
+    /// Markers expire if an interrupted agent never sends its final update.
+    private struct Generation: Codable {
+        let expires: Date
+    }
+
+    public static let generationSessionKey = "BULKMAKER_GENERATION_SESSION"
+    public static let generationLifetime: TimeInterval = 20 * 60
+
+    private static func generationFile(in directory: URL, session: UUID) -> URL {
+        directory.appendingPathComponent(".generation", isDirectory: true)
+            .appendingPathComponent(session.uuidString + ".json")
+    }
+
+    public static func beginGeneration(in directory: URL, session: UUID, now: Date = Date()) throws {
+        let file = generationFile(in: directory, session: session)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(Generation(expires: now.addingTimeInterval(generationLifetime)))
+            .write(to: file, options: .atomic)
+    }
+
+    public static func endGeneration(in directory: URL, session: UUID) throws {
+        let file = generationFile(in: directory, session: session)
+        if FileManager.default.fileExists(atPath: file.path) { try FileManager.default.removeItem(at: file) }
+    }
+
+    /// Only sessions still owned by this app count. Closing/restarting a tab or relaunching the app
+    /// immediately invalidates its markers, even if the CLI was killed before it could clean up.
+    public static func isGenerating(in directory: URL, sessions: Set<UUID>, now: Date = Date()) -> Bool {
+        sessions.contains { session in
+            guard let data = try? Data(contentsOf: generationFile(in: directory, session: session)),
+                  let generation = try? JSONDecoder().decode(Generation.self, from: data) else { return false }
+            return generation.expires > now
+        }
+    }
+
     public static func entries(in directory: URL) -> [Entry] {
         guard let data = try? Data(contentsOf: directory.appendingPathComponent("board.json")) else { return [] }
         return (try? JSONDecoder().decode([Entry].self, from: data)) ?? []

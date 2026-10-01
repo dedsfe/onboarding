@@ -70,7 +70,9 @@ struct ArtworkBrowser: View {
         Group {
             let results = results
             if results.isEmpty {
-                ContentUnavailableView.search(text: query)
+                SlidiMessage(state: .curious, title: "Essa obra não apareceu",
+                             detail: "Tente outro título ou o nome do artista.", width: 64, stacked: true)
+                    .padding(32)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
@@ -92,6 +94,16 @@ struct ArtworkBrowser: View {
             }
         }
         .safeAreaBar(edge: .top) { header }
+        .safeAreaBar(edge: .bottom) {
+            if failed != nil || !downloading.isEmpty {
+                SlidiMessage(state: failed != nil ? .concerned : .thinking,
+                             title: failed != nil ? "Não consegui baixar a obra" : "Buscando sua obra",
+                             detail: failed != nil ? "Confira a conexão e tente novamente." : "Ela vai aparecer na biblioteca de fundos.",
+                             width: 28)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(18)
+            }
+        }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         // Scrolled paintings must not poke past the panel's rounded corners.
         .clipShape(.rect(cornerRadius: 26))
