@@ -312,20 +312,8 @@ struct SettingsPage: View {
                     Button("Abrir biblioteca no Finder", action: openBackgroundLibrary)
                         .buttonStyle(.glass)
                 }
-                // Visual only for now: the account, purchase and legal flows are not wired yet.
-                section(title: "Assinatura", icon: "star.circle") {
-                    settingsRow("Plano", value: "Grátis")
-                    HStack(spacing: 8) {
-                        Button("Gerenciar assinatura") {}.buttonStyle(.glass)
-                        Button("Restaurar compras") {}.buttonStyle(.glass)
-                    }
-                }
-                section(title: "Conta", icon: "person.crop.circle") {
-                    settingsRow("E-mail", value: "Não conectado")
-                    HStack(spacing: 8) {
-                        Button("Sair") {}.buttonStyle(.glass)
-                        Button("Apagar conta", role: .destructive) {}.buttonStyle(.glass).tint(.red)
-                    }
+                section(title: "Conta e assinatura", icon: "person.crop.circle") {
+                    LicenseAccountView(license: .shared)
                 }
                 section(title: "Suporte e privacidade", icon: "questionmark.circle") {
                     linkRow("Falar com o suporte", icon: "envelope")

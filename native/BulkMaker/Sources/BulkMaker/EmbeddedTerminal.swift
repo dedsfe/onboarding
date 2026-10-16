@@ -1,5 +1,6 @@
 import AppKit
 import CarouselEngine
+import Combine
 import SwiftTerm
 import SwiftUI
 
@@ -39,12 +40,19 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
     private(set) var activityID = UUID()
     private var pendingCLI: AgentCLI?
     private var pendingPrompt = ""
+    private var licenseObservation: AnyCancellable?
+    private var licenseWasAllowed = false
 
     init(cli: AgentCLI? = nil, prompt: String = "") {
         // The tab names the model, so comparing Sonnet and Opus side by side stays readable.
         title = cli.map { $0 == .claude ? "Claude \(ClaudeModel.current.label)" : $0.rawValue.capitalized } ?? "zsh"
         pendingCLI = cli
         pendingPrompt = prompt
+        super.init()
+        licenseWasAllowed = License.shared.canUse(.useAI)
+        licenseObservation = License.shared.objectWillChange.sink { [weak self] _ in
+            Task { @MainActor [weak self] in self?.licenseChanged() }
+        }
     }
 
     func terminalView() -> LocalProcessTerminalView {
@@ -67,6 +75,10 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
         pendingCLI = nil
         pendingPrompt = ""
         self.view = view
+        guard License.shared.canUse(.useAI) else {
+            view.feed(text: "Ative a licença ou comece o teste grátis para usar a IA.\r\nSeus arquivos continuam disponíveis para abrir e exportar.\r\n")
+            return view
+        }
         view.startProcess(executable: "/bin/zsh",
                           args: cli.map { ["-ilc", $0.shellCommand(prompt: prompt)] } ?? ["-il"],
                           environment: environment.map { "\($0.key)=\($0.value)" },
@@ -79,14 +91,29 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
     }
 
     func launch(_ cli: AgentCLI, prompt: String) {
+        guard License.shared.require(.useAI) else { return }
         pendingCLI = cli
         pendingPrompt = prompt
         restart()
     }
 
     func restart() {
-        view?.terminate()
+        let previous = view
         view = nil
+        previous?.terminate()
+        activityID = UUID()
+        generation += 1
+    }
+
+    private func licenseChanged() {
+        let allowed = License.shared.canUse(.useAI)
+        guard allowed != licenseWasAllowed else { return }
+        licenseWasAllowed = allowed
+        // Stop an already running CLI when access expires; don't wait for another button click.
+        // Detach before terminate so its exit callback cannot close a replacement tab.
+        let previous = view
+        view = nil
+        previous?.terminate()
         activityID = UUID()
         generation += 1
     }
@@ -114,6 +141,7 @@ final class TerminalTabs: ObservableObject {
     }
 
     func open(_ cli: AgentCLI? = nil, prompt: String = "") {
+        if cli != nil, !License.shared.require(.useAI) { return }
         let session = TerminalSession(cli: cli, prompt: prompt)
         session.onExit = { [weak self] in self?.close($0) }
         sessions.append(session)

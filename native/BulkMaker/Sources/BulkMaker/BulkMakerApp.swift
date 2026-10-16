@@ -7,13 +7,16 @@ struct BulkMakerApp: App {
     var body: some Scene {
         WindowGroup("The Carousel Maker") {
             BatchFlowView().frame(minWidth: 960, minHeight: 690)
+                .modifier(LicenseLifecycle())
         }
         .windowStyle(.hiddenTitleBar)
         .windowBackgroundDragBehavior(.enabled)
+        Settings { LicenseSettingsView(license: .shared) }
     }
 }
 
 private struct BatchFlowView: View {
+    @ObservedObject private var license = License.shared
     @State private var photos: PhotoCatalog?
     @State private var desiredURL: URL?
     @State private var document: CSVDocument?
@@ -213,7 +216,6 @@ private struct BatchFlowView: View {
             navButton("Calendário", icon: "calendar", page: .calendar)
             navButton("Postar", icon: "paperplane", page: .post)
             navButton("Configurações", icon: "gearshape", page: .settings)
-                .keyboardShortcut(",", modifiers: .command)
         }
         .padding(4)
         .glassEffect(.regular, in: .capsule)
@@ -276,7 +278,17 @@ private struct BatchFlowView: View {
                     .padding(.top, -64)
                     .transition(.opacity)
             } else if page == .post {
-                InstagramPage()
+                Group {
+                    if license.canUse(.post) { InstagramPage() }
+                    else {
+                        VStack(spacing: 20) {
+                            LicenseStatusView(license: license)
+                            Button("Ativar para postar") { license.showsActivation = true }
+                        }
+                        .padding(32)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                }
                     .transition(.opacity)
             } else if page == .settings {
                 // Scrolls under the floating nav instead of being cut off below it.
@@ -523,6 +535,7 @@ private struct BatchFlowView: View {
 
     /// "Gerar" opens the chosen AI in the terminal panel, so the user watches the batch and can step in.
     private func launchBatch(_ request: BatchRunRequest) {
+        guard license.require(.generateBatch) else { return }
         do {
             _ = try TerminalHandoff.prepare(photos: request.photos, desired: request.desired,
                                             csv: request.csv, output: request.output,
