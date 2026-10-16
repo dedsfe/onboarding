@@ -152,7 +152,10 @@ final class License: ObservableObject {
         message = nil
         defer { isBusy = false }
         do {
-            try await provider.deactivate(key: credentials.key, instanceID: credentials.entitlement.instanceID)
+            do { try await provider.deactivate(key: credentials.key, instanceID: credentials.entitlement.instanceID) }
+            catch LicenseFailure.rejected where credentials.rejected {
+                // A previously revoked/deleted instance must not trap the user on an unusable key.
+            }
             var next = record
             next.credentials = nil
             // Deactivation is not a new trial and never deletes projects or output.

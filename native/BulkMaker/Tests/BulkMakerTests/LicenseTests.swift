@@ -122,6 +122,21 @@ final class LicenseTests: XCTestCase {
         XCTAssertTrue(license.canStartTrial)
     }
 
+    @MainActor func testRevokedInstanceCanBeClearedToUseAnotherKeyWithoutResettingTrial() async {
+        let storage = MemoryLicenseStorage()
+        let provider = FakeLicenseProvider(entitlement: entitlement())
+        let license = License(provider: provider, storage: storage, configuration: configuration, now: { self.start })
+        await license.activate(key: "dummy")
+        provider.failure = .rejected
+        await license.revalidate()
+        await license.deactivate()
+        XCTAssertFalse(license.hasActivation)
+        XCTAssertFalse(license.canStartTrial)
+        provider.failure = nil
+        await license.activate(key: "replacement")
+        XCTAssertTrue(license.canUse(.generateBatch))
+    }
+
     @MainActor func testFailedActivationSaveReleasesRemoteSlot() async {
         let storage = MemoryLicenseStorage()
         let provider = FakeLicenseProvider(entitlement: entitlement())

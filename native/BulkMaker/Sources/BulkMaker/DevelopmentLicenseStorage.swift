@@ -7,6 +7,7 @@ struct DevelopmentLicenseStorage: LicenseStorage {
     static func defaultURL(environment: String) -> URL {
         FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("The Carousel Maker/Development", isDirectory: true)
+            .appendingPathComponent(Bundle.main.bundleIdentifier ?? "unknown.dev", isDirectory: true)
             .appendingPathComponent("license-\(environment).json")
     }
 
