@@ -54,6 +54,7 @@ targets:
       base:
         PRODUCT_NAME: The Carousel Maker
         PRODUCT_BUNDLE_IDENTIFIER: com.andrefelipe.carouselmaker
+        CODE_SIGN_ENTITLEMENTS: Xcode/CarouselMaker.entitlements
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: The Carousel Maker
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity

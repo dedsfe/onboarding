@@ -14,28 +14,32 @@ extension LicenseStorage {
 
 struct LicenseKeychain: LicenseStorage {
     let service: String
+    var accessGroup: String? = "4ZQ8PBTL5U.com.andrefelipe.carouselmaker"
 
     init(service: String) { self.service = service }
 
-    private var query: [String: Any] {
-        [kSecClass as String: kSecClassGenericPassword,
+    var query: [String: Any] {
+        var value: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
          kSecAttrService as String: service,
          kSecAttrAccount as String: "license-record-v1",
-         kSecAttrSynchronizable as String: false]
+         kSecAttrSynchronizable as String: false,
+         kSecUseDataProtectionKeychain as String: true]
+        if let accessGroup { value[kSecAttrAccessGroup as String] = accessGroup }
+        return value
     }
 
     func load() throws -> LicenseRecord? {
-        try load(allowAuthentication: false)
+        try loadWithoutAuthentication()
     }
 
     func recover() throws -> LicenseRecord? {
-        try load(allowAuthentication: true)
+        try loadWithoutAuthentication()
     }
 
-    private func load(allowAuthentication: Bool) throws -> LicenseRecord? {
+    private func loadWithoutAuthentication() throws -> LicenseRecord? {
         var request = query
         let context = LAContext()
-        context.interactionNotAllowed = !allowAuthentication
+        context.interactionNotAllowed = true
         request[kSecUseAuthenticationContext as String] = context
         request[kSecReturnData as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne

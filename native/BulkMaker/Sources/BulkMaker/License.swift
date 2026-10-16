@@ -6,8 +6,11 @@ import Foundation
 final class License: ObservableObject {
     static let shared: License = {
         let configuration = LicenseConfiguration.bundled
+        let storage: any LicenseStorage = (Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true)
+            ? DevelopmentLicenseStorage(url: DevelopmentLicenseStorage.defaultURL(environment: configuration.environment))
+            : LicenseKeychain(service: "com.andrefelipe.carouselmaker.license.\(configuration.environment)")
         return License(provider: LemonSqueezyLicenseProvider(configuration: configuration),
-                       storage: LicenseKeychain(service: "com.andrefelipe.carouselmaker.license.\(configuration.environment)"),
+                       storage: storage,
                        configuration: configuration)
     }()
 
@@ -95,7 +98,7 @@ final class License: ObservableObject {
                 catch {
                     record = next
                     storageFailed = true
-                    message = "A ativação foi criada, mas o Chaves não pôde salvá-la. Mantenha o app aberto, desbloqueie o Chaves e clique em Tentar acessar o Chaves."
+                    message = "A ativação foi criada, mas o Chaves não pôde salvá-la. Mantenha o app aberto, desbloqueie o Chaves e clique em Tentar novamente."
                     return
                 }
                 throw LicenseFailure.storage
@@ -168,7 +171,7 @@ final class License: ObservableObject {
         defer { isBusy = false }
         do {
             let storage = storage
-            // System authorization is only requested after a deliberate click, off the UI thread.
+            // Never ask for the login Keychain password, including explicit retries.
             let recovered = try await Task.detached(priority: .userInitiated) { try storage.recover() }.value
             if record.credentials != nil || record.trialStartedAt != nil { try persist(record) }
             else { record = recovered ?? LicenseRecord(); storageFailed = false }

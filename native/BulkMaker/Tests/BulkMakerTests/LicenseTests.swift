@@ -133,11 +133,38 @@ final class LicenseTests: XCTestCase {
         XCTAssertNil(storage.record?.credentials)
     }
 
+    func testDataProtectionKeychainUsesStableAccessGroupAndNeverLegacyKeychain() {
+        let store = LicenseKeychain(service: "test")
+        XCTAssertEqual(store.query[kSecUseDataProtectionKeychain as String] as? Bool, true)
+        XCTAssertEqual(store.query[kSecAttrAccessGroup as String] as? String, "4ZQ8PBTL5U.com.andrefelipe.carouselmaker")
+        XCTAssertEqual(store.query[kSecAttrSynchronizable as String] as? Bool, false)
+    }
+
+    func testDevelopmentStorageSurvivesRebuildWithPrivatePermissions() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("license.json")
+        let store = DevelopmentLicenseStorage(url: url)
+        XCTAssertNil(try store.load())
+        try store.save(.init(trialStartedAt: start))
+        XCTAssertEqual(try DevelopmentLicenseStorage(url: url).load()?.trialStartedAt, start)
+        try store.save(.init(trialStartedAt: start, credentials: .init(key: "dummy", entitlement: entitlement(), validatedAt: start)))
+        XCTAssertEqual(try store.load()?.credentials?.key, "dummy")
+        XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? Int, 0o600)
+        XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: directory.path)[.posixPermissions] as? Int, 0o700)
+    }
+
     func testKeychainRoundTripUsesSeparateDeviceOnlyItem() throws {
         let service = "com.andrefelipe.carouselmaker.tests.\(UUID().uuidString)"
         let store = LicenseKeychain(service: service)
+        // A bare swift-test executable does not have the distribution host's access-group entitlement.
+        var probe: CFTypeRef?
+        let probeStatus = SecItemCopyMatching(store.query as CFDictionary, &probe)
+        if probeStatus == errSecMissingEntitlement || probeStatus == errSecNotAvailable {
+            throw XCTSkip("Data Protection Keychain integration requires the signed app host.")
+        }
         defer {
-            SecItemDelete([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service] as CFDictionary)
+            SecItemDelete(store.query as CFDictionary)
         }
         XCTAssertNil(try store.load())
         var record = LicenseRecord(trialStartedAt: start)

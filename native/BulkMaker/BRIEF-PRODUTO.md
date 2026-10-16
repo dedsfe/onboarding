@@ -122,7 +122,7 @@ license.canUse(.exportExisting)
 
 O app inicia a revalidação ao abrir, repete depois de 24h e atualiza o estado durante a execução. Após falha
 transitória, a última validação boa permite no máximo 7 dias offline; uma rejeição explícita bloqueia imediatamente.
-Keychain guarda chave, instance_id, último sucesso, revogação e histórico do teste. A sessão do HTTP não usa cache em disco.
+Data Protection Keychain guarda chave, instance_id, último sucesso, revogação e histórico do teste na distribuição. No bundle `.dev`, um arquivo local privado (0600) evita o ACL instável da assinatura ad-hoc. A sessão do HTTP não usa cache em disco.
 O teste local não é uma assinatura do Lemon Squeezy e não tem cobrança automática. Não protege contra apagar
 intencionalmente o item no Keychain; controle de abuso entre instalações requer um serviço de testes no servidor.
 
@@ -155,3 +155,5 @@ posteriormente de um endpoint autenticado do site que consulte a API privada de 
 Referências: [licenças](https://docs.lemonsqueezy.com/guides/tutorials/license-keys),
 [portal](https://docs.lemonsqueezy.com/help/online-store/customer-portal),
 [teste e live](https://docs.lemonsqueezy.com/guides/developer-guide/testing-going-live).
+
+A licença não consulta nem migra o login Keychain legado. Todas as consultas ao Data Protection Keychain têm interação desativada, inclusive a tentativa manual; nenhum fluxo de licença pede a senha do login Keychain. O grupo estável é `4ZQ8PBTL5U.com.andrefelipe.carouselmaker`, declarado em `Xcode/CarouselMaker.entitlements`.
