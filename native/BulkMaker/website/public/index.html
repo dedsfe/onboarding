@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="description" content="Transforme fotos e ideias em carrosséis em lote, com sua IA, direto no Mac. Canvas, calendário e publicação no Instagram.">
+  <meta property="og:title" content="The Carousel Maker: crie carrosséis em lote">
+  <meta property="og:description" content="Fotos, textos e sua IA. Mais espaço para criar, menos trabalho repetido.">
+  <meta property="og:image" content="/assets/monet.jpg"><meta property="og:type" content="website">
+  <title>The Carousel Maker: carrosséis em lote no Mac</title>
+  <link rel="icon" href="/assets/favicon.svg"><link rel="preload" href="/assets/gambarino.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/commerce.js" defer></script>
+</head>
+<body class="sales">
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+  <header class="site-nav"><a class="brand" href="/">The Carousel Maker</a><nav aria-label="Principal"><a href="#assinatura">Assinatura</a><a href="/download">Download</a></nav></header>
+  <main id="conteudo">
+    <section class="hero" aria-labelledby="hero-title">
+      <!-- Monet, Banks of the Seine, Vétheuil (1880), National Gallery of Art. Public domain. -->
+      <div class="background" aria-hidden="true"></div>
+      <div class="hero-copy"><h1 id="hero-title">Crie carrosséis<br>em lote.</h1><p class="sub">Fotos, textos e IA. Tudo no seu Mac.</p>
+        <a class="submit hero-action" href="/download">Experimentar por 7 dias</a>
+        <p class="requirement">Sem cartão. Mac com Apple Silicon e macOS 26+.<br>Requer Claude Code ou Codex com sua própria assinatura.</p>
+      </div>
+    </section>
+    <section class="collection" aria-labelledby="collection-title">
+      <div class="collection-copy"><h2 id="collection-title">Suas fotos.<br>Um lote de possibilidades.</h2><p>Para criadores, social medias e marcas que têm mais ideias do que tempo para montar cada post.</p><p>Escolha as fotos e uma referência visual. Sua IA cria variações; você escolhe o que fica, ajusta no canvas e organiza os próximos posts no calendário.</p></div>
+      <figure class="sample"><div class="sample-track" id="sample-track">
+        <img src="/assets/sample-01.jpg" alt="Carrossel de exemplo: Sua galeria tem muito mais para contar, sobre uma pintura de Monet." width="1080" height="1350" loading="lazy">
+        <img src="/assets/sample-02.jpg" alt="Segundo slide: Uma ideia. Várias formas de dizer." width="1080" height="1350" loading="lazy" hidden>
+        <img src="/assets/sample-03.jpg" alt="Terceiro slide: Menos produção repetida. Mais espaço para criar." width="1080" height="1350" loading="lazy" hidden>
+      </div><figcaption><span>Exemplo criado com o renderizador do app.</span><div class="sample-controls" hidden><button type="button" data-step="-1" aria-label="Slide anterior">‹</button><span id="slide-position" aria-live="polite">1 / 3</span><button type="button" data-step="1" aria-label="Próximo slide">›</button></div></figcaption></figure>
+    </section>
+    <section class="workflow" aria-label="Do rascunho ao post">
+      <p class="workflow-intro">Da ideia ao calendário,<br>no mesmo lugar.</p>
+      <div><h3>Crie com a sua IA</h3><p>Claude Code ou Codex no terminal integrado. Você usa a assinatura que já tem, acompanha a criação e pede os ajustes.</p></div>
+      <div><h3>Encontre uma direção</h3><p>Pesquise referências de carrosséis no TikTok e organize fotos, textos e versões num canvas infinito.</p></div>
+      <div><h3>Escolha quando publicar</h3><p>Calendário e postagem no Instagram, com a sua conta. Na postagem automática, o app precisa estar aberto e conectado.</p></div>
+    </section>
+    <section id="assinatura" class="subscription" aria-labelledby="subscription-title">
+      <h2 id="subscription-title">Uma assinatura.<br>Seu processo inteiro.</h2><p>Os mesmos recursos nos dois períodos. Até 2 Macs por assinatura. Teste local de 7 dias, sem cartão e sem cobrança automática.</p>
+      <div class="plan-table">
+        <div class="plan"><h3>Mensal</h3><p class="price">{{MONTHLY_PRICE}}<span>por mês</span></p><p>Renovação mensal.<br>Cancele pelo portal da assinatura.</p><form action="/checkout/monthly" method="post" class="checkout-form"><button class="submit" {{MONTHLY_DISABLED}}>Escolher mensal</button></form></div>
+        <div class="plan"><h3>Anual</h3><p class="price">{{ANNUAL_PRICE}}<span>por ano</span></p><p>Uma cobrança por ano.<br>{{ANNUAL_OFFER}}</p><form action="/checkout/annual" method="post" class="checkout-form"><button class="submit" {{ANNUAL_DISABLED}}>Escolher anual</button></form></div>
+      </div><p class="commerce-note" role="status" id="checkout-message">{{COMMERCE_NOTE}}</p><p class="requirements-full">Antes de assinar: o app funciona em Macs com chip Apple Silicon e macOS 26 ou posterior. A assinatura do The Carousel Maker não inclui Claude ou ChatGPT. Você precisa ter Claude Code ou Codex instalado e conectado à sua própria conta. Pesquisa e postagem dependem de internet e da disponibilidade de TikTok e Instagram.</p>
+    </section>
+    <section class="questions" aria-labelledby="questions-title"><h2 id="questions-title">Antes de começar</h2><dl>
+      <div><dt>Preciso pagar outra IA?</dt><dd>Você usa sua própria assinatura compatível com Claude Code ou Codex. O app não inclui créditos nem uma assinatura de IA.</dd></div>
+      <div><dt>Meus arquivos ficam comigo?</dt><dd>Sim. Os projetos e as exportações ficam no Mac. Mesmo depois do teste ou da assinatura, você pode abrir e exportar o que já fez.</dd></div>
+      <div><dt>Posso usar em dois Macs?</dt><dd>Sim. Cada assinatura permite até 2 Macs ativados. Desative um Mac em Conta e assinatura para liberar a vaga.</dd></div>
+      <div><dt>E se eu ficar sem internet?</dt><dd>Uma licença já validada permite até 7 dias offline desde a última validação boa. Recursos online, como pesquisa e postagem, continuam precisando de conexão.</dd></div>
+      <div><dt>O app publica sem eu fazer nada?</dt><dd>Você decide o que agendar. A publicação automática usa sua conta do Instagram e exige o app aberto no Mac. Não há promessa de alcance ou resultado.</dd></div>
+      <div><dt>Como cancelo ou peço reembolso?</dt><dd>Cancele a renovação no portal do Lemon Squeezy, disponível no app. Consulte a <a href="/reembolso">política de reembolso</a> para pedidos de devolução.</dd></div>
+    </dl></section>
+    <section class="release-note" aria-labelledby="release-title"><div><h2 id="release-title">Avise quando estiver pronto.</h2><p>Entre na lista de lançamento.<br>Sem cobrança, sem compromisso.</p></div><form id="waitlist" action="/api/waitlist" method="post"><label for="email">E-mail</label><input id="email" name="email" type="email" placeholder="voce@exemplo.com" autocomplete="email" maxlength="254" required aria-describedby="form-message"><label for="x-handle">Seu @ no X</label><input id="x-handle" name="xHandle" type="text" placeholder="@seuperfil" pattern="@?[A-Za-z0-9_]{1,15}" maxlength="16" required aria-describedby="form-message"><button class="submit" type="submit">Receber o aviso</button><p id="form-message" class="form-message" role="status" aria-live="polite"></p></form></section>
+  </main>
+  <footer class="site-footer"><p>The Carousel Maker</p><nav aria-label="Informações"><a href="/termos">Termos</a><a href="/privacidade">Privacidade</a><a href="/reembolso">Reembolso</a><a href="/download">Download</a></nav><p class="support-contact">{{SUPPORT_CONTACT}}</p><p class="art-credit">Arte: Claude Monet, 1880. <a href="https://www.nga.gov/artworks/46652-banks-seine-vetheuil">National Gallery of Art</a>.</p></footer>
+</body></html>

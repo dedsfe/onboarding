@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+data/
+releases/
+node_modules/
+*.csv
+.DS_Store

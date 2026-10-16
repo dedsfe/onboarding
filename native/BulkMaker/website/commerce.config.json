@@ -1,0 +1,14 @@
+{
+  "enabled": false,
+  "environment": "test",
+  "storeID": 0,
+  "productID": 0,
+  "storeSubdomain": "",
+  "supportEmail": "",
+  "legalApproved": false,
+  "currency": "BRL",
+  "plans": {
+    "monthly": { "name": "Mensal", "variantID": 0, "amount": null, "interval": "month" },
+    "annual": { "name": "Anual", "variantID": 0, "amount": null, "interval": "year" }
+  }
+}
