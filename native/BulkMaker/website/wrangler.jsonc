@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "carousel-maker",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "html_handling": "none",
+    "not_found_handling": "none",
+    "run_worker_first": true
+  },
+  "observability": { "enabled": true },
+  "vars": { "SITE_ORIGIN": "https://carousel-maker.the-carousel-maker-site.workers.dev" }
+  // Secrets (wrangler secret put): SUPABASE_URL, SUPABASE_SECRET_KEY, LEMON_SQUEEZY_API_KEY.
+}
