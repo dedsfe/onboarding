@@ -1,9 +1,15 @@
 import Foundation
+import LocalAuthentication
 import Security
 
 protocol LicenseStorage {
     func load() throws -> LicenseRecord?
     func save(_ record: LicenseRecord) throws
+    func recover() throws -> LicenseRecord?
+}
+
+extension LicenseStorage {
+    func recover() throws -> LicenseRecord? { try load() }
 }
 
 struct LicenseKeychain: LicenseStorage {
@@ -19,7 +25,18 @@ struct LicenseKeychain: LicenseStorage {
     }
 
     func load() throws -> LicenseRecord? {
+        try load(allowAuthentication: false)
+    }
+
+    func recover() throws -> LicenseRecord? {
+        try load(allowAuthentication: true)
+    }
+
+    private func load(allowAuthentication: Bool) throws -> LicenseRecord? {
         var request = query
+        let context = LAContext()
+        context.interactionNotAllowed = !allowAuthentication
+        request[kSecUseAuthenticationContext as String] = context
         request[kSecReturnData as String] = true
         request[kSecMatchLimit as String] = kSecMatchLimitOne
         var result: CFTypeRef?
@@ -36,7 +53,11 @@ struct LicenseKeychain: LicenseStorage {
     func save(_ record: LicenseRecord) throws {
         let data = try JSONEncoder().encode(record)
         let attributes = [kSecValueData as String: data]
-        var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        var updateQuery = query
+        let context = LAContext()
+        context.interactionNotAllowed = true
+        updateQuery[kSecUseAuthenticationContext as String] = context
+        var status = SecItemUpdate(updateQuery as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {
             var item = query
             item[kSecValueData as String] = data
