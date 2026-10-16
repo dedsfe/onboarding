@@ -157,3 +157,31 @@ Referências: [licenças](https://docs.lemonsqueezy.com/guides/tutorials/license
 [teste e live](https://docs.lemonsqueezy.com/guides/developer-guide/testing-going-live).
 
 A licença não consulta nem migra o login Keychain legado. Todas as consultas ao Data Protection Keychain têm interação desativada, inclusive a tentativa manual; nenhum fluxo de licença pede a senha do login Keychain. O grupo estável é `4ZQ8PBTL5U.com.andrefelipe.carouselmaker`, declarado em `Xcode/CarouselMaker.entitlements`.
+
+### Entregas seguintes: Sparkle, DMG e site
+
+- Sparkle 2.10.0 está integrado ao SwiftPM/XcodeGen. A UI de atualizações fica na própria SettingsPage, e a busca
+  manual no menu do app. Não há janela Settings separada. A ativação usa ModalBackdrop/ModalHeader/modalPanel,
+  com o Slidi existente. `--license-preview` é uma opção somente de DEBUG para revisar esse modal.
+- `updates.json` guarda só URL pública, chave EdDSA pública e nome da conta do Keychain para assinatura.
+  A chave privada do Sparkle foi criada no Keychain da máquina, na conta `com.andrefelipe.carouselmaker.sparkle`.
+  O cliente exige feed assinado e valida o arquivo antes da extração; a assinatura é gerada pelo generate_appcast.
+- `VERSION` é a fonte da versão no pipeline SwiftPM, e o build é o timestamp UTC com segundos.
+  `release-mac.sh` monta o framework preservando symlinks, assina de dentro para fora, notariza o app, gera ZIP
+  e DMG com arrastar para Aplicativos, assina/notariza/grampeia o DMG e produz publish/appcast.xml + latest.json.
+  `--preview` gera um pacote local ad-hoc verificável, sem manifesto de publicação nem promessa de notarização.
+- Distribuição final depende do domínio/feed e de `PROVISIONING_PROFILE` Developer ID que autorize este App ID
+  e seu grupo do Keychain, além da credencial `notarytool` carousel-maker. Os perfis locais existentes pertencem
+  a outros apps. Um certificado Developer ID sozinho não autoriza os entitlements restritos do Keychain.
+- O site usa `website/commerce.config.json` como fonte pública de planos/preços/IDs. Segredo do Lemon Squeezy só
+  no `.env` do servidor. `scripts/configure-commerce.py --site-origin https://DOMINIO` gera o plist do app,
+  updates.json e Xcode/Distribution.xcconfig com os mesmos dados, sem segredos.
+- O endpoint de renovação descrito anteriormente já está implementado em `/api/license/subscription`; ao configurar
+  `subscriptionURL`, o app apresenta `renews_at` real. Falha desse endpoint opcional não invalida uma licença boa.
+- Site pronto para revisão local, sem publicação nem cobrança live. Faltam os preços, loja de teste, domínio,
+  suporte e aprovação dos textos legais pelo André. As páginas legais são minutas identificadas como revisão;
+  vendas permanecem desabilitadas até a configuração e aprovação. Telemetria de crash não foi adicionada nem ativada.
+
+Execução: `swift test --scratch-path /private/tmp/bulkmaker-build`, `npm test --prefix website`,
+`zsh run-mac.sh`, `zsh release-mac.sh --preview`. Não editar os arquivos reservados ao Claude para integrar guards:
+continuam documentados acima e devem ser conectados antes da venda.

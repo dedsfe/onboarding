@@ -57,6 +57,10 @@ struct LicenseActivationView: View {
                     .focused($keyFocused)
                     .accessibilityIdentifier("license.key")
                     .onSubmit { activate() }
+                  .onKeyPress(.return) {
+                    activate()
+                    return .handled
+                  }
                   Button(license.isBusy ? "Ativando…" : "Ativar neste Mac", action: activate)
                     .disabled(
                       key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || license.isBusy
