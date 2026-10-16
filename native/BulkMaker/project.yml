@@ -14,6 +14,9 @@ settings:
     MARKETING_VERSION: 0.1.0
     CURRENT_PROJECT_VERSION: 1
 packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.0
   SwiftTerm:
     url: https://github.com/migueldeicaza/SwiftTerm
     exactVersion: 1.11.2
@@ -38,11 +41,14 @@ targets:
   TheCarouselMaker:
     type: application
     platform: macOS
+    configFiles:
+      Release: Xcode/Distribution.xcconfig
     sources:
       - path: Sources/BulkMaker
       - path: Xcode/BundleModule.swift
     dependencies:
       - package: SwiftTerm
+      - package: Sparkle
       - target: CarouselEngine
       # The renderer ships next to the app binary; TerminalHandoff copies it into each workspace.
       - target: carousel-render
@@ -55,6 +61,11 @@ targets:
         PRODUCT_NAME: The Carousel Maker
         PRODUCT_BUNDLE_IDENTIFIER: com.andrefelipe.carouselmaker
         CODE_SIGN_ENTITLEMENTS: Xcode/CarouselMaker.entitlements
+        INFOPLIST_KEY_SUFeedURL: $(CAROUSEL_FEED_URL)
+        INFOPLIST_KEY_SUPublicEDKey: $(CAROUSEL_ED_PUBLIC_KEY)
+        INFOPLIST_KEY_SUVerifyUpdateBeforeExtraction: YES
+        INFOPLIST_KEY_SURequireSignedFeed: YES
+        INFOPLIST_KEY_SUSendProfileInfo: NO
         GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_CFBundleDisplayName: The Carousel Maker
         INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.productivity

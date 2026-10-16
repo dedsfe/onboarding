@@ -7,6 +7,9 @@ struct LicenseConfiguration: Decodable {
     var variantIDs: [Int]
     var portalURL: URL?
     var checkoutURL: URL?
+    var subscriptionURL: URL? = nil
+    var siteURL: URL? = nil
+    var supportEmail: String? = nil
 
     var isConfigured: Bool {
         ["test", "live"].contains(environment) && storeID > 0 && productID > 0
@@ -44,7 +47,11 @@ struct LemonSqueezyLicenseProvider: LicenseProvider {
         guard license.activationLimit == 2, license.activationUsage < 2 else { throw LicenseFailure.activationLimit }
         let result = try await request("activate", fields: ["license_key": key, "instance_name": instanceName])
         guard result.activated == true else { throw LicenseFailure.rejected }
-        return try entitlement(result)
+        do { return try await enrich(try entitlement(result), key: key) }
+        catch {
+            if let instance = result.instance { try? await deactivate(key: key, instanceID: instance.id) }
+            throw error
+        }
     }
 
     func validate(key: String, instanceID: String) async throws -> LicenseEntitlement {
@@ -52,12 +59,34 @@ struct LemonSqueezyLicenseProvider: LicenseProvider {
         guard result.valid == true else { throw LicenseFailure.rejected }
         let entitlement = try entitlement(result)
         guard entitlement.instanceID == instanceID else { throw LicenseFailure.rejected }
-        return entitlement
+        return try await enrich(entitlement, key: key)
     }
 
     func deactivate(key: String, instanceID: String) async throws {
         let result = try await request("deactivate", fields: ["license_key": key, "instance_id": instanceID])
         guard result.deactivated == true else { throw LicenseFailure.rejected }
+    }
+
+    private func enrich(_ entitlement: LicenseEntitlement, key: String) async throws -> LicenseEntitlement {
+        guard let url = configuration.subscriptionURL, url.scheme == "https", url.host != nil else { return entitlement }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.timeoutInterval = 8
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["license_key": key, "instance_id": entitlement.instanceID])
+        // Billing details enrich the validated license. A billing-server outage never revokes a good key.
+        guard let (data, response) = try? await session.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let metadata = try? JSONDecoder().decode(SubscriptionMetadata.self, from: data) else { return entitlement }
+        if metadata.status == "expired" { throw LicenseFailure.rejected }
+        var value = entitlement
+        value.renewsAt = metadata.renewsAt.flatMap(Self.date)
+        return value
+    }
+
+    private struct SubscriptionMetadata: Decodable {
+        var renewsAt: String?
+        var status: String
     }
 
     private func checkIdentity(_ response: Response) throws {

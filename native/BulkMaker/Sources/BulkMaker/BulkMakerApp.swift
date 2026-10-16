@@ -11,7 +11,13 @@ struct BulkMakerApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .windowBackgroundDragBehavior(.enabled)
-        Settings { LicenseSettingsView(license: .shared) }
+        .commands {
+            CommandGroup(after: .appInfo) { CheckForAppUpdates() }
+            CommandGroup(replacing: .appSettings) {
+                Button("Ajustes…") { NotificationCenter.default.post(name: .showProductSettings, object: nil) }
+                    .keyboardShortcut(",", modifiers: .command)
+            }
+        }
     }
 }
 
@@ -93,6 +99,9 @@ private struct BatchFlowView: View {
         .overlay { InputPickerHost() }
         .ignoresSafeArea(.container, edges: .top)
         .onAppear(perform: importSelectionIfChanged)
+        .onReceive(NotificationCenter.default.publisher(for: .showProductSettings)) { _ in
+            withAnimation(.snappy(duration: 0.3)) { page = .settings }
+        }
         .modifier(TerminalShortcuts(isAvailable: pageHasTerminal && !showDesignEditor, isOpen: showTerminalPanel,
                                     tabs: tabs, toggle: toggleTerminal))
         .onChange(of: desiredURL, initial: true) { _, url in desiredCatalog = url.flatMap { try? PhotoCatalog(directory: $0) } }

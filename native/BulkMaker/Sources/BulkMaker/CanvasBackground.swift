@@ -315,12 +315,15 @@ struct SettingsPage: View {
                 section(title: "Conta e assinatura", icon: "person.crop.circle") {
                     LicenseAccountView(license: .shared)
                 }
+                section(title: "Atualizações", icon: "arrow.triangle.2.circlepath") {
+                    UpdateSettingsView()
+                }
                 section(title: "Suporte e privacidade", icon: "questionmark.circle") {
-                    linkRow("Falar com o suporte", icon: "envelope")
+                    linkRow("Falar com o suporte", icon: "envelope", destination: ProductLinks.support)
                     Divider()
-                    linkRow("Política de Privacidade", icon: "hand.raised")
+                    linkRow("Política de Privacidade", icon: "hand.raised", destination: ProductLinks.privacy)
                     Divider()
-                    linkRow("Termos de Uso", icon: "doc.text")
+                    linkRow("Termos de Uso", icon: "doc.text", destination: ProductLinks.terms)
                     Divider()
                     settingsRow("Versão", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
                 }
@@ -382,8 +385,8 @@ struct SettingsPage: View {
         }
     }
 
-    private func linkRow(_ title: String, icon: String) -> some View {
-        Button {} label: {
+    private func linkRow(_ title: String, icon: String, destination: URL?) -> some View {
+        Button { if let destination { NSWorkspace.shared.open(destination) } } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon).frame(width: 20).foregroundStyle(.tint)
                 Text(title).font(.system(size: 14))
@@ -393,6 +396,8 @@ struct SettingsPage: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .disabled(destination == nil)
+        .help(destination == nil ? "Este contato ainda será configurado antes do lançamento." : "")
     }
 
     private func section<Content: View>(title: String, icon: String,

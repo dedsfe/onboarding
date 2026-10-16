@@ -116,6 +116,27 @@ final class LemonSqueezyLicenseProviderTests: XCTestCase {
             XCTFail("Missing configuration must not grant access")
         } catch { XCTAssertEqual(error as? LicenseFailure, .configuration) }
     }
+
+    func testRenewalComesFromOptionalBillingServerAndItsOutageDoesNotRevokeGoodLicense() async throws {
+        var config = provider().configuration
+        config.subscriptionURL = URL(string: "https://carousel.example.invalid/api/license/subscription")
+        let direct = fixture()
+        var client = provider()
+        client = .init(configuration: config, session: client.session)
+        LicenseURLProtocol.respond { request in
+            if request.url?.host == "carousel.example.invalid" {
+                return (200, Data(#"{"status":"active","renewsAt":"2026-11-01T00:00:00Z"}"#.utf8))
+            }
+            return (200, direct)
+        }
+        let value = try await client.validate(key: "dummy", instanceID: "this-mac")
+        XCTAssertNotNil(value.renewsAt)
+        LicenseURLProtocol.respond { request in
+            request.url?.host == "carousel.example.invalid" ? (503, Data()) : (200, direct)
+        }
+        let offlineBilling = try await client.validate(key: "dummy", instanceID: "this-mac")
+        XCTAssertEqual(offlineBilling.instanceID, "this-mac")
+    }
 }
 
 private final class LicenseRequestLog: @unchecked Sendable {

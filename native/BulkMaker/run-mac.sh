@@ -9,6 +9,9 @@ swift build --package-path "$project_dir" --scratch-path "$scratch_dir"
 binary_dir="$(swift build --package-path "$project_dir" --scratch-path "$scratch_dir" --show-bin-path)"
 
 mkdir -p "$app_dir/Contents/MacOS" "$app_dir/Contents/Resources"
+framework="$scratch_dir/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+mkdir -p "$app_dir/Contents/Frameworks"
+ditto "$framework" "$app_dir/Contents/Frameworks/Sparkle.framework"
 cp "$binary_dir/BulkMaker" "$app_dir/Contents/MacOS/BulkMaker"
 # Our native slide renderer; TerminalHandoff copies it into each project's .bulk-maker/bin.
 cp "$binary_dir/carousel-render" "$app_dir/Contents/MacOS/carousel-render"

@@ -9,12 +9,15 @@ let package = Package(
         .executable(name: "carousel-render", targets: ["carousel-render"])
     ],
     dependencies: [
-        .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.11.2")
+        .package(url: "https://github.com/migueldeicaza/SwiftTerm", exact: "1.11.2"),
+        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.0")
     ],
     targets: [
         .target(name: "CarouselEngine"),
         .executableTarget(name: "carousel-render", dependencies: ["CarouselEngine"]),
-        .executableTarget(name: "BulkMaker", dependencies: ["SwiftTerm", "CarouselEngine"], resources: [.process("Resources")]),
+        .executableTarget(name: "BulkMaker", dependencies: ["SwiftTerm", "CarouselEngine", .product(name: "Sparkle", package: "Sparkle")],
+                          resources: [.process("Resources")],
+                          linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]),
         .testTarget(name: "BulkMakerTests", dependencies: ["BulkMaker", "CarouselEngine"])
     ],
     swiftLanguageModes: [.v5]
