@@ -33,6 +33,11 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         /// Missing counts must never be presented as measured zeroes.
         var unavailableMetrics: Set<String> = []
         var url: String { "https://www.tiktok.com/@\(author)/photo/\(id)" }
+        /// Days since it was posted; unknown dates count as old.
+        var ageDays: Int { created.timeIntervalSince1970 > 0 ? max(0, Int(Date().timeIntervalSince(created) / 86400)) : .max }
+        /// Viralizing now, not years ago: what a founder can still ride.
+        var isRecent: Bool { ageDays <= TikTokResearcher.recentDays }
+        var viewsPerDay: Int { ageDays == .max ? 0 : views / max(1, ageDays) }
         var mentionsApp: Bool { TikTokResearcher.mentionsApp(caption) }
         /// Sells an app: said in the caption, or found in the slides' text (the "part 2: download this app" slide).
         var sellsApp = false
@@ -145,6 +150,8 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
     nonisolated static let floorViews = 10_000
     /// The bar of the fixed rule: what we want first is carousels with millions of views.
     nonisolated static let millionViews = 1_000_000
+    /// What counts as "viralizing now": posted in the last 90 days. Older posts only fill the gaps.
+    nonisolated static let recentDays = 90
 
     /// Whether a text (caption or a slide) is about an app (the kind of product the people using this sell):
     /// app words, or one of the competitors' names.
@@ -175,6 +182,8 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         var proven: Bool { posts.filter { $0.views >= TikTokResearcher.viralViews }.count >= 2 }
         /// Its best carousel under the fixed rule.
         var priority: Int { posts.map(\.priority).min() ?? 3 }
+        /// Has a carousel that went viral in the last 90 days.
+        var recent: Bool { posts.contains(where: \.isRecent) }
     }
 
     /// The AI's research: the term, the same term about apps (carousels selling an app come first and a plain
@@ -236,11 +245,12 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         defer { try? FileManager.default.removeItem(at: staged) }
         let candidates = posts.values.filter { $0.images.count >= 2 && $0.views >= Self.viralViews && !$0.unavailableMetrics.contains("playCount") }
             .sorted {
+                if $0.isRecent != $1.isRecent { return $0.isRecent }
                 let left = Self.mentionsApp($0.caption, names: appNames)
                 let right = Self.mentionsApp($1.caption, names: appNames)
                 if left != right { return left }
                 return $0.views != $1.views ? $0.views > $1.views : $0.id < $1.id
-            }.prefix(30)
+            }.prefix(40)
         var inspected: [Post] = []
         for var post in candidates {
             let folder = staged.appendingPathComponent(post.id)
@@ -289,6 +299,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
                     "trechos": [assessment?.nicheEvidence ?? "", assessment?.angleEvidence ?? "", assessment?.creatorEvidence ?? ""],
                     "texto_lido": String(post.inspectionText.prefix(1500)),
                     "formato": assessment?.format ?? "", "gancho": assessment?.hook ?? "",
+                    "dias": post.ageDays == .max ? -1 : post.ageDays,
                     "motivo": assessment?.reason ?? "a IA não avaliou este post"]
         }
         let log: [String: Any] = ["buscas": searched, "posts_vistos": seen, "candidatos": rows]
@@ -317,17 +328,19 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         return (reading.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
     }
 
-    /// Accounts ranked by a fixed rule, the best carousel of each deciding: an app in the niche with 1M+ views
-    /// first, then any 1M+ views, then the rest. Within each, like a person scouting the niche would: 2+
+    /// Accounts ranked by a fixed rule, the best carousel of each deciding: a hit in the last 90 days first,
+    /// then an app in the niche with 1M+ views, then any 1M+ views, then the rest. Within each, like a person scouting the niche would: 2+
     /// carousels past 50K views (a pattern, not luck) first, then typical views. Top 10% in views per follower get ★.
     static func judge(_ posts: [Post], profile: ProductProfile? = nil) -> [Account] {
-        let monthsAgo = Date().addingTimeInterval(-120 * 86400)
         let eligible = posts.filter {
             $0.images.count >= 2 && $0.views >= viralViews && !$0.unavailableMetrics.contains("playCount")
                 && ($0.assessment?.isSupported(by: $0.inspectionText) == true)
         }
         var accounts = Dictionary(grouping: eligible, by: \.author).map { handle, list -> Account in
-            let sorted = list.sorted { $0.priority != $1.priority ? $0.priority < $1.priority : $0.views > $1.views }
+            let sorted = list.sorted {
+                if $0.isRecent != $1.isRecent { return $0.isRecent }
+                return $0.priority != $1.priority ? $0.priority < $1.priority : $0.views > $1.views
+            }
             let views = sorted.map(\.views).sorted()
             let median = views.count % 2 == 1 ? views[views.count / 2]
                 : (views[views.count / 2 - 1] + views[views.count / 2]) / 2
@@ -336,10 +349,6 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
                            viewsPerFollower: followers > 0 ? Double(median) / Double(followers) : nil,
                            lastPost: list.map(\.created).max() ?? .distantPast)
         }
-        // Gone quiet for 4 months: the format may have stopped working; kept only if nothing else.
-        // Millions of views always stay: the rule puts them first.
-        let active = accounts.filter { $0.lastPost >= monthsAgo || $0.priority < 3 }
-        if active.count >= 3 { accounts = active }
         // Nothing past 10K: not a reference, unless the niche is that small.
         let reaching = accounts.filter { ($0.posts.first?.views ?? 0) >= floorViews }
         if reaching.count >= 3 { accounts = reaching }
@@ -348,7 +357,9 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             let cut = ratios[Int(0.9 * Double(ratios.count - 1))]
             for index in accounts.indices where (accounts[index].viewsPerFollower ?? 0) >= cut { accounts[index].standout = true }
         }
+        // Viralizing now comes first; an account whose hits are years old only fills what's left.
         return accounts.sorted {
+            if $0.recent != $1.recent { return $0.recent }
             if $0.priority != $1.priority { return $0.priority < $1.priority }
             if $0.proven != $1.proven { return $0.proven }
             return $0.medianViews > $1.medianViews
@@ -357,6 +368,10 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
 
     /// Takes accounts from each format in turn, best first within each, so ten lists of apps can't fill the top.
     static func mixFormats(_ accounts: [Account]) -> [Account] {
+        let recent = accounts.filter(\.recent)
+        guard recent.count == accounts.count || recent.isEmpty else {
+            return mixFormats(recent) + mixFormats(accounts.filter { !$0.recent })
+        }
         var order: [String] = []
         var queues: [String: [Account]] = [:]
         for account in accounts {
@@ -513,6 +528,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             + "Canvas de destino: \(project.canvasDirectory.path)\n"
             + "Buscas: \(searched.map { "\"\($0)\"" }.joined(separator: ", ")). "
             + "\(seenPosts) carrosséis de \(seenAccounts) contas avaliados.\n"
+            + "🔥 = viralizou nos últimos \(Self.recentDays) dias; esses vêm primeiro e os mais antigos só completam a lista.\n"
             + "Critério: 2+ slides completos, 50 mil+ views e relevância verificada com trechos dos próprios slides/legenda. "
             + "Recomendações de produto no nicho vêm antes de relatos pessoais no nicho; não há preenchimento com conteúdo genérico. "
             + "As contas alternam entre formatos ([lista de produtos], [relato com produto]…) pra não vir tudo igual.\n"
@@ -522,6 +538,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             let accountFolder = folder.appendingPathComponent(String(format: "%02d-@%@", index + 1, account.handle), isDirectory: true)
             // The fixed rule first, then carousels with 2+ slides, then views; 3 per account show the pattern.
             let best = account.posts.sorted {
+                if $0.isRecent != $1.isRecent { return $0.isRecent }
                 if $0.priority != $1.priority { return $0.priority < $1.priority }
                 if ($0.images.count > 1) != ($1.images.count > 1) { return $0.images.count > 1 }
                 return $0.views > $1.views
@@ -552,9 +569,13 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
                 try ResearchCanvas.add(title: Self.referenceTitle(post), details: details,
                                        slides: slides, to: project.canvasDirectory)
                 postRows.append(Self.referenceRecord(post, folder: postFolder, slides: slides, canvas: project.canvasDirectory))
-                postLines += "   - \(post.priority == 1 ? "📱 app · " : "")\(post.assessment.map { "[\($0.format)] " } ?? "")\(Self.referenceTitle(post)) · "
-                    + "\(saved == 1 ? "1 slide" : "\(saved) slides") · \(post.caption.replacingOccurrences(of: "\n", with: " ").prefix(90))\n"
-                    + (post.assessment.map { $0.hook.isEmpty ? "" : "     Gancho: \"\($0.hook)\"\n" } ?? "")
+                let tags: String = (post.isRecent ? "🔥 " : "") + (post.priority == 1 ? "📱 app · " : "")
+                    + (post.assessment.map { "[\($0.format)] " } ?? "")
+                let hook: String = post.assessment.map { $0.hook.isEmpty ? "" : "     Gancho: \"\($0.hook)\"\n" } ?? ""
+                let caption = String(post.caption.replacingOccurrences(of: "\n", with: " ").prefix(90))
+                postLines += "   - \(tags)\(Self.referenceTitle(post)) · "
+                    + "\(saved == 1 ? "1 slide" : "\(saved) slides") · \(Self.age(post)) · \(caption)\n"
+                    + hook
                     + "     \(post.url) (pasta \(accountFolder.lastPathComponent)/\(name))\n"
                     + "     Importado no canvas com legenda, métricas e textos de todos os slides.\(failed.isEmpty ? "" : " Falha ao baixar slides: \(failed).")\n"
             }
@@ -627,6 +648,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             "relato_pessoal": post.assessment?.personalStory ?? false,
             "motivo_selecao": post.assessment?.reason ?? "Não validado",
             "formato": post.assessment?.format ?? "", "gancho": post.assessment?.hook ?? "",
+            "recente": post.isRecent, "views_por_dia": post.viewsPerDay,
             "evidencia_nicho": post.assessment?.nicheEvidence ?? "",
             "evidencia_formato": post.assessment?.angleEvidence ?? "",
             "conta": post.author.isEmpty ? NSNull() : "@" + post.author,
@@ -656,6 +678,12 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             + "\n\(post.author.isEmpty ? "URL da conta não informada" : post.url)\n"
             + (post.caption.isEmpty ? "Legenda não informada." : post.caption)
             + (post.assessment.map { "\n\nPor que entrou: \($0.reason)\nNicho: \($0.nicheEvidence)\nProduto/relato: \($0.angleEvidence)" } ?? "")
+    }
+
+    /// "há 12 dias · 40K views/dia": how fresh it is and how fast it's still going.
+    static func age(_ post: Post) -> String {
+        guard post.ageDays != .max else { return "data não informada" }
+        return "há \(post.ageDays) dias · \(short(post.viewsPerDay)) views/dia"
     }
 
     private static func short(_ value: Int) -> String {

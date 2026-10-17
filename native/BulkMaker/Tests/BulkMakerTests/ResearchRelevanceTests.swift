@@ -78,6 +78,24 @@ final class ResearchRelevanceTests: XCTestCase {
         XCTAssertEqual(TikTokResearcher.mixFormats(ranked).map(\.handle), ["lista1", "relato", "lista2", "lista3"])
     }
 
+    func testRecentHitsComeBeforeOldOnes() {
+        func approved(_ id: String, views: Int, daysAgo: Int) -> TikTokResearcher.Post {
+            var p = post(id, author: id, caption: "Esse aplicativo de oração mudou minhas manhãs", views: views, slides: 4)
+            p.created = Date().addingTimeInterval(-Double(daysAgo) * 86400)
+            p.inspectedSlides = [ResearchCanvas.Slide(number: 1, file: nil, text: "Esse aplicativo de oração mudou minhas manhãs")]
+            p.assessment = ResearchAssessment(id: id, nicheMatch: true, productPromotion: true, personalStory: false,
+                creatorLed: true, nicheEvidence: "aplicativo de oração mudou", angleEvidence: "Esse aplicativo de oração",
+                creatorEvidence: "", reason: "", format: "relato com produto")
+            return p
+        }
+        let old = approved("velho", views: 5_000_000, daysAgo: 800)
+        let fresh = approved("novo", views: 90_000, daysAgo: 12)
+        let ranked = TikTokResearcher.mixFormats(TikTokResearcher.judge([old, fresh]))
+        XCTAssertEqual(ranked.map(\.handle), ["novo", "velho"])
+        XCTAssertEqual(fresh.viewsPerDay, 7_500)
+        XCTAssertTrue(TikTokResearcher.age(fresh).hasPrefix("há 12 dias"))
+    }
+
     func testOCRNoiseDoesNotSinkARealQuote() {
         let assessment = ResearchAssessment(id: "ocr", nicheMatch: true, productPromotion: true, personalStory: false,
             creatorLed: true, nicheEvidence: "apps católicos para rezar todo dia", angleEvidence: "Hallow: terço guiado e liturgia diária",
