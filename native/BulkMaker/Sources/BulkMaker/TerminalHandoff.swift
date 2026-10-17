@@ -108,7 +108,7 @@ enum TerminalHandoff {
                                     renderer: URL? = bundledRenderer) throws {
         guard let renderer else {
             throw NSError(domain: "TerminalHandoff", code: 1, userInfo: [
-                NSLocalizedDescriptionKey: "Não achei o renderizador carousel-render ao lado do app. Rode o run-mac.sh de novo."
+                NSLocalizedDescriptionKey: "O app está incompleto (falta o renderizador carousel-render). Baixe e instale de novo pelo site."
             ])
         }
         let bin = workspace.appendingPathComponent("bin", isDirectory: true)
