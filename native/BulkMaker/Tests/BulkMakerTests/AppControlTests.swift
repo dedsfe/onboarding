@@ -149,4 +149,11 @@ final class AppControlTests: XCTestCase {
         try AppStyleCommand.apply(command(##"{"action":"setStyle","mode":"agent"}"##))
         XCTAssertEqual(DesignPreferences.current.slideStyle, SlideStyle())
     }
+
+    func testAMissingCLITellsHowToInstallIt() {
+        let message = TerminalSession.startFailure(.claude, code: 127)
+        XCTAssertTrue(message.contains("não está instalado"))
+        XCTAssertTrue(message.contains("npm install -g @anthropic-ai/claude-code"))
+        XCTAssertTrue(TerminalSession.startFailure(.codex, code: 1).contains("@openai/codex"))
+    }
 }

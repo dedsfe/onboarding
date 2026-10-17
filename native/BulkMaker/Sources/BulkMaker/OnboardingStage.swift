@@ -1109,6 +1109,7 @@ private struct AccessStep: View {
                 .shadow(color: tint.opacity(0.5), radius: 24)
             StepTitle("Desbloqueie o seu lote", wentToCheckout
                       ? "Você entrou na fila. Quando abrir, a chave chega no seu e-mail: cole aqui."
+                      : license.canStartTrial ? "Teste 7 dias grátis, sem cartão. Já tem uma chave? Cole aqui."
                       : "O lançamento está chegando. Tem uma chave? Cole aqui.")
             VStack(spacing: 8) {
                 HStack(spacing: 10) {
@@ -1129,10 +1130,17 @@ private struct AccessStep: View {
                     Text(message).font(.system(size: 12.5)).foregroundStyle(.orange).multilineTextAlignment(.center)
                 }
             }
-            // No key yet: the waitlist is the way forward until launch. With one pasted, activating is.
+            // No key yet: the free trial gets them in right away (the waitlist is for after it).
+            // With one pasted, activating is.
             HStack(spacing: 12) {
                 if key.trimmingCharacters(in: .whitespaces).isEmpty {
-                    primaryButton("Entrar na lista de espera", icon: "arrow.up.forward", action: checkout)
+                    if license.canStartTrial {
+                        secondaryButton("Lista de espera", icon: "arrow.up.forward", action: checkout)
+                        primaryButton("Começar 7 dias grátis", icon: "sparkles", action: startTrial)
+                            .disabled(license.isBusy)
+                    } else {
+                        primaryButton("Entrar na lista de espera", icon: "arrow.up.forward", action: checkout)
+                    }
                 } else {
                     secondaryButton("Lista de espera", icon: "arrow.up.forward", action: checkout)
                     primaryButton("Ativar", icon: "lock.open.fill", action: activate)
@@ -1154,6 +1162,11 @@ private struct AccessStep: View {
             await license.activate(key: key)
             if license.access.isAllowed { enter() }
         }
+    }
+
+    private func startTrial() {
+        license.startTrial()
+        if license.access.isAllowed { enter() }
     }
 }
 

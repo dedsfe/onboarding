@@ -159,6 +159,19 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         return try await hunt(queries, appNames: appNames, count: count)
     }
 
+    /// The canvas's own search button: the same research as the terminal's command, no command to type.
+    /// Waits behind any search already running. Returns how many carousels came into the canvas.
+    func researchFromCanvas(_ query: String, count: Int = 10) async throws -> Int {
+        while busy { try await Task.sleep(for: .seconds(1)) }
+        busy = true
+        defer { busy = false }
+        let folder = try await research(query, count: count)
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent("resultado.json")),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let accounts = json["contas"] as? [[String: Any]] else { return 0 }
+        return accounts.reduce(0) { $0 + (($1["carrosseis"] as? [Any])?.count ?? 0) }
+    }
+
     // MARK: Search
 
     /// Where a carousel starts to count as viral, and the floor under which an account isn't worth showing.

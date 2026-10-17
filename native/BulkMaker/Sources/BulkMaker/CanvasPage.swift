@@ -58,6 +58,7 @@ struct CanvasPage: View {
                         importButton
                             .fixedSize()
                             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("canvasScreen")) } action: { onControlFrame?("import", $0) }
+                        CanvasResearchButton(compact: geometry.size.width < 840).fixedSize()
                         blurControl(compact: geometry.size.width < 640)
                             .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("canvasScreen")) } action: { onControlFrame?("blur", $0) }
                         Spacer(minLength: 0)
@@ -94,7 +95,7 @@ struct CanvasPage: View {
                 .font(.system(size: 32, weight: .light))
                 .foregroundStyle(.white.opacity(0.7))
             Text("Solte suas imagens aqui").font(.system(size: 22, weight: .bold))
-            Text("Arraste do Finder ou cole com ⌘V.")
+            Text("Arraste do Finder, cole com ⌘V ou pesquise no TikTok aqui embaixo.")
                 .font(.system(size: 14))
                 .foregroundStyle(.white.opacity(0.7))
         }

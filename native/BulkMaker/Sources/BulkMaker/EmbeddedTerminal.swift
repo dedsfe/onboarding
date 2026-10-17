@@ -39,6 +39,8 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
     /// Changes on restart, so an interrupted run cannot leave the generation indicator running in a new session.
     private(set) var activityID = UUID()
     private var pendingCLI: AgentCLI?
+    /// The CLI this tab is running, so a failed start can say which one to install.
+    private var runningCLI: AgentCLI?
     private var pendingPrompt = ""
     private var licenseObservation: AnyCancellable?
     private var licenseWasAllowed = false
@@ -80,6 +82,7 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
             view.feed(text: "Ative a licença ou comece o teste grátis para usar a IA.\r\nSeus arquivos continuam disponíveis para abrir e exportar.\r\n")
             return view
         }
+        runningCLI = cli
         view.startProcess(executable: "/bin/zsh",
                           args: cli.map { ["-ilc", $0.shellCommand(prompt: prompt)] } ?? ["-il"],
                           environment: environment.map { "\($0.key)=\($0.value)" },
@@ -124,8 +127,30 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
     nonisolated func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
     nonisolated func processTerminated(source: TerminalView, exitCode: Int32?) {
         Task { @MainActor in
-            if source === self.view { self.onExit?(self) }
+            guard source === self.view else { return }
+            // Claude Code or Codex that failed to start (not installed, not logged in): closing the tab would
+            // hide the reason. Keep it open with what to do; a normal exit (code 0) still closes it.
+            if let cli = self.runningCLI, let code = exitCode, code != 0, code < 128 {  // 128+: Ctrl-C or a signal, on purpose
+                self.runningCLI = nil
+                self.view?.feed(text: "\r\n\r\n" + Self.startFailure(cli, code: code).replacingOccurrences(of: "\n", with: "\r\n") + "\r\n")
+                return
+            }
+            self.onExit?(self)
         }
+    }
+
+    nonisolated static func startFailure(_ cli: AgentCLI, code: Int32) -> String {
+        let name = cli == .claude ? "Claude Code" : "Codex"
+        let install = cli == .claude ? "npm install -g @anthropic-ai/claude-code   (depois rode: claude)"
+            : "npm install -g @openai/codex   (depois rode: codex)"
+        let reason = code == 127 ? "não está instalado neste Mac" : "fechou com erro (código \(code))"
+        return """
+        O \(name) \(reason).
+        Pra instalar, abra uma aba zsh com o + e rode:
+          \(install)
+        Entre com a sua conta quando ele pedir e abra o \(name) de novo pelo +.
+        Pode fechar esta aba.
+        """
     }
 }
 
