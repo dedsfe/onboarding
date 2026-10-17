@@ -205,10 +205,10 @@ struct CalendarPrototypeView: View {
                 }
                 if !todayPosts.isEmpty {
                     Button { airDrop(todayPosts) } label: {
-                        Label("Enviar hoje", systemImage: "square.and.arrow.up")
+                        Label("Mandar pro iPhone", systemImage: "iphone.and.arrow.forward")
                     }
                     .buttonStyle(.appSecondary)
-                    .help("Manda os carrosséis de hoje pro iPhone por AirDrop")
+                    .help("Manda os carrosséis de hoje pro iPhone por AirDrop, pra você postar")
                     .padding(.trailing, 8)
                     .transition(.opacity)
                 }

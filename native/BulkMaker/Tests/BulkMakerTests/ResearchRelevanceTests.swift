@@ -135,7 +135,7 @@ final class ResearchRelevanceTests: XCTestCase {
 
     func testSearchUsesShortProductTermsInsteadOfAppendingTheWholeNiche() {
         let terms = TikTokResearcher.researchQueries("devocional diário", profile: profile)
-        XCTAssertTrue(terms.contains("app Hallow"))
+        XCTAssertTrue(terms.contains("Hallow oração da manhã"), "Concorrente vem junto do tema do nicho")
         XCTAssertTrue(terms.contains("app devocional diário"))
         XCTAssertFalse(terms.contains("oração da manhã"), "Tema amplo sem recorte de produto não deve virar busca de referência")
         XCTAssertTrue(terms.allSatisfy { $0.split(separator: " ").count <= 9 })

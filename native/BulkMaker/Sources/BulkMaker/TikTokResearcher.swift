@@ -215,7 +215,9 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         var terms = Array((profile?.sellerSearches ?? []).prefix(3))
         let topic = profile?.keywords.first ?? profile?.subNiches.first ?? profile?.name ?? ""
         terms += Array((profile?.keywords ?? []).prefix(2)).map { "app \($0)" }
-        terms += Array((profile?.competitors ?? []).prefix(2)).map { "app \($0)" }
+        // A competitor's name alone drifts ("Cal AI" brings AI chat apps); with the niche's topic it stays on target.
+        let anchor = profile?.keywords.first ?? ""
+        terms += Array((profile?.competitors ?? []).prefix(2)).map { anchor.isEmpty ? "app \($0)" : "\($0) \(anchor)" }
         // "app …" alone brings back lists of apps; these find the stories and reviews where a product shows up.
         if let keyword = profile?.keywords.first { terms += ["pov \(keyword)", "minha rotina \(keyword)"] }
         if let competitor = profile?.competitors.first { terms.append("\(competitor) review") }
@@ -249,10 +251,26 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         var perSearch: [String] = []
         let terms = Self.shortQueries(queries)
         // TikTok's photo search ignores its "date posted" filter, so freshness is ranked here, after the fact.
+        var related: [String] = []
         for (index, term) in terms.enumerated() {
             searched.append(term)
             let results = (try? await search(term, want: index == 0 ? 60 : 40)) ?? []
             perSearch.append("\(term): \(results.count), \(results.filter(\.isRecent).count) dos últimos 90 dias")
+            for post in results { posts[post.id] = post }
+            related += suggestions
+        }
+        // More of the niche as TikTok sees it: its related searches, only those about a product (an app word or a
+        // competitor), since "salada que me ajudou a emagrecer" sells nothing.
+        let productWords = ["app", "apps", "aplicativo", "aplicativos"] + appNames.map { $0.lowercased() }
+        let extra = Self.shortQueries(related).filter { suggestion in
+            let text = suggestion.lowercased()
+            return !searched.contains { $0.lowercased() == text }
+                && productWords.contains { word in text.split(separator: " ").contains(Substring(word)) || (word.contains(" ") && text.contains(word)) }
+        }.prefix(3)
+        for term in extra {
+            searched.append(term)
+            let results = (try? await search(term, want: 40)) ?? []
+            perSearch.append("\(term) (sugestão do TikTok): \(results.count)")
             for post in results { posts[post.id] = post }
         }
         #if DEBUG
