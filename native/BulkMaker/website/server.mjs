@@ -126,7 +126,7 @@ async function saveSignup(req, res) {
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return json(res, 400, { error: 'Confira seu email.', field: 'email' });
   }
-  if (!/^[A-Za-z0-9_]{1,15}$/.test(xHandle)) {
+  if (xHandle.length > 0 && !/^[A-Za-z0-9_]{1,15}$/.test(xHandle)) {
     return json(res, 400, { error: 'Confira seu @ do X.', field: 'xHandle' });
   }
   await store.save(email, xHandle);

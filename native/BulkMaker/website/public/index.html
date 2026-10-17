@@ -20,65 +20,73 @@
     <nav aria-label="Principal">
       <a href="#recursos">Recursos</a><a href="#como-funciona">Como funciona</a><a href="#perguntas">Perguntas</a>
     </nav>
-    <a class="button" href="#lista-de-espera">Entrar na lista de espera</a>
+    <div class="nav-actions">
+      <form id="header-waitlist" class="header-form" action="/api/waitlist" method="post" novalidate>
+        <label for="header-email" class="sr-only">Seu e-mail</label>
+        <input id="header-email" name="email" type="email" placeholder="Seu e-mail" autocomplete="email" maxlength="254" required aria-label="Seu e-mail para a lista de espera" class="header-input">
+        <button class="button small header-btn" type="submit">Entrar</button>
+      </form>
+      <a class="button small header-mobile-btn" href="#lista-de-espera">Entrar</a>
+    </div>
   </header>
 
   <main id="conteudo">
     <!-- Hero -->
     <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-glow" aria-hidden="true"></div>
       <!-- Monet, Banks of the Seine, Vétheuil (1880), National Gallery of Art. Domínio público. -->
       <div class="ascii" aria-hidden="true"></div>
-      <h1 id="hero-title">Referências virais. <em>Criação em lote.</em></h1>
-      <p class="lead">Para fundadores e criadores: encontre no TikTok os carrosséis que já viralizam no seu nicho. Reúna slides, textos e métricas no canvas e crie os seus com IA, no Mac.</p>
-      <div class="actions"><a class="button" href="#lista-de-espera">Entrar na lista de espera</a></div>
-      <p class="availability">Em preparação para o lançamento. Receba o aviso por e-mail.</p>
-      <div class="prompts" aria-hidden="true">
+      <h1 id="hero-title" class="reveal">Referências virais. <em>Criação em lote.</em></h1>
+      <p class="lead reveal">Para fundadores e criadores: encontre no TikTok os carrosséis que já viralizam no seu nicho. Reúna slides, textos e métricas no canvas e crie os seus com IA, no Mac.</p>
+      <div class="actions reveal"><a class="button" href="#lista-de-espera">Entrar na lista de espera</a></div>
+      <p class="availability reveal">Em preparação para o lançamento. Receba o aviso por e-mail.</p>
+      <div class="prompts reveal" aria-hidden="true">
         <p>Encontre carrosséis que mostram apps de produtividade</p>
         <p>Traga slides, textos e métricas dessas referências para o canvas</p>
         <div class="prompt-box"><span id="prompt-text">Crie 30 carrosséis no estilo dessa referência, com as minhas fotos</span></div>
         <p>Organize os arquivos e horários da próxima semana no calendário</p>
         <p>Encontre relatos pessoais sobre organização da rotina</p>
       </div>
-      <figure class="window hero-shot"><img src="/assets/app/lote.webp" width="1800" height="1161" alt="Tela Criar em lote: fotos, resultado desejado e copy entram, a IA gera as variações e salva na saída."></figure>
+      <figure class="window hero-shot reveal"><img src="/assets/app/lote.webp" width="1800" height="1161" alt="Tela Criar em lote: fotos, resultado desejado e copy entram, a IA gera as variações e salva na saída."></figure>
     </section>
 
     <!-- O que viraliza -->
     <section class="made" aria-labelledby="made-title">
-      <h2 id="made-title">Uma referência vale mais com contexto.</h2>
-      <p class="section-lead">Exemplos de carrosséis do TikTok. Na pesquisa do seu nicho, procure posts que mostram um produto ou app, vendem uma solução ou contam uma experiência pessoal.</p>
-      <div class="phone-marquee"><div class="phone-track"><figure class="phone"><img src="/assets/tiktok/post-1.webp" width="480" height="973" decoding="async" alt="Carrossel de @cyrofernando: 10 frases que vão virar uma chave no seu cérebro"></figure><figure class="phone"><img src="/assets/tiktok/post-2.webp" width="480" height="973" decoding="async" alt="Carrossel de Varón recto: orar deitado vs orar de joelhos, 185 mil curtidas"></figure><figure class="phone"><img src="/assets/tiktok/post-3.webp" width="480" height="973" decoding="async" alt="Carrossel de Bruna R. Cordeiro: ideias para passar uma hora com Deus, 170 mil curtidas"></figure><figure class="phone"><img src="/assets/tiktok/post-4.webp" width="480" height="973" decoding="async" alt="Carrossel de @cyrofernando: Deus está lhe dando um sinal, 28 mil curtidas"></figure><figure class="phone"><img src="/assets/tiktok/post-5.webp" width="480" height="973" decoding="async" alt="Carrossel de @franfranzner: como orar, 45 mil curtidas"></figure><figure class="phone"><img src="/assets/tiktok/post-6.webp" width="480" height="973" decoding="async" alt="Carrossel de @aescoladaprosperidade: ei filho, vamos orar? 1 milhão de curtidas"></figure><figure class="phone"><img src="/assets/tiktok/post-7.webp" width="480" height="973" decoding="async" alt="Carrossel de @cyrofernando: truques de psicologia não verbal"></figure><figure class="phone"><img src="/assets/tiktok/post-8.webp" width="480" height="973" decoding="async" alt="Carrossel de Una cita con Dios: como aprender a orar, 128 mil curtidas"></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-1.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-2.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-3.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-4.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-5.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-6.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-7.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-8.webp" width="480" height="973" decoding="async" alt=""></figure></div></div>
+      <h2 id="made-title" class="reveal">Uma referência vale mais com contexto.</h2>
+      <p class="section-lead reveal">Exemplos de carrosséis do TikTok. Na pesquisa do seu nicho, procure posts que mostram um produto ou app, vendem uma solução ou contam uma experiência pessoal.</p>
+      <div class="phone-marquee reveal"><div class="phone-track"><figure class="phone"><img src="/assets/tiktok/post-1.webp" width="480" height="973" decoding="async" alt="Carrossel de @cyrofernando: 10 frases que vão virar uma chave no seu cérebro"></figure><figure class="phone"><img src="/assets/tiktok/post-2.webp" width="480" height="973" decoding="async" alt="Carrossel de Varón recto: orar deitado vs orar de joelhos, 185 mil curtidas"></figure><figure class="phone"><img src="/assets/tiktok/post-3.webp" width="480" height="973" decoding="async" alt="Carrossel de Bruna R. Cordeiro: ideias para passar uma hora com Deus, 170 mil curtidas"></figure><figure class="phone"><img src="/assets/tiktok/post-4.webp" width="480" height="973" decoding="async" alt="Carrossel de @cyrofernando: Deus está lhe dando um sinal, 28 mil curtidas"></figure><figure class="phone"><img src="/assets/tiktok/post-5.webp" width="480" height="973" decoding="async" alt="Carrossel de @franfranzner: como orar, 45 mil curtidas"></figure><figure class="phone"><img src="/assets/tiktok/post-6.webp" width="480" height="973" decoding="async" alt="Carrossel de @aescoladaprosperidade: ei filho, vamos orar? 1 milhão de curtidas"></figure><figure class="phone"><img src="/assets/tiktok/post-7.webp" width="480" height="973" decoding="async" alt="Carrossel de @cyrofernando: truques de psicologia não verbal"></figure><figure class="phone"><img src="/assets/tiktok/post-8.webp" width="480" height="973" decoding="async" alt="Carrossel de Una cita con Dios: como aprender a orar, 128 mil curtidas"></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-1.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-2.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-3.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-4.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-5.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-6.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-7.webp" width="480" height="973" decoding="async" alt=""></figure><figure class="phone" aria-hidden="true"><img src="/assets/tiktok/post-8.webp" width="480" height="973" decoding="async" alt=""></figure></div></div>
     </section>
 
     <!-- Recursos -->
     <section id="recursos" class="features" aria-labelledby="features-title">
-      <h2 id="features-title">Da pesquisa ao seu próximo carrossel.</h2>
-      <p class="section-lead">Referências, criação e organização no mesmo projeto. Você orienta o Claude Code ou o Codex pelo terminal embutido.</p>
+      <h2 id="features-title" class="reveal">Da pesquisa ao seu próximo carrossel.</h2>
+      <p class="section-lead reveal">Referências, criação e organização no mesmo projeto. Você orienta o Claude Code ou o Codex pelo terminal embutido.</p>
       <div class="feature-grid">
-        <article class="feature tone-blue">
+        <article class="feature tone-blue reveal stagger-1">
           <span class="icon" aria-hidden="true">⌕</span><p class="kicker">Pesquise contas</p>
           <h3>Encontre os carrosséis do seu nicho.</h3>
           <ul><li>Busca por tema, com as buscas que o próprio TikTok sugere</li><li>Busque referências que mostram produtos, apps ou relatos pessoais</li><li>Só carrossel: nada de vídeo no meio</li></ul>
           <figure class="window"><img src="/assets/app/pesquisa.webp" width="1800" height="1161" loading="lazy" alt="Canvas com contas pesquisadas, cada uma com views, curtidas e os slides baixados."></figure>
         </article>
-        <article class="feature tone-green">
+        <article class="feature tone-green reveal stagger-2">
           <span class="icon" aria-hidden="true">▦</span><p class="kicker">Meça tudo</p>
           <h3>Slides, textos e métricas no canvas.</h3>
           <ul><li>Consulte as métricas disponíveis de cada carrossel</li><li>Legenda, hashtags e data, junto dos slides</li><li>Ordene pelo que mais performou</li></ul>
           <figure class="window"><img src="/assets/app/canvas.webp" width="1800" height="1161" loading="lazy" alt="Canvas infinito com dezenas de referências organizadas por conta."></figure>
         </article>
-        <article class="feature tone-purple">
+        <article class="feature tone-purple reveal stagger-1">
           <span class="icon" aria-hidden="true">⧉</span><p class="kicker">Crie em lote</p>
           <h3>Crie variações a partir das referências.</h3>
           <ul><li>Suas fotos + uma referência + a copy, se quiser</li><li>Gere vários carrosséis na mesma criação em lote</li><li>Formato TikTok (9:16) ou feed (4:5)</li></ul>
           <figure class="window"><img src="/assets/app/lote.webp" width="1800" height="1161" loading="lazy" alt="Fluxo Criar em lote, da entrada à saída com 945 imagens."></figure>
         </article>
-        <article class="feature tone-orange">
+        <article class="feature tone-orange reveal stagger-2">
           <span class="icon" aria-hidden="true">✳</span><p class="kicker">Com a sua IA</p>
           <h3>Peça ajustes como pediria a um designer.</h3>
           <ul><li>Claude Code ou Codex no terminal, dentro do app</li><li>Selecione um slide no canvas e peça uma versão nova</li><li>Use sua conta de IA, conforme os limites do seu provedor</li></ul>
           <figure class="window"><img src="/assets/app/ia.webp" width="1800" height="1090" loading="lazy" alt="Canvas com um slide selecionado e o Codex criando uma nova versão no terminal ao lado."></figure>
         </article>
-        <article class="feature tone-pink">
+        <article class="feature tone-pink reveal stagger-1">
           <span class="icon" aria-hidden="true">▤</span><p class="kicker">Calendário</p>
           <h3>Arquivos e horários, organizados.</h3>
           <ul><li>Arraste os carrosséis pros dias que quiser</li><li>Quantos posts por dia, e em que horário</li><li>Revise os arquivos e publique manualmente nas plataformas</li></ul>
@@ -127,7 +135,7 @@
             </div>
           </figure>
         </article>
-        <article class="feature tone-teal">
+        <article class="feature tone-teal reveal stagger-2">
           <span class="icon" aria-hidden="true">▢</span><p class="kicker">Projetos</p>
           <h3>Um espaço para cada produto ou marca.</h3>
           <ul><li>Reúna as referências no canvas do projeto</li><li>Mantenha a criação em lote junto dos seus materiais</li><li>Organize os posts no calendário de cada projeto</li></ul>
@@ -137,18 +145,18 @@
     </section>
 
     <section id="como-funciona" class="workflow" aria-labelledby="workflow-title">
-      <h2 id="workflow-title">Comece pelo que você vende.</h2>
+      <h2 id="workflow-title" class="reveal">Comece pelo que você vende.</h2>
       <div class="workflow-grid">
-        <article><h3>Encontre referências</h3><p>Pesquise o seu nicho no TikTok. Prefira carrosséis de produtos, apps e relatos pessoais que façam sentido para o seu público.</p></article>
-        <article><h3>Crie com contexto</h3><p>Traga slides, textos e métricas para o canvas. Use suas fotos e peça ao Claude Code ou Codex novas versões em lote.</p></article>
-        <article><h3>Prepare a sua rotina</h3><p>Revise os carrosséis e organize arquivos e horários no calendário. A publicação nas plataformas é manual.</p></article>
+        <article class="reveal stagger-1"><h3>Encontre referências</h3><p>Pesquise o seu nicho no TikTok. Prefira carrosséis de produtos, apps e relatos pessoais que façam sentido para o seu público.</p></article>
+        <article class="reveal stagger-2"><h3>Crie com contexto</h3><p>Traga slides, textos e métricas para o canvas. Use suas fotos e peça ao Claude Code ou Codex novas versões em lote.</p></article>
+        <article class="reveal stagger-3"><h3>Prepare a sua rotina</h3><p>Revise os carrosséis e organize arquivos e horários no calendário. A publicação nas plataformas é manual.</p></article>
       </div>
     </section>
 
     <!-- Perguntas -->
     <section id="perguntas" class="faq" aria-labelledby="faq-title">
-      <h2 id="faq-title">Respostas rápidas</h2>
-      <div class="faq-list">
+      <h2 id="faq-title" class="reveal">Respostas rápidas</h2>
+      <div class="faq-list reveal">
         <details open><summary>O que é o The Carousel Maker?</summary><p>Um app de Mac para fundadores e criadores encontrarem carrosséis que já viralizam no TikTok, reunirem slides, textos e métricas no canvas e criarem carrosséis parecidos em lote com IA.</p></details>
         <details><summary>O app publica no TikTok ou no Instagram?</summary><p>Não. O calendário organiza os arquivos e os horários planejados. Você revisa o conteúdo e faz a publicação manualmente em cada plataforma.</p></details>
         <details><summary>Como a IA entra no processo?</summary><p>Você usa o Claude Code ou o Codex no terminal embutido para criar e ajustar os carrosséis com o contexto do projeto. É preciso ter a ferramenta instalada e conectada à sua conta.</p></details>
@@ -161,16 +169,24 @@
 
     <!-- Lista -->
     <section id="lista-de-espera" class="community" aria-labelledby="community-title">
-      <img class="mascot" src="/assets/favicon.svg" alt="" width="56" height="56">
-      <h2 id="community-title">Entre na lista de espera.</h2>
-      <p class="section-lead">Deixe seu e-mail e seu perfil do X para receber o aviso quando o acesso estiver disponível.</p>
-      <form id="waitlist" action="/api/waitlist" method="post">
-        <label for="email">E-mail</label><input id="email" name="email" type="email" placeholder="voce@exemplo.com" autocomplete="email" maxlength="254" required aria-describedby="form-message">
-        <label for="x-handle">Seu @ no X</label><input id="x-handle" name="xHandle" type="text" placeholder="@seuperfil no X" pattern="@?[A-Za-z0-9_]{1,15}" maxlength="16" required aria-describedby="form-message">
-        <button class="button" type="submit">Entrar na lista de espera</button>
+      <img class="mascot reveal" src="/assets/favicon.svg" alt="" width="56" height="56">
+      <h2 id="community-title" class="reveal">Entre na lista de espera.</h2>
+      <p class="section-lead reveal">Deixe seu e-mail e seu perfil do X para receber o aviso quando o acesso estiver disponível.</p>
+      <form id="waitlist" class="reveal" action="/api/waitlist" method="post" novalidate>
+        <div class="waitlist-fields">
+          <div class="field-item">
+            <label for="email" class="field-label">E-mail</label>
+            <input id="email" name="email" type="email" placeholder="voce@exemplo.com" autocomplete="email" maxlength="254" required aria-describedby="form-message">
+          </div>
+          <div class="field-item">
+            <label for="x-handle" class="field-label">Seu @ no X <span class="field-opt">(opcional)</span></label>
+            <input id="x-handle" name="xHandle" type="text" placeholder="@seuperfil" pattern="@?[A-Za-z0-9_]{1,15}" maxlength="16" aria-describedby="form-message">
+          </div>
+        </div>
+        <button class="button waitlist-btn" type="submit">Entrar na lista de espera</button>
         <p id="form-message" class="form-message" role="status" aria-live="polite"></p>
       </form>
-      <p class="fine">Inscrição gratuita. Ao enviar, você concorda em receber o aviso de lançamento. <a href="/privacidade">Como usamos seus dados</a>.</p>
+      <p class="fine reveal">Inscrição gratuita. Ao enviar, você concorda em receber o aviso de lançamento. <a href="/privacidade">Como usamos seus dados</a>.</p>
     </section>
   </main>
 

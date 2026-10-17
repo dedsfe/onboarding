@@ -69,7 +69,7 @@ async function saveSignup(request, env) {
   const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
   const xHandle = typeof body.xHandle === 'string' ? body.xHandle.trim().replace(/^@/, '') : '';
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(400, { error: 'Confira seu email.', field: 'email' });
-  if (!/^[A-Za-z0-9_]{1,15}$/.test(xHandle)) return json(400, { error: 'Confira seu @ do X.', field: 'xHandle' });
+  if (xHandle.length > 0 && !/^[A-Za-z0-9_]{1,15}$/.test(xHandle)) return json(400, { error: 'Confira seu @ do X.', field: 'xHandle' });
 
   // D1 first: the list lives in the same Cloudflare account as the site. Supabase stays as the alternative.
   if (env.WAITLIST_DB) {

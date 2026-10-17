@@ -31,5 +31,7 @@ test('site serves complete pages, protects checkout and streams the latest relea
   const range=await fetch(origin+'/releases/Fixture.dmg',{headers:{Range:'bytes=1-3'}});assert.equal(range.status,206);assert.equal(await range.text(),'ixt');
   assert.equal((await fetch(origin+'/releases/Fixture.dmg',{headers:{Range:'bytes=100-200'}})).status,416);
   const signup=await fetch(origin+'/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'http@example.invalid',xHandle:'httptest'})});assert.equal(signup.status,200);
+  const signupEmpty=await fetch(origin+'/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'emptyhandle@example.invalid',xHandle:''})});assert.equal(signupEmpty.status,200);
+  const signupInvalid=await fetch(origin+'/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'bad@example.invalid',xHandle:'bad handle!'})});assert.equal(signupInvalid.status,400);
  } finally { child.kill('SIGTERM'); await new Promise(r=>child.once('exit',r));await rm(directory,{recursive:true,force:true}); }
 });

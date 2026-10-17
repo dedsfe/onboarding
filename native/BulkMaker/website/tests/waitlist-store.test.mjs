@@ -12,14 +12,16 @@ test('SQLite persists signups and duplicate email preserves the original handle'
     store = await createWaitlistStore({ env: { DATA_DIR: dir } });
     await store.save('person@example.invalid', 'first_handle');
     await store.save('person@example.invalid', 'another_handle');
+    await store.save('second@example.invalid', '');
     store.close();
     store = undefined;
     const { DatabaseSync } = await import('node:sqlite');
     const reader = new DatabaseSync(join(dir, 'waitlist.sqlite'), { readOnly: true });
     try {
-      const rows = reader.prepare('SELECT email, x_handle FROM waitlist').all();
-      assert.equal(rows.length, 1);
+      const rows = reader.prepare('SELECT email, x_handle FROM waitlist ORDER BY id').all();
+      assert.equal(rows.length, 2);
       assert.equal(rows[0].x_handle, 'first_handle');
+      assert.equal(rows[1].x_handle, '');
     } finally { reader.close(); }
   } finally {
     store?.close();
