@@ -285,6 +285,8 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         guard !fresh.isEmpty else {
             throw Failure("todos os \(posts.count) posts que o TikTok mostrou já foram importados neste projeto. Tente outro termo.")
         }
+        let skipped = posts.count - fresh.count
+        let skippedNote = skipped > 0 ? " \(skipped) post(s) que já estavam neste projeto foram pulados de propósito." : ""
         posts = fresh
         let staged = FileManager.default.temporaryDirectory.appendingPathComponent("reference-review-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: staged, withIntermediateDirectories: true)
@@ -306,7 +308,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             inspected.append(post)
         }
         guard !inspected.isEmpty else {
-            throw Failure("não encontrei carrosséis completos com 2+ slides e 50 mil visualizações; não importei imagens únicas nem completei com posts genéricos")
+            throw Failure("não encontrei carrosséis novos com 2+ slides e 50 mil visualizações.\(skippedNote) Tente outro termo.")
         }
         let assessments: [String: ResearchAssessment]
         do {
@@ -326,7 +328,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         let picked = Set(accounts.prefix(count).flatMap { $0.posts.prefix(3).map(\.id) })
         Self.logReview(inspected, assessments: assessments, searched: perSearch, seen: posts.count, picked: picked)
         guard !accounts.isEmpty else {
-            throw Failure("os resultados não passaram na validação: preciso de carrossel viral do seu nicho com produto recomendado ou relato pessoal concreto. Não importei os posts fora do critério")
+            throw Failure("nenhum post novo passou: preciso de carrossel viral do seu nicho mostrando um produto ou relato pessoal, com qualidade 3+ de 5.\(skippedNote) Tente outro termo; o motivo de cada post está em .bulk-maker/pesquisa/ultima-avaliacao.json")
         }
         return try await save(Array(accounts.prefix(count)), query: queries.first ?? "", searched: searched,
                               seenPosts: posts.count, seenAccounts: accounts.count, competitors: appNames,
