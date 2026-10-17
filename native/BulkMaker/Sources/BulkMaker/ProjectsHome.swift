@@ -368,7 +368,7 @@ enum ProjectCover {
             guard ["png", "jpg", "jpeg", "webp", "heic"].contains(url.pathExtension.lowercased()),
                   let values = try? url.resourceValues(forKeys: Set(keys)), values.isRegularFile == true else { continue }
             let date = values.contentModificationDate ?? .distantPast
-            if best == nil || date > best!.date { best = (url, date) }
+            if date > (best?.date ?? .distantPast) || best == nil { best = (url, date) }
         }
         return best?.url
     }

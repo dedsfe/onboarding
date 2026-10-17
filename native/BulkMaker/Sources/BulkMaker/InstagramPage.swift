@@ -347,7 +347,7 @@ final class InstagramBrowser: NSObject, ObservableObject, WKUIDelegate, WKNaviga
         if let issue = health.issue { throw PostError(message: issue.message) }
         if InstagramPageHealth.isVerificationURL(webView.url) {
             health.verificationRequired()
-            throw PostError(message: "Conclua a verificação do Instagram na aba Postar antes de publicar.")
+            throw PostError(message: "Conclua a verificação do Instagram na janela de login antes de continuar.")
         }
     }
 

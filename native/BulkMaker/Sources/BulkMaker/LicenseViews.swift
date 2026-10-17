@@ -57,7 +57,8 @@ struct LicenseActivationView: View {
                     return .handled
                   }
                   Button(license.isBusy ? "Ativando…" : "Ativar neste Mac", action: activate)
-                    .buttonStyle(.appPrimary)
+                    // The trial button above is already the primary one when it shows.
+                    .buttonStyle(license.canStartTrial ? .appSecondary : .appPrimary)
                     .disabled(
                       key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || license.isBusy
                     )
@@ -161,6 +162,7 @@ struct LicenseStatusView: View {
 }
 
 struct LicenseAccountView: View {
+  @State private var confirmingDeactivation = false
   @ObservedObject var license: License
 
   var body: some View {
@@ -191,9 +193,15 @@ struct LicenseAccountView: View {
             .buttonStyle(.appSecondary)
             .disabled(license.configuration.portalURL == nil)
         }
-        Button("Desativar neste Mac", role: .destructive) { Task { await license.deactivate() } }
+        Button("Desativar neste Mac", role: .destructive) { confirmingDeactivation = true }
           .buttonStyle(.appSecondary)
           .disabled(license.isBusy)
+          // Frees this Mac's activation: the app locks until the key is pasted again.
+          .confirmationDialog("Desativar a licença neste Mac?", isPresented: $confirmingDeactivation) {
+            Button("Desativar", role: .destructive) { Task { await license.deactivate() } }
+          } message: {
+            Text("O app fica bloqueado aqui até você colar a chave de novo.")
+          }
       } else {
         Button(license.canStartTrial ? "Começar teste ou ativar chave" : "Ativar uma chave") {
           license.showsActivation = true

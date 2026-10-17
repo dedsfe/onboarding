@@ -145,7 +145,7 @@ struct CalendarPostComposer: View {
                     .buttonStyle(.appIcon).controlSize(.small)
                     .disabled(index == slides.count - 1).help("Mover para depois").accessibilityLabel("Adiar slide \(index + 1)")
                     .reportPostControl("next-\(index)", to: onControlFrame)
-                Button { slides.remove(at: index) } label: { Image(systemName: "xmark") }
+                Button { if slides.indices.contains(index) { slides.remove(at: index) } } label: { Image(systemName: "xmark") }
                     .buttonStyle(.appIcon).controlSize(.small)
                     .help("Remover do carrossel").accessibilityLabel("Remover slide \(index + 1)")
                     .reportPostControl("remove-\(index)", to: onControlFrame)

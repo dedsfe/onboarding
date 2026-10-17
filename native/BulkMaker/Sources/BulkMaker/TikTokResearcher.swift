@@ -629,14 +629,8 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             + "(o formato puxa mais do que a fama da conta).\n\n"
         for (index, account) in accounts.enumerated() {
             let accountFolder = folder.appendingPathComponent(String(format: "%02d-@%@", index + 1, account.handle), isDirectory: true)
-            // The fixed rule first, then carousels with 2+ slides, then views; 3 per account show the pattern.
-            let best = account.posts.sorted {
-                if $0.isRecent != $1.isRecent { return $0.isRecent }
-                if $0.priority != $1.priority { return $0.priority < $1.priority }
-                if $0.quality != $1.quality { return $0.quality > $1.quality }
-                if ($0.images.count > 1) != ($1.images.count > 1) { return $0.images.count > 1 }
-                return $0.views > $1.views
-            }.prefix(3)
+            // Same order as the ranking (and as ultima-avaliacao.json's "escolhido").
+            let best = account.posts.sorted(by: Self.better).prefix(3)
             var postRows: [[String: Any]] = []
             var postLines = ""
             for (position, post) in best.enumerated() {
