@@ -54,6 +54,37 @@ final class ResearchRelevanceTests: XCTestCase {
         XCTAssertFalse(assessment.isSupported(by: "Dicas de crescer no TikTok. Poste nos stories."))
     }
 
+    func testAListOfNicheAppsCountsWithoutFirstPerson() {
+        let list = ResearchAssessment(id: "list", nicheMatch: true, productPromotion: true, personalStory: false,
+            creatorLed: false, nicheEvidence: "grow closer to God with these apps", angleEvidence: "Glorify daily devotionals",
+            creatorEvidence: "", reason: "Lista de apps bíblicos")
+        XCTAssertTrue(list.isSupported(by: "grow closer to God with these apps! #fyp\nGlorify\ndaily devotionals"))
+        let generic = ResearchAssessment(id: "g", nicheMatch: true, productPromotion: false, personalStory: false,
+            creatorLed: false, nicheEvidence: "oração da manhã poderosa", angleEvidence: "salmo 91 para começar",
+            creatorEvidence: "", reason: "Oração genérica")
+        XCTAssertFalse(generic.isSupported(by: "oração da manhã poderosa salmo 91 para começar"))
+    }
+
+    func testFormatsTakeTurnsAtTheTop() {
+        func account(_ handle: String, _ format: String, views: Int) -> TikTokResearcher.Account {
+            var p = post(handle, author: handle, caption: "", views: views, slides: 4)
+            p.assessment = ResearchAssessment(id: handle, nicheMatch: true, productPromotion: true, personalStory: false,
+                creatorLed: false, nicheEvidence: "", angleEvidence: "", creatorEvidence: "", reason: "", format: format)
+            return TikTokResearcher.Account(handle: handle, followers: 0, posts: [p], medianViews: views,
+                                            viewsPerFollower: nil, lastPost: Date())
+        }
+        let ranked = [account("lista1", "lista de produtos", views: 900), account("lista2", "lista de produtos", views: 800),
+                      account("lista3", "lista de produtos", views: 700), account("relato", "relato com produto", views: 100)]
+        XCTAssertEqual(TikTokResearcher.mixFormats(ranked).map(\.handle), ["lista1", "relato", "lista2", "lista3"])
+    }
+
+    func testOCRNoiseDoesNotSinkARealQuote() {
+        let assessment = ResearchAssessment(id: "ocr", nicheMatch: true, productPromotion: true, personalStory: false,
+            creatorLed: true, nicheEvidence: "apps católicos para rezar todo dia", angleEvidence: "Hallow: terço guiado e liturgia diária",
+            creatorEvidence: "", reason: "Recomenda apps de oração")
+        XCTAssertTrue(assessment.isSupported(by: "APPS CATOLICOS PARA\nREZAR TODO DlA 🙏\nHallow - terço guiado\ne liturgia diária"))
+    }
+
     func testSearchUsesShortProductTermsInsteadOfAppendingTheWholeNiche() {
         let terms = TikTokResearcher.researchQueries("devocional diário", profile: profile)
         XCTAssertTrue(terms.contains("app Hallow"))

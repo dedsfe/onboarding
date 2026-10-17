@@ -190,7 +190,10 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         var terms = Array((profile?.sellerSearches ?? []).prefix(3))
         let topic = profile?.keywords.first ?? profile?.subNiches.first ?? profile?.name ?? ""
         terms += Array((profile?.keywords ?? []).prefix(2)).map { "app \($0)" }
-        terms += Array((profile?.competitors ?? []).prefix(3)).map { "app \($0)" }
+        terms += Array((profile?.competitors ?? []).prefix(2)).map { "app \($0)" }
+        // "app …" alone brings back lists of apps; these find the stories and reviews where a product shows up.
+        if let keyword = profile?.keywords.first { terms += ["pov \(keyword)", "minha rotina \(keyword)"] }
+        if let competitor = profile?.competitors.first { terms.append("\(competitor) review") }
         let generic = ["referencias", "referência", "referências", "carrossel", "carrosseis", "carrosséis"]
         let requested = generic.contains(query.lowercased()) ? topic : query
         if !requested.isEmpty { terms.append(mentionsApp(requested) ? requested : "app \(requested)") }
@@ -215,9 +218,12 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         }
         var posts: [String: Post] = [:]
         var searched: [String] = []
+        var perSearch: [String] = []
         for (index, term) in Self.shortQueries(queries).enumerated() where !searched.contains(where: { $0.lowercased() == term.lowercased() }) {
             searched.append(term)
-            for post in (try? await search(term, want: index == 0 ? 60 : 40)) ?? [] { posts[post.id] = post }
+            let results = (try? await search(term, want: index == 0 ? 60 : 40)) ?? []
+            perSearch.append("\(term): \(results.count)")
+            for post in results { posts[post.id] = post }
             #if DEBUG
             print("[hunt] searched \"\(term)\": \(posts.count) posts so far")
             #endif
@@ -260,8 +266,8 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             inspected[index].assessment = assessment
             inspected[index].sellsApp = assessment.productPromotion
         }
-        Self.logReview(inspected, assessments: assessments, searched: searched, seen: posts.count)
-        let accounts = Self.judge(inspected)
+        Self.logReview(inspected, assessments: assessments, searched: perSearch, seen: posts.count)
+        let accounts = Self.mixFormats(Self.judge(inspected))
         guard !accounts.isEmpty else {
             throw Failure("os resultados não passaram na validação: preciso de carrossel viral do seu nicho com produto recomendado ou relato pessoal concreto. Não importei os posts fora do critério")
         }
@@ -280,6 +286,9 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
                     "nicho": assessment?.nicheMatch ?? false, "produto": assessment?.productPromotion ?? false,
                     "relato": assessment?.personalStory ?? false, "pessoa": assessment?.creatorLed ?? false,
                     "evidencias_conferem": assessment.map { $0.isSupported(by: post.inspectionText) } ?? false,
+                    "trechos": [assessment?.nicheEvidence ?? "", assessment?.angleEvidence ?? "", assessment?.creatorEvidence ?? ""],
+                    "texto_lido": String(post.inspectionText.prefix(1500)),
+                    "formato": assessment?.format ?? "", "gancho": assessment?.hook ?? "",
                     "motivo": assessment?.reason ?? "a IA não avaliou este post"]
         }
         let log: [String: Any] = ["buscas": searched, "posts_vistos": seen, "candidatos": rows]
@@ -346,6 +355,22 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         }
     }
 
+    /// Takes accounts from each format in turn, best first within each, so ten lists of apps can't fill the top.
+    static func mixFormats(_ accounts: [Account]) -> [Account] {
+        var order: [String] = []
+        var queues: [String: [Account]] = [:]
+        for account in accounts {
+            let format = account.posts.first?.assessment?.format ?? ""
+            if queues[format] == nil { order.append(format) }
+            queues[format, default: []].append(account)
+        }
+        var mixed: [Account] = []
+        while mixed.count < accounts.count {
+            for format in order where !(queues[format]?.isEmpty ?? true) { mixed.append(queues[format]!.removeFirst()) }
+        }
+        return mixed
+    }
+
     /// Opens the photo tab of TikTok's search, scrolls to load more, and stops once it has `want`
     /// carousels, TikTok has no more, or 45 s passed.
     private func search(_ query: String, want: Int) async throws -> [Post] {
@@ -361,7 +386,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         while Date() < deadline {
             try await Task.sleep(for: .seconds(2.5))
             if found.count >= want || (!hasMore && !found.isEmpty) { break }
-            _ = try? await view.evaluateJavaScript("window.scrollTo(0, document.body.scrollHeight)")
+            _ = try? await view.evaluateJavaScript(Self.scrollToEnd)
             // Nothing new for a while: TikTok is done or is asking for a check we don't do.
             if found.count == lastCount { still += 1 } else { still = 0 }
             if still >= 6 { break }
@@ -370,6 +395,25 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         tearDown()
         return Array(found.values)
     }
+
+    /// TikTok's search scrolls an inner container, not the page, and it changes which one; the tallest
+    /// scrollable one is the feed. Scrolling the page alone only ever loads the first 12 results.
+    private static let scrollToEnd = """
+    (() => {
+      const options = [document.scrollingElement];
+      for (const el of document.querySelectorAll('main, div, section')) {
+        const cs = getComputedStyle(el);
+        if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') && el.scrollHeight > el.clientHeight + 10) options.push(el);
+      }
+      const target = options.filter(Boolean).sort((a, b) => b.scrollHeight - a.scrollHeight)[0];
+      if (!target) return;
+      target.scrollTop = target.scrollHeight;
+      target.dispatchEvent(new Event('scroll', { bubbles: true }));
+      window.dispatchEvent(new Event('scroll'));
+      const last = document.querySelectorAll('[data-e2e="search_photo-item"], [data-e2e="search-common-link"]');
+      if (last.length) last[last.length - 1].scrollIntoView({ block: 'end' });
+    })()
+    """
 
     private func makeWebView() -> WKWebView {
         tearDown()
@@ -470,7 +514,8 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             + "Buscas: \(searched.map { "\"\($0)\"" }.joined(separator: ", ")). "
             + "\(seenPosts) carrosséis de \(seenAccounts) contas avaliados.\n"
             + "Critério: 2+ slides completos, 50 mil+ views e relevância verificada com trechos dos próprios slides/legenda. "
-            + "Recomendações de produto no nicho vêm antes de relatos pessoais no nicho; não há preenchimento com conteúdo genérico.\n"
+            + "Recomendações de produto no nicho vêm antes de relatos pessoais no nicho; não há preenchimento com conteúdo genérico. "
+            + "As contas alternam entre formatos ([lista de produtos], [relato com produto]…) pra não vir tudo igual.\n"
             + "Views típicas = mediana das views dos carrosséis da conta. ★ = top 10% em views por seguidor "
             + "(o formato puxa mais do que a fama da conta).\n\n"
         for (index, account) in accounts.enumerated() {
@@ -507,8 +552,9 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
                 try ResearchCanvas.add(title: Self.referenceTitle(post), details: details,
                                        slides: slides, to: project.canvasDirectory)
                 postRows.append(Self.referenceRecord(post, folder: postFolder, slides: slides, canvas: project.canvasDirectory))
-                postLines += "   - \(post.priority == 1 ? "📱 app · " : "")\(Self.referenceTitle(post)) · "
+                postLines += "   - \(post.priority == 1 ? "📱 app · " : "")\(post.assessment.map { "[\($0.format)] " } ?? "")\(Self.referenceTitle(post)) · "
                     + "\(saved == 1 ? "1 slide" : "\(saved) slides") · \(post.caption.replacingOccurrences(of: "\n", with: " ").prefix(90))\n"
+                    + (post.assessment.map { $0.hook.isEmpty ? "" : "     Gancho: \"\($0.hook)\"\n" } ?? "")
                     + "     \(post.url) (pasta \(accountFolder.lastPathComponent)/\(name))\n"
                     + "     Importado no canvas com legenda, métricas e textos de todos os slides.\(failed.isEmpty ? "" : " Falha ao baixar slides: \(failed).")\n"
             }
@@ -580,6 +626,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             "criador_pessoal": post.assessment?.creatorLed ?? false,
             "relato_pessoal": post.assessment?.personalStory ?? false,
             "motivo_selecao": post.assessment?.reason ?? "Não validado",
+            "formato": post.assessment?.format ?? "", "gancho": post.assessment?.hook ?? "",
             "evidencia_nicho": post.assessment?.nicheEvidence ?? "",
             "evidencia_formato": post.assessment?.angleEvidence ?? "",
             "conta": post.author.isEmpty ? NSNull() : "@" + post.author,
