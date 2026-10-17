@@ -23,6 +23,8 @@ struct CalendarPrototypeView: View {
     @State private var agendaStamp: Date?
     @State private var showRules = false
     @State private var shareError: String?
+    @State private var isSelectingForAirDrop = false
+    @State private var selectedPostIds: Set<String> = []
     /// Slide files of each scheduled folder, listed once per agenda change instead of on every redraw.
     @State private var slidesByFolder: [String: [URL]] = [:]
     @State private var planStamps: [String: Date?] = [:]
@@ -47,11 +49,24 @@ struct CalendarPrototypeView: View {
                 calendarPanel(width: panelWidth, height: panelHeight)
                     .frame(width: panelWidth, height: panelHeight)
                     .glassEffect(.regular, in: .rect(cornerRadius: 38))
+                    .overlay(alignment: .bottom) {
+                        if isSelectingForAirDrop {
+                            selectionFloatingBar
+                                .padding(.bottom, 16)
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                        }
+                    }
+                    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isSelectingForAirDrop)
+                    .onExitCommand {
+                        if isSelectingForAirDrop {
+                            exitSelectionMode()
+                        }
+                    }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, navInset).padding(.bottom, margin)
 
                 if isCarouselOpen {
-                    CalendarCarouselViewer(slides: openSlides, onSlideChange: reportOpenPost, close: closeCarousel)
+                    CalendarCarouselViewer(slides: openSlides, onSlideChange: reportOpenPost, onAirDrop: { airDrop(files: openSlides) }, close: closeCarousel)
                     .onDisappear { reportOpenPost(nil) }
                     .transition(.opacity)
                     .zIndex(20)
@@ -203,12 +218,18 @@ struct CalendarPrototypeView: View {
                         .foregroundStyle(.secondary)
                         .padding(.trailing, 12)
                 }
-                if !todayPosts.isEmpty {
-                    Button { airDrop(todayPosts) } label: {
+                if !agenda.posts.isEmpty {
+                    Button {
+                        if isSelectingForAirDrop {
+                            exitSelectionMode()
+                        } else {
+                            startSelectionMode()
+                        }
+                    } label: {
                         Label("Mandar pro iPhone", systemImage: "iphone.and.arrow.forward")
                     }
                     .buttonStyle(.appSecondary)
-                    .help("Manda os carrosséis de hoje pro iPhone por AirDrop, pra você postar")
+                    .help(isSelectingForAirDrop ? "Sair do modo de seleção" : "Manda carrosséis pro iPhone por AirDrop, pra você postar")
                     .padding(.trailing, 8)
                     .transition(.opacity)
                 }
@@ -247,6 +268,7 @@ struct CalendarPrototypeView: View {
                 }
             }
             calendarStatus
+                .opacity(isSelectingForAirDrop ? 0 : 1)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .frame(height: 64)
                 .padding(.top, 12)
@@ -281,7 +303,8 @@ struct CalendarPrototypeView: View {
     }
 
     private func dayCell(_ day: Int?, height: CGFloat) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        let scheduled = day.map(posts(on:)) ?? []
+        return VStack(alignment: .leading, spacing: 4) {
             if let day {
                 Text("\(day)")
                     .font(.system(size: 14, weight: isToday(day) ? .bold : .medium))
@@ -292,17 +315,17 @@ struct CalendarPrototypeView: View {
                         if isToday(day) { Circle().fill(Color.primary.opacity(0.12)) }
                     }
 
-                let scheduled = posts(on: day).sorted { $0.time < $1.time }
-                if scheduled.count > 1 {
+                let sortedPosts = scheduled.sorted { $0.time < $1.time }
+                if sortedPosts.count > 1 {
                     // Several posts: one card per post, in posting order, each opening its own carousel.
-                    slideFan(for: day, cards: scheduled.prefix(Self.maxFanCards).map { post in
+                    slideFan(for: day, cards: sortedPosts.prefix(Self.maxFanCards).map { post in
                         let slides = slidesByFolder[post.folder] ?? []
-                        return FanCard(id: post.id, cover: slides.first, time: post.time, slides: slides)
-                    }, extra: scheduled.count - Self.maxFanCards)
-                } else if let post = scheduled.first {
-                    slideFan(for: day, cards: slideCards(slidesByFolder[post.folder] ?? [], time: post.time), extra: 0)
+                        return FanCard(id: post.id, postId: post.id, cover: slides.first, time: post.time, slides: slides)
+                    }, extra: sortedPosts.count - Self.maxFanCards)
+                } else if let post = sortedPosts.first {
+                    slideFan(for: day, cards: slideCards(slidesByFolder[post.folder] ?? [], postId: post.id, time: post.time), extra: 0)
                 } else if agenda.posts.isEmpty, day == previewDay, preview.coverURL != nil {
-                    slideFan(for: day, cards: slideCards(preview.slides, time: nil), extra: 0)
+                    slideFan(for: day, cards: slideCards(preview.slides, postId: nil, time: nil), extra: 0)
                 }
             }
             Spacer(minLength: 0)
@@ -313,6 +336,10 @@ struct CalendarPrototypeView: View {
         .frame(height: height)
         .overlay(alignment: .top) { Color.primary.opacity(0.10).frame(height: 0.5) }
         .contentShape(Rectangle())
+        .onTapGesture {
+            guard isSelectingForAirDrop, let post = scheduled.first, scheduled.count == 1 else { return }
+            togglePostSelection(post.id)
+        }
         .contextMenu {
             if let day, !posts(on: day).isEmpty {
                 Button("Enviar por AirDrop", systemImage: "square.and.arrow.up") { airDrop(posts(on: day)) }
@@ -321,18 +348,81 @@ struct CalendarPrototypeView: View {
         .zIndex(hoveredDay == day ? 10 : 0)
     }
 
+    private func togglePostSelection(_ id: String) {
+        withAnimation(.snappy(duration: 0.18)) {
+            if selectedPostIds.contains(id) {
+                selectedPostIds.remove(id)
+            } else {
+                selectedPostIds.insert(id)
+            }
+        }
+    }
+
+    private func startSelectionMode() {
+        withAnimation(.snappy(duration: 0.2)) {
+            selectedPostIds = Set(todayPosts.map(\.id))
+            isSelectingForAirDrop = true
+        }
+    }
+
+    private func exitSelectionMode() {
+        withAnimation(.snappy(duration: 0.2)) {
+            isSelectingForAirDrop = false
+            selectedPostIds.removeAll()
+        }
+    }
+
+    private func sendSelectedAirDrop() {
+        let selectedPosts = agenda.posts.filter { selectedPostIds.contains($0.id) }
+        exitSelectionMode()
+        airDrop(selectedPosts)
+    }
+
+    private var selectionFloatingBar: some View {
+        let count = selectedPostIds.count
+        let countText = count == 1 ? "1 selecionado" : "\(count) selecionados"
+        let sendTitle = count == 1 ? "Mandar 1 pro iPhone" : (count > 1 ? "Mandar \(count) pro iPhone" : "Mandar pro iPhone")
+
+        return HStack(spacing: 12) {
+            Text(countText)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.leading, 18)
+
+            Capsule()
+                .fill(.white.opacity(0.18))
+                .frame(width: 1, height: 16)
+                .padding(.horizontal, 2)
+
+            Button("Cancelar") {
+                exitSelectionMode()
+            }
+            .buttonStyle(.appSecondary)
+            .keyboardShortcut(.cancelAction)
+
+            Button {
+                sendSelectedAirDrop()
+            } label: {
+                Label(sendTitle, systemImage: "iphone.and.arrow.forward")
+            }
+            .buttonStyle(.appPrimary)
+            .disabled(count == 0)
+        }
+        .padding(.trailing, 6)
+        .padding(.vertical, 6)
+        .glassEffect(.regular.tint(.black.opacity(0.35)), in: .capsule)
+        .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 1))
+        .shadow(color: .black.opacity(0.4), radius: 20, x: 0, y: 8)
+    }
+
     private var todayPosts: [PostAgenda.Post] {
         let key = PostAgenda.dayFormatter.string(from: Date())
         return agenda.posts.filter { $0.date == key }
     }
 
-    /// Sends every slide of the day's posts, in posting order, straight to the AirDrop picker.
-    private func airDrop(_ posts: [PostAgenda.Post]) {
-        let files = posts.sorted { $0.time < $1.time }.flatMap {
-            slidesByFolder[$0.folder] ?? CalendarPreview.slides(in: URL(fileURLWithPath: $0.folder))
-        }
+    private func airDrop(files: [URL]) {
         guard !files.isEmpty else {
-            shareError = "Os slides desses posts não estão mais na pasta."
+            shareError = "Os slides não estão mais na pasta."
             return
         }
         guard let service = NSSharingService(named: .sendViaAirDrop), service.canPerform(withItems: files) else {
@@ -342,10 +432,23 @@ struct CalendarPrototypeView: View {
         service.perform(withItems: files)
     }
 
+    /// Sends every slide of the posts, in date and posting order, straight to the AirDrop picker.
+    private func airDrop(_ posts: [PostAgenda.Post]) {
+        let files = posts.sorted { ($0.date, $0.time) < ($1.date, $1.time) }.flatMap {
+            slidesByFolder[$0.folder] ?? CalendarPreview.slides(in: URL(fileURLWithPath: $0.folder))
+        }
+        guard !files.isEmpty else {
+            shareError = "Os slides desses posts não estão mais na pasta."
+            return
+        }
+        airDrop(files: files)
+    }
+
     private static let maxFanCards = 4
 
     private struct FanCard: Identifiable {
         let id: String
+        let postId: String?
         let cover: URL?
         /// Set when each card is its own post; shown under the card while the fan is open.
         let time: String?
@@ -353,8 +456,8 @@ struct CalendarPrototypeView: View {
     }
 
     /// One post: its first slides as cards, all opening the same carousel.
-    private func slideCards(_ slides: [URL], time: String?) -> [FanCard] {
-        slides.prefix(3).map { FanCard(id: $0.path, cover: $0, time: nil, slides: slides) }
+    private func slideCards(_ slides: [URL], postId: String?, time: String?) -> [FanCard] {
+        slides.prefix(3).map { FanCard(id: $0.path, postId: postId, cover: $0, time: nil, slides: slides) }
     }
 
     private func slideFan(for day: Int, cards: [FanCard], extra: Int) -> some View {
@@ -371,7 +474,7 @@ struct CalendarPrototypeView: View {
             ForEach(Array(cards.enumerated()), id: \.element.id) { index, card in
                 let side = sides[index]
                 let isFocused = expanded && focusedCard == card.id
-                fanCardFace(card, expanded: expanded)
+                fanCardFace(card, index: index, isPostList: isPostList, expanded: expanded)
                     .scaleEffect(isFocused ? 1.14 : (expanded && focusedCard != nil ? 0.96 : 1), anchor: .bottom)
                     .rotationEffect(.degrees(Double(side) * (expanded ? (isPostList ? 9 : 12) : (isPostList ? 2.5 : 0))), anchor: .bottom)
                     .offset(x: side * (expanded ? step : (isPostList ? 3 : 0)), y: expanded ? (isFocused ? -14 : -8) : 0)
@@ -421,12 +524,21 @@ struct CalendarPrototypeView: View {
                     }
                 }
                 .onTapGesture {
-                    let card = cards.first { $0.id == focusedCard } ?? cards.first
-                    openSlides = card?.slides ?? []
-                    withAnimation(.easeOut(duration: 0.2)) { isCarouselOpen = true }
+                    if isSelectingForAirDrop {
+                        let card = cards.first { $0.id == focusedCard } ?? cards.first
+                        if let postId = card?.postId {
+                            togglePostSelection(postId)
+                        }
+                    } else {
+                        let card = cards.first { $0.id == focusedCard } ?? cards.first
+                        openSlides = card?.slides ?? []
+                        withAnimation(.easeOut(duration: 0.2)) { isCarouselOpen = true }
+                    }
                 }
                 .pointerStyle(.link)
-                .help(isPostList ? "Clique no post para ver o carrossel" : "Clique para ver o carrossel")
+                .help(isSelectingForAirDrop
+                      ? (isPostList ? "Clique para marcar ou desmarcar o post" : "Clique para marcar ou desmarcar o carrossel")
+                      : (isPostList ? "Clique no post para ver o carrossel" : "Clique para ver o carrossel"))
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(isPostList ? "\(cards.count + max(extra, 0)) posts" : "Carrossel")
@@ -437,7 +549,7 @@ struct CalendarPrototypeView: View {
         reduceMotion ? .linear(duration: 0.01) : .spring(response: 0.3, dampingFraction: 0.78)
     }
 
-    private func fanCardFace(_ card: FanCard, expanded: Bool) -> some View {
+    private func fanCardFace(_ card: FanCard, index: Int, isPostList: Bool, expanded: Bool) -> some View {
         Group {
             if let cover = card.cover {
                 SlideImage(url: cover, maxPixel: 240) { image in image.resizable().scaledToFill() }
@@ -458,6 +570,32 @@ struct CalendarPrototypeView: View {
                     .background(Capsule().fill(.regularMaterial))
                     .offset(y: 9)
                     .transition(.opacity)
+            }
+        }
+        .overlay(alignment: .topLeading) {
+            if isSelectingForAirDrop, let postId = card.postId, (isPostList || index == 0) {
+                let isSelected = selectedPostIds.contains(postId)
+                ZStack {
+                    if isSelected {
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 18, height: 18)
+                            .overlay {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(.black)
+                            }
+                            .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                    } else {
+                        Circle()
+                            .strokeBorder(.white.opacity(0.7), lineWidth: 1.5)
+                            .background(Circle().fill(.black.opacity(0.35)))
+                            .frame(width: 18, height: 18)
+                            .shadow(color: .black.opacity(0.2), radius: 2, y: 1)
+                    }
+                }
+                .padding(4)
+                .transition(.scale.combined(with: .opacity))
             }
         }
         .contentShape(Rectangle())
@@ -493,6 +631,7 @@ struct CalendarPrototypeView: View {
 struct CalendarCarouselViewer: View {
     let slides: [URL]
     var onSlideChange: (Int) -> Void = { _ in }
+    var onAirDrop: (() -> Void)? = nil
     let close: () -> Void
     var onControlFrame: ((String, CGRect) -> Void)? = nil
 
@@ -521,8 +660,12 @@ struct CalendarCarouselViewer: View {
                         phone(width: phoneWidth, height: phoneHeight)
                         navigationButton("chevron.right", direction: 1, label: "Próximo slide")
                         if let session {
-                            SlideEditorPanel(session: session, index: selectedIndex, close: close)
-                                .frame(width: Self.editorWidth, height: phoneHeight)
+                            if session.slide(selectedIndex) != nil {
+                                SlideEditorPanel(session: session, index: selectedIndex, close: close)
+                                    .frame(width: Self.editorWidth, height: phoneHeight)
+                            } else {
+                                legacyPostEmptyState
+                            }
                         }
                     }
                     .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("post-viewer")) } action: { contentBounds = $0 }
@@ -548,12 +691,26 @@ struct CalendarCarouselViewer: View {
                 .padding(.leading, 24).padding(.top, 76)
             }
             .overlay(alignment: .topTrailing) {
-                Button(action: close) {
-                    Image(systemName: "xmark")
+                HStack(spacing: 8) {
+                    Button {
+                        if let onAirDrop {
+                            onAirDrop()
+                        } else {
+                            airDropDirect()
+                        }
+                    } label: {
+                        Label("Mandar pro iPhone", systemImage: "iphone.and.arrow.forward")
+                    }
+                    .buttonStyle(.appSecondary)
+                    .help("Manda os slides deste post pro iPhone por AirDrop")
+
+                    Button(action: close) {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.appIcon)
+                    .accessibilityLabel("Fechar post").help("Voltar ao calendário (Esc)")
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("post-viewer")) } action: { onControlFrame?("close", $0) }
                 }
-                .buttonStyle(.appIcon)
-                .accessibilityLabel("Fechar post").help("Voltar ao calendário (Esc)")
-                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("post-viewer")) } action: { onControlFrame?("close", $0) }
                 .padding(.trailing, 24).padding(.top, 76)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
@@ -568,6 +725,50 @@ struct CalendarCarouselViewer: View {
         // The AI can redo this post from the terminal while it is open.
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in session?.checkExternalChanges() }
         .onExitCommand(perform: close)
+    }
+
+    private func airDropDirect() {
+        guard !slides.isEmpty else { return }
+        if let service = NSSharingService(named: .sendViaAirDrop), service.canPerform(withItems: slides) {
+            service.perform(withItems: slides)
+        }
+    }
+
+    private var legacyPostEmptyState: some View {
+        VStack(spacing: 12) {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.white.opacity(0.08))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(.white.opacity(0.12), lineWidth: 1)
+                }
+                .frame(width: 44, height: 44)
+                .overlay {
+                    Image(systemName: "doc.badge.clock")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+
+            VStack(spacing: 4) {
+                Text("Sem plano salvo")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.white)
+
+                Text("Peça pra IA refazer ele para editar aqui.")
+                    .font(.system(size: 12, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.65))
+                    .lineLimit(1)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 20)
+        .frame(width: 280)
+        .glassEffect(.regular.tint(.black.opacity(0.3)), in: .rect(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(.white.opacity(0.10), lineWidth: 1)
+        }
     }
 
     private func phone(width: CGFloat, height: CGFloat) -> some View {
