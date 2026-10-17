@@ -1,23 +1,40 @@
 import AppKit
 import ImageIO
+import CarouselEngine
 import SwiftUI
 
 @main
 struct BulkMakerApp: App {
+    @NSApplicationDelegateAdaptor(AppLaunch.self) private var launch
+
     var body: some Scene {
         WindowGroup("The Carousel Maker") {
             BatchFlowView().frame(minWidth: 960, minHeight: 690)
                 .modifier(LicenseLifecycle())
+                .modifier(ProductIntroductionLifecycle())
         }
         .windowStyle(.hiddenTitleBar)
         .windowBackgroundDragBehavior(.enabled)
         .commands {
-            CommandGroup(after: .appInfo) { CheckForAppUpdates() }
+            CommandGroup(after: .appInfo) {
+                CheckForAppUpdates()
+                Button("Rever apresentação…") {
+                    NotificationCenter.default.post(name: .showProductIntroduction, object: nil)
+                }
+            }
             CommandGroup(replacing: .appSettings) {
                 Button("Ajustes…") { NotificationCenter.default.post(name: .showProductSettings, object: nil) }
                     .keyboardShortcut(",", modifiers: .command)
             }
         }
+    }
+}
+
+/// What must run as long as the app does, window or not: a research the terminal asked for can't wait
+/// for someone to reopen a closed window.
+final class AppLaunch: NSObject, NSApplicationDelegate {
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        MainActor.assumeIsolated { TikTokResearcher.shared.start() }
     }
 }
 
@@ -39,12 +56,18 @@ private struct BatchFlowView: View {
     @State private var showTerminalPanel = false
     // Decoded once in the store; reloading the JPEG on every body pass made panning drop frames.
     @StateObject private var wallpapers = WallpaperStore()
-    @State private var page: Page = ProcessInfo.processInfo.arguments.contains("--calendar-preview") ? .calendar : .batch
+    @State private var page: Page = ProcessInfo.processInfo.arguments.contains("--calendar-preview") ? .calendar
+        : ProcessInfo.processInfo.arguments.contains("--settings-preview") ? .settings
+        : ProcessInfo.processInfo.arguments.contains("--canvas-preview") ? .canvas
+        : ProcessInfo.processInfo.arguments.contains("--batch-preview") ? .batch : .batch
     @State private var showDesignEditor = false
     @State private var showArtworks = false
+    /// The projects home opens first, like Figma's file browser; the dev previews skip it.
+    @State private var showsHome = !ProcessInfo.processInfo.arguments.contains { $0.hasSuffix("-preview") }
+    @State private var homeSection: ProjectsHome<SettingsPage>.Section = .projects
     @Namespace private var navSelection
 
-    private enum Page { case batch, canvas, calendar, post, settings }
+    private enum Page: String { case batch, canvas, calendar, settings }
     /// The same terminal tabs follow the user between the batch, the canvas and the calendar.
     private var pageHasTerminal: Bool { page == .batch || page == .canvas || page == .calendar }
     private struct BatchRunRequest {
@@ -63,7 +86,10 @@ private struct BatchFlowView: View {
     @State private var canvasOffset = CGSize.zero
     @State private var panStart: CGSize?
     @State private var terminalDragStart: Double?
+    @State private var windowWidth: CGFloat = 960
     @StateObject private var tabs = TerminalTabs()
+    private let appControl = AppControl.shared
+    @State private var controlWindow: NSWindow?
 
     var body: some View {
         HStack(spacing: 0) {
@@ -72,37 +98,32 @@ private struct BatchFlowView: View {
                 Rectangle().fill(Color(nsColor: .separatorColor)).frame(width: 1)
                     .overlay { terminalResizeHandle }
                     .zIndex(1)
-                terminalPanel.frame(width: terminalWidth)
+                terminalPanel.frame(width: min(terminalWidth, max(windowWidth - 480, 320)))
                     .transition(.move(edge: .trailing))
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { windowWidth = $0 }
         .overlay(alignment: .topTrailing) { if pageHasTerminal { terminalToggle.padding(.top, 14).padding(.trailing, 16) } }
         .background { canvasBackground }
-        .overlay {
-            if showDesignEditor {
-                DesignEditorOverlay(photoURL: photos?.files.first) {
-                    withAnimation(.snappy(duration: 0.25)) { showDesignEditor = false }
-                    _ = refreshContext()
-                }
-                .transition(.opacity)
-            }
+        .background { AppControlWindowReader { controlWindow = $0 }.allowsHitTesting(false) }
+        .overlay { overlayLayers }
+        .modifier(NotificationHandlers(
+            onShowProjectsHome: handleShowProjectsHome,
+            onEnterCurrentProject: handleEnterCurrentProject,
+            onShowPostingCalendar: handleShowPostingCalendar,
+            onShowProductSettings: handleShowProductSettings
+        ))
+        .onReceive(Timer.publish(every: 3_600, on: .main, in: .common).autoconnect()) { _ in
+            ProjectStore.shared.maintainTrash()
         }
-        .overlay {
-            if showArtworks {
-                ArtworkBrowser(wallpapers: wallpapers) {
-                    withAnimation(.snappy(duration: 0.25)) { showArtworks = false }
-                }
-                .transition(.opacity)
-            }
-        }
-        .overlay { InputPickerHost() }
+        .onAppear(perform: checkLoginPreview)
         .ignoresSafeArea(.container, edges: .top)
         .onAppear(perform: importSelectionIfChanged)
-        .onReceive(NotificationCenter.default.publisher(for: .showProductSettings)) { _ in
-            withAnimation(.snappy(duration: 0.3)) { page = .settings }
-        }
-        .modifier(TerminalShortcuts(isAvailable: pageHasTerminal && !showDesignEditor, isOpen: showTerminalPanel,
+        .onAppear { pollAppCommands() }
+        .onAppear { OnboardingStage.shared.presentIfNeeded() }
+        .onAppear { TikTokResearcher.shared.start() }
+        .modifier(TerminalShortcuts(isAvailable: pageHasTerminal && !showDesignEditor && !showsHome, isOpen: showTerminalPanel,
                                     tabs: tabs, toggle: toggleTerminal))
         .onChange(of: desiredURL, initial: true) { _, url in desiredCatalog = url.flatMap { try? PhotoCatalog(directory: $0) } }
         .onChange(of: outputURL, initial: true) { _, _ in
@@ -111,15 +132,85 @@ private struct BatchFlowView: View {
             refreshOutput(force: true)
         }
         .onChange(of: variations) { _, _ in _ = refreshContext() }
-        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
-            importSelectionIfChanged()
-            refreshOutput()
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in handleTimerTick() }
+        .overlay(alignment: .top) { errorToast }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: errorMessage)
+    }
+
+    @ViewBuilder
+    private var overlayLayers: some View {
+        if showsHome {
+            ProjectsHome(section: $homeSection, settings: { settingsPage }) {
+                withAnimation(.snappy(duration: 0.3)) { showsHome = false }
+            }
+            .background { canvasBackground }
+            .transition(.opacity)
         }
-        .alert("Não foi possível carregar", isPresented: Binding(
-            get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
-        )) {
-            Button("OK") { errorMessage = nil }
-        } message: { Text(errorMessage ?? "") }
+        if showDesignEditor {
+            DesignEditorOverlay(photoURL: photos?.files.first) {
+                withAnimation(.snappy(duration: 0.25)) { showDesignEditor = false }
+                _ = refreshContext()
+            }
+            .transition(.opacity)
+        }
+        if showArtworks {
+            ArtworkBrowser(wallpapers: wallpapers) {
+                withAnimation(.snappy(duration: 0.25)) { showArtworks = false }
+            }
+            .transition(.opacity)
+        }
+        InputPickerHost()
+        CalendarPostHost()
+        SocialLoginHost()
+    }
+
+    private func handleShowProjectsHome() {
+        withAnimation(.snappy(duration: 0.3)) { homeSection = .projects; showsHome = true }
+    }
+
+    private func handleEnterCurrentProject() {
+        withAnimation(.snappy(duration: 0.3)) { showsHome = false; page = .batch }
+    }
+
+    private func handleShowPostingCalendar() {
+        withAnimation(.snappy(duration: 0.25)) { showsHome = false; page = .calendar }
+    }
+
+    private func handleShowProductSettings() {
+        withAnimation(.snappy(duration: 0.3)) { if showsHome { homeSection = .settings } else { page = .settings } }
+    }
+
+    private func handleTimerTick() {
+        importSelectionIfChanged()
+        refreshOutput()
+        pollAppCommands()
+    }
+
+    @ViewBuilder
+    private var errorToast: some View {
+        if let error = errorMessage {
+            HStack(spacing: 10) {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                Text(error).font(.system(size: 13, weight: .medium)).lineLimit(2)
+                Button {
+                    withAnimation(.snappy(duration: 0.2)) { errorMessage = nil }
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.appIcon)
+                .controlSize(.small)
+            }
+            .padding(.horizontal, 16).padding(.vertical, 10)
+            .glassEffect(.regular, in: .capsule)
+            .shadow(color: .black.opacity(0.3), radius: 10, y: 4)
+            .padding(.top, 76)
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .task(id: error) {
+                try? await Task.sleep(for: .seconds(6))
+                withAnimation(.snappy(duration: 0.2)) { errorMessage = nil }
+            }
+            .zIndex(100)
+        }
     }
 
     private var terminalPanel: some View {
@@ -189,7 +280,7 @@ private struct BatchFlowView: View {
                     .onChanged { value in
                         let start = terminalDragStart ?? terminalWidth
                         terminalDragStart = start
-                        terminalWidth = min(max(start - value.translation.width, 320), 900)
+                        terminalWidth = min(max(start - value.translation.width, 320), min(max(windowWidth - 480, 320), 900))
                     }
                     .onEnded { _ in terminalDragStart = nil }
             )
@@ -203,9 +294,8 @@ private struct BatchFlowView: View {
     private var terminalToggle: some View {
         Button(action: toggleTerminal) {
             Image(systemName: showTerminalPanel ? "sidebar.right" : "terminal")
-                .frame(width: 20, height: 20)
         }
-        .buttonStyle(.glass)
+        .buttonStyle(.appIcon)
         .keyboardShortcut("`", modifiers: .control)
         .help(showTerminalPanel ? "Esconder Terminal (⌘S)" : "Mostrar Terminal (⌘S)")
     }
@@ -223,7 +313,6 @@ private struct BatchFlowView: View {
             navButton("Criar em lote", icon: "square.stack.3d.up", page: .batch)
             navButton("Canvas", icon: "square.dashed", page: .canvas)
             navButton("Calendário", icon: "calendar", page: .calendar)
-            navButton("Postar", icon: "paperplane", page: .post)
             navButton("Configurações", icon: "gearshape", page: .settings)
         }
         .padding(4)
@@ -234,6 +323,9 @@ private struct BatchFlowView: View {
     private func navButton(_ title: String, icon: String, page target: Page) -> some View {
         let isSelected = page == target
         return Button {
+            if target == .calendar {
+                NotificationCenter.default.post(name: .calendarReturnToOverview, object: nil)
+            }
             withAnimation(.snappy(duration: 0.3)) { page = target }
         } label: {
             HStack(spacing: 8) {
@@ -268,42 +360,49 @@ private struct BatchFlowView: View {
             .accessibilityLabel("\(title), em breve")
     }
 
+    private var settingsPage: SettingsPage {
+        SettingsPage(wallpapers: wallpapers, choose: chooseBackgrounds, add: addBackgrounds,
+                     openBackgroundLibrary: openBackgroundLibrary,
+                     openArtworks: { withAnimation(.snappy(duration: 0.25)) { showArtworks = true } })
+    }
+
+    /// A disposable canvas for manual QA; production builds always use the project's board.
+    private var canvasPreviewDirectory: URL? {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "--canvas-fixture"), index + 1 < arguments.count {
+            return URL(fileURLWithPath: arguments[index + 1], isDirectory: true)
+        }
+        #endif
+        return nil
+    }
+
     private var mainPane: some View {
         VStack(spacing: 0) {
             HStack {
                 Spacer()
             }
             .font(.system(size: 14)).padding(.horizontal, 20).frame(height: 64)
-            .overlay { topNav }
+            .overlay(alignment: showTerminalPanel && pageHasTerminal ? .trailing : .center) {
+                topNav.padding(.trailing, showTerminalPanel && pageHasTerminal ? 12 : 0)
+            }
             // Clear of the window's traffic lights.
-            .overlay(alignment: .leading) { ProjectSwitcher().padding(.leading, 84) }
+            .overlay(alignment: .leading) {
+                HomeNavigationButton().padding(.leading, 84)
+            }
             .zIndex(1)
             if page == .calendar {
                 CalendarPrototypeView(outputFolder: outputURL)
+                    .id(ProjectStore.shared.current.id)
                     .padding(.top, -64)
                     .transition(.opacity)
             } else if page == .canvas {
-                CanvasPage(terminals: tabs)
+                CanvasPage(terminals: tabs, directory: canvasPreviewDirectory)
                     .padding(.top, -64)
-                    .transition(.opacity)
-            } else if page == .post {
-                Group {
-                    if license.canUse(.post) { InstagramPage() }
-                    else {
-                        VStack(spacing: 20) {
-                            LicenseStatusView(license: license)
-                            Button("Ativar para postar") { license.showsActivation = true }
-                        }
-                        .padding(32)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                }
                     .transition(.opacity)
             } else if page == .settings {
                 // Scrolls under the floating nav instead of being cut off below it.
-                SettingsPage(wallpapers: wallpapers, choose: chooseBackgrounds, add: addBackgrounds,
-                             openBackgroundLibrary: openBackgroundLibrary,
-                             openArtworks: { withAnimation(.snappy(duration: 0.25)) { showArtworks = true } })
+                settingsPage
                     .padding(.top, -64)
                     .transition(.opacity)
             } else {
@@ -320,7 +419,7 @@ private struct BatchFlowView: View {
             .contentShape(Rectangle())
             .clipped()
             .background {
-                CanvasScrollMonitor(isEnabled: !showDesignEditor) { delta in
+                CanvasScrollMonitor(isEnabled: !showsHome && !showDesignEditor && !showArtworks) { delta in
                     canvasOffset.width += delta.width
                     canvasOffset.height += delta.height
                 }
@@ -483,6 +582,11 @@ private struct BatchFlowView: View {
         panel.canCreateDirectories = true
         return panel.runModal() == .OK ? panel.url : nil
     }
+    private func checkLoginPreview() {
+        let args = ProcessInfo.processInfo.arguments
+        guard let index = args.firstIndex(of: "--login-preview"), index + 1 < args.count else { return }
+        SocialSessions.shared.signingIn = SocialNetwork(rawValue: args[index + 1])
+    }
     // Photos and references can mix Mac folders, loose files and canvas images; the picker hands back one folder.
     private func choosePhotos() { InputPickerCenter.shared.present(.photos, completion: setPhotos) }
     private func chooseDesired() { InputPickerCenter.shared.present(.desired, completion: setDesired) }
@@ -591,6 +695,97 @@ private struct BatchFlowView: View {
                                               variations: variations)
         } catch { errorMessage = error.localizedDescription }
     }
+    private func pollAppCommands() {
+        if let controlWindow, let main = NSApp.mainWindow, main !== controlWindow { return }
+        do { try appControl.poll(project: ProjectStore.shared.current.id, perform: performAppCommand) }
+        catch { errorMessage = "Não foi possível conectar o chat ao app: \(error.localizedDescription)" }
+    }
+
+    private func performAppCommand(_ command: AppCommand) throws -> AppControlWire.Reply {
+        guard license.canUse(.useAI) else { throw AppControlError("Ative sua licença ou o teste grátis para usar a IA.") }
+        let projects = ProjectStore.shared
+        switch command.action {
+        case .status:
+            struct Status: Encodable {
+                let page: String
+                let terminalVisible: Bool
+                let project: ProjectFolderStatus
+                let projects: [ProjectFolderStatus]
+                let variations: Int
+                let inputs: BatchSelection
+                let style: SlideStyle
+                let actions: [String]
+            }
+            return try AppControl.result(Status(page: page.rawValue, terminalVisible: showTerminalPanel,
+                project: ProjectFolderStatus(projects.current), projects: projects.projects.map(ProjectFolderStatus.init),
+                variations: variations,
+                inputs: BatchSelection(photos: photos?.directory, desired: desiredURL, csv: csvURL, output: outputURL),
+                style: DesignPreferences.current.slideStyle, actions: AppCommand.Action.allCases.map(\.rawValue)))
+        case .navigate:
+            guard let raw = command.page, let target = Page(rawValue: raw) else {
+                throw AppControlError("page: batch, canvas, calendar ou settings.")
+            }
+            showsHome = false
+            withAnimation(.snappy(duration: 0.3)) { page = target }
+        case .terminal:
+            guard let visible = command.visible else { throw AppControlError("Informe visible: true ou false.") }
+            if visible { showsHome = false; if !pageHasTerminal { page = .batch } }
+            showTerminalPanel = visible
+        case .setVariations:
+            guard let count = command.count, (1...20).contains(count) else { throw AppControlError("count deve ser de 1 a 20.") }
+            variations = count
+            guard refreshContext() else { throw AppControlError(errorMessage ?? "Não foi possível salvar o lote.") }
+        case .selectInputs:
+            guard let inputs = command.inputs, !inputs.isEmpty,
+                  Set(inputs.keys).isSubset(of: ["photos", "desired", "csv", "output"]) else {
+                throw AppControlError("inputs aceita photos, desired, csv e output; null limpa o campo.")
+            }
+            var selection = BatchSelection(photos: photos?.directory, desired: desiredURL, csv: csvURL, output: outputURL)
+            for (key, value) in inputs {
+                if let value, !value.hasPrefix("/") { throw AppControlError("Use caminhos absolutos.") }
+                switch key {
+                case "photos": selection.photos = value
+                case "desired": selection.desired = value
+                case "csv": selection.csv = value
+                default: selection.output = value
+                }
+            }
+            _ = try selection.resolve() // Validate every path before changing anything.
+            try BatchSelectionBridge.data(for: selection).write(to: BatchSelectionBridge.fileURL, options: .atomic)
+            importSelectionIfChanged()
+            guard refreshContext() else { throw AppControlError(errorMessage ?? "Não foi possível atualizar as entradas.") }
+        case .setStyle:
+            try AppStyleCommand.apply(command)
+            guard refreshContext() else { throw AppControlError(errorMessage ?? "Não foi possível salvar o estilo.") }
+        case .createProject, .renameProject:
+            guard let name = command.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+                throw AppControlError("Informe name para o projeto.")
+            }
+            if command.action == .createProject { projects.create(named: name) }
+            else {
+                let target = try projectTarget(command.target)
+                projects.rename(target, to: name)
+            }
+            importSelectionIfChanged()
+            guard refreshContext() else { throw AppControlError(errorMessage ?? "Não foi possível atualizar o projeto.") }
+        case .openProject:
+            projects.open(try projectTarget(command.target))
+            importSelectionIfChanged()
+            guard refreshContext() else { throw AppControlError(errorMessage ?? "Não foi possível abrir o projeto.") }
+            showsHome = false
+        case .canvasList, .canvasAddText, .canvasUpdate, .canvasRemove, .canvasArrange:
+            return try CanvasCommands.perform(command, directory: projects.current.canvasDirectory)
+        }
+        return .init(ok: true, message: "Ação concluída: \(command.action.rawValue).")
+    }
+
+    private func projectTarget(_ id: UUID?) throws -> ProjectFolder {
+        guard let id, let target = ProjectStore.shared.projects.first(where: { $0.id == id }) else {
+            throw AppControlError("Informe target com o id de um projeto retornado por status.")
+        }
+        return target
+    }
+
     private func importCSV() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.commaSeparatedText, .plainText]
@@ -643,6 +838,7 @@ private struct FlowNode: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             NodeHeader(title: title, icon: icon, isReady: state.isReady, isOptional: isOptional)
+                .allowsHitTesting(false)
             content
         }
         .padding(16).frame(width: 256, height: 176, alignment: .topLeading)
@@ -650,6 +846,14 @@ private struct FlowNode: View {
         .overlay {
             RoundedRectangle(cornerRadius: 20)
                 .strokeBorder(borderColor, lineWidth: isTargeted ? 2 : 1)
+        }
+        .background {
+            Button(action: activate) {
+                RoundedRectangle(cornerRadius: 20).fill(.clear)
+                    .contentShape(RoundedRectangle(cornerRadius: 20))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Abrir \(title)")
         }
         .scaleEffect(isTargeted ? 1.03 : (isHovering ? 1.015 : 1))
         .shadow(color: .black.opacity(isHovering ? 0.18 : 0.08), radius: isHovering ? 18 : 8, y: isHovering ? 8 : 3)
@@ -663,6 +867,14 @@ private struct FlowNode: View {
         } isTargeted: { isTargeted = $0 }
         .overlay(alignment: .top) { if hasInput { FlowPort().offset(y: -6) } }
         .overlay(alignment: .bottom) { if hasOutput { FlowPort().offset(y: 6) } }
+    }
+
+    private func activate() {
+        if case .output(let directory, _, _) = state {
+            NSWorkspace.shared.open(directory)
+        } else {
+            pick()
+        }
     }
 
     private var borderColor: Color {
@@ -701,7 +913,7 @@ private struct FlowNode: View {
             .help("\(emptyAction) ou arraste até aqui")
         case .photos(let catalog):
             Spacer(minLength: 0)
-            PhotoStrip(files: catalog.files)
+            PhotoStrip(files: catalog.files).allowsHitTesting(false)
             changeRow(icon: "folder",
                       text: "\(catalog.directory.lastPathComponent) · \(catalog.files.count) \(catalog.files.count == 1 ? "foto" : "fotos")")
         case .file(let name, let detail, let fileIcon):
@@ -735,34 +947,32 @@ private struct FlowNode: View {
             if let error {
                 Label("Não foi possível ler a pasta", systemImage: "exclamationmark.triangle.fill")
                     .font(.system(size: 13, weight: .medium)).foregroundStyle(.orange)
-                    .help(error)
+                    .help(error).allowsHitTesting(false)
             } else if let catalog, !catalog.previewImages.isEmpty {
-                PhotoStrip(files: catalog.previewImages)
+                PhotoStrip(files: catalog.previewImages).allowsHitTesting(false)
             } else {
                 Label(catalog == nil ? "Verificando arquivos…" : "Aguardando o lote",
                       systemImage: catalog == nil ? "arrow.triangle.2.circlepath" : "hourglass")
                     .font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, minHeight: 40)
                     .background(RoundedRectangle(cornerRadius: 12).fill(.white.opacity(0.1)))
+                    .allowsHitTesting(false)
             }
             HStack(spacing: 8) {
                 changeRow(icon: "folder", text: outputSummary(directory: directory, catalog: catalog))
                 Button { NSWorkspace.shared.open(directory) } label: {
                     Image(systemName: "arrow.up.forward.app")
-                        .font(.system(size: 13, weight: .semibold))
-                        .frame(width: 26, height: 26)
-                        .background(Circle().fill(.white.opacity(0.3)))
-                        .contentShape(Circle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.appIcon)
+                .controlSize(.small)
                 .help("Abrir no Finder")
             }
         case .warning(let message):
             Spacer(minLength: 0)
             Label(message, systemImage: "exclamationmark.triangle.fill")
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.orange)
-            Button("Escolher outra pasta", action: pick).buttonStyle(.glass)
+                .foregroundStyle(.orange).allowsHitTesting(false)
+            Button("Escolher outra pasta", action: pick).buttonStyle(.appSecondary)
         }
     }
 
@@ -839,8 +1049,8 @@ struct AgentNode: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            SlidiMessage(state: isReady ? .happy : .thinking, title: "CLI + IA",
-                         detail: isReady ? "Tudo pronto para criar" : "Escolha as entradas", width: 32)
+            AppStatusMessage(title: "CLI + IA",
+                         detail: isReady ? "Tudo pronto para criar" : "Escolha as entradas")
             VStack(spacing: 0) {
                 controlRow("IA") {
                     // One menu for CLI + model: "codex" or a Claude model name.
@@ -926,25 +1136,19 @@ struct AgentNode: View {
     private func stepButton(_ icon: String, enabled: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 11, weight: .bold))
-                .frame(width: 26, height: 26)
-                .background(Circle().fill(.white.opacity(0.35)))
-                .contentShape(Circle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.appIcon)
+        .controlSize(.small)
         .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.4)
     }
 
     @ViewBuilder private var actionButton: some View {
         if isReady {
             Button(action: generate) {
                 Label(variations == 1 ? "Gerar 1 variação" : "Gerar \(variations) variações", systemImage: "sparkles")
-                    .font(.system(size: 13, weight: .semibold))
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.glassProminent)
-            .controlSize(.large)
+            .buttonStyle(.appPrimary)
         } else {
             Label("Falta \(missing.joined(separator: ", "))", systemImage: "circle.dashed")
                 .font(.system(size: 13, weight: .semibold))
@@ -1012,5 +1216,20 @@ private struct FlowPort: View {
         Circle().fill(Color(nsColor: .windowBackgroundColor))
             .frame(width: 12, height: 12)
             .overlay { Circle().strokeBorder(Color(nsColor: .separatorColor), lineWidth: 2) }
+    }
+}
+
+private struct NotificationHandlers: ViewModifier {
+    let onShowProjectsHome: () -> Void
+    let onEnterCurrentProject: () -> Void
+    let onShowPostingCalendar: () -> Void
+    let onShowProductSettings: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .showProjectsHome)) { _ in onShowProjectsHome() }
+            .onReceive(NotificationCenter.default.publisher(for: .enterCurrentProject)) { _ in onEnterCurrentProject() }
+            .onReceive(NotificationCenter.default.publisher(for: .showPostingCalendar)) { _ in onShowPostingCalendar() }
+            .onReceive(NotificationCenter.default.publisher(for: .showProductSettings)) { _ in onShowProductSettings() }
     }
 }

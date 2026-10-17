@@ -34,6 +34,39 @@ final class ProjectStoreTests: XCTestCase {
         try BatchSelectionBridge.decode(Data(contentsOf: selectionFile))
     }
 
+    func testProductContextUpdatesAnOpenSessionAndNeverLeaksAcrossProjects() throws {
+        let store = makeStore()
+        let workspace = selectionFile.deletingLastPathComponent()
+        try AgentSession.install(in: workspace, state: "# Estado\n- Agenda: teste")
+        store.setProfile(site: "https://produto.test", about: "Ajuda a criar uma rotina de oração")
+        var profile = ProductProfile()
+        profile.name = "Oração Diária"
+        profile.audience = "Pessoas criando um hábito de oração"
+        profile.features = ["Orações guiadas"]
+        profile.umbrellaNiche = "oração"
+        store.setProductProfile(profile)
+        let first = store.current
+        let stateFile = workspace.appendingPathComponent("estado.md")
+        let state = try String(contentsOf: stateFile, encoding: .utf8)
+        XCTAssertTrue(state.contains("Oração Diária"))
+        XCTAssertTrue(state.contains("https://produto.test"))
+        XCTAssertTrue(state.contains("Ajuda a criar uma rotina de oração"))
+        XCTAssertTrue(state.contains("Orações guiadas"))
+        XCTAssertTrue(state.contains("Pessoas criando um hábito de oração"))
+        XCTAssertEqual(state.components(separatedBy: "<!-- produto-usuario:start -->").count, 2)
+        XCTAssertEqual(defaults.string(forKey: ProjectStore.productContextKey), first.project.productContext)
+
+        _ = store.create(named: "Outro produto")
+        let other = try String(contentsOf: stateFile, encoding: .utf8)
+        XCTAssertFalse(other.contains("Oração Diária"))
+        XCTAssertTrue(other.contains("Perfil ainda não informado"))
+        XCTAssertNil(defaults.string(forKey: ProjectStore.productContextKey))
+        XCTAssertTrue(other.contains("- Canvas do projeto: `\(store.current.canvasDirectory.path)`"))
+        XCTAssertFalse(other.contains(first.canvasDirectory.path))
+        store.open(first)
+        XCTAssertTrue(try String(contentsOf: stateFile, encoding: .utf8).contains("Orações guiadas"))
+    }
+
     func testFirstLaunchTurnsWhatTheAppHadIntoTheFirstProject() throws {
         try writeSelection(photos: "/tmp/fotos", output: "/tmp/saida")
         try FileManager.default.createDirectory(at: legacyCanvas, withIntermediateDirectories: true)
@@ -137,4 +170,121 @@ final class ProjectStoreTests: XCTestCase {
         XCTAssertEqual(real(try PostAgenda.load(from: live).posts.first?.folder), output.map { $0 + "/variacao-01" })
         XCTAssertEqual(store.current.id, moved.id)
     }
+    func testTrashAndRestorePreserveFilesInputsCalendarAndIdentity() throws {
+        let store = makeStore()
+        let first = store.current
+        let project = store.create(named: "Restaurável")
+        try FileManager.default.createDirectory(at: project.canvasDirectory, withIntermediateDirectories: true)
+        let canvasFile = project.canvasDirectory.appendingPathComponent("board.json")
+        let canvas = Data("conteúdo intacto".utf8)
+        try canvas.write(to: canvasFile)
+        try writeSelection(photos: "/tmp/fotos-para-restaurar", output: project.defaultOutput.path)
+        let post = PostAgenda.Post(folder: project.defaultOutput.path, date: "2026-10-01", time: "12:00", caption: "legenda")
+        let live = base.appendingPathComponent(".bulk-maker/agenda.json")
+        try PostAgenda(posts: [post]).save(to: live)
+        try store.moveToTrash(project)
+        XCTAssertEqual(store.current.id, first.id)
+        XCTAssertFalse(store.projects.contains { $0.id == project.id })
+        XCTAssertEqual(store.trashedProjects.map(\.id), [project.id])
+        XCTAssertEqual(try Data(contentsOf: canvasFile), canvas)
+        XCTAssertEqual(try PostAgenda.load(from: project.agendaFile).posts.map(\.id), [post.id])
+
+        let reopened = makeStore()
+        let trashed = try XCTUnwrap(reopened.trashedProjects.first)
+        XCTAssertNotNil(trashed.project.trashedAt)
+        try reopened.restore(trashed)
+        reopened.open(project)
+        XCTAssertEqual(reopened.current.id, project.id)
+        XCTAssertNil(reopened.current.project.trashedAt)
+        XCTAssertEqual(try readSelection().photos, "/tmp/fotos-para-restaurar")
+        XCTAssertEqual(try PostAgenda.load(from: live).posts.map(\.id), [post.id])
+        XCTAssertEqual(try Data(contentsOf: canvasFile), canvas)
+        XCTAssertTrue(makeStore().trashedProjects.isEmpty)
+    }
+
+    func testLastProjectCanBeTrashedAndRestoredWithoutCreatingAnotherCard() throws {
+        let store = makeStore()
+        let last = store.current
+        try store.moveToTrash(last)
+        XCTAssertTrue(store.projects.isEmpty)
+        XCTAssertNotEqual(store.current.id, last.id)
+        XCTAssertNil(try readSelection().output)
+        let reopened = makeStore()
+        XCTAssertTrue(reopened.projects.isEmpty)
+        XCTAssertEqual(reopened.trashedProjects.count, 1)
+        try reopened.restore(last)
+        XCTAssertEqual(reopened.current.id, last.id)
+        XCTAssertEqual(reopened.projects.map(\.id), [last.id])
+    }
+
+    func testPermanentDeletionRemovesOnlyTrashedProjectAndPreservesExternalFiles() throws {
+        let store = makeStore()
+        let last = store.current
+        let external = base.appendingPathComponent("Fotos externas")
+        try FileManager.default.createDirectory(at: external, withIntermediateDirectories: true)
+        let file = external.appendingPathComponent("original.png")
+        try Data("original".utf8).write(to: file)
+        try writeSelection(photos: external.path, output: external.path)
+        XCTAssertThrowsError(try store.deletePermanently(last), "Um projeto ativo nunca pode ser excluído diretamente")
+        try store.moveToTrash(last)
+        try store.deletePermanently(last)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: last.folder.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: file.path))
+        XCTAssertTrue(store.trashedProjects.isEmpty)
+        XCTAssertTrue(makeStore().projects.isEmpty, "Reabrir não pode recriar um projeto apagado")
+        XCTAssertThrowsError(try store.restore(last))
+        let new = store.create(named: "Novo depois de apagar todos")
+        XCTAssertEqual(store.projects.map(\.id), [new.id])
+    }
+
+    func testTrashExpiresAtThirtyDaysAndNotBefore() throws {
+        let store = makeStore()
+        let project = store.create(named: "Prazo")
+        let deletedAt = Date()
+        try store.moveToTrash(project, at: deletedAt)
+        let deadline = deletedAt.addingTimeInterval(30 * 24 * 60 * 60)
+        try store.purgeExpiredTrash(now: deadline.addingTimeInterval(-1))
+        XCTAssertEqual(store.trashedProjects.count, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: project.folder.path))
+        try store.purgeExpiredTrash(now: deadline)
+        XCTAssertTrue(store.trashedProjects.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: project.folder.path))
+        XCTAssertEqual(store.projects.count, 1)
+    }
+
+    func testReopeningCleansExpiredTrashAndKeepsRecentTrashAndActiveProjects() throws {
+        let store = makeStore()
+        let active = store.current
+        let expired = store.create(named: "Antigo")
+        let recent = store.create(named: "Recente")
+        try store.moveToTrash(expired, at: Date().addingTimeInterval(-31 * 24 * 60 * 60))
+        try store.moveToTrash(recent)
+        let reopened = makeStore()
+        XCTAssertEqual(reopened.projects.map(\.id), [active.id])
+        XCTAssertEqual(reopened.trashedProjects.map(\.id), [recent.id])
+        XCTAssertFalse(FileManager.default.fileExists(atPath: expired.folder.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recent.folder.path))
+    }
+
+    func testFailedTrashSaveDoesNotRemoveProjectFromActiveList() throws {
+        let store = makeStore()
+        let project = store.current
+        try FileManager.default.removeItem(at: project.file)
+        try FileManager.default.createDirectory(at: project.file, withIntermediateDirectories: false)
+        XCTAssertThrowsError(try store.moveToTrash(project))
+        XCTAssertEqual(store.projects.map(\.id), [project.id])
+        XCTAssertEqual(store.current.id, project.id)
+        XCTAssertTrue(store.trashedProjects.isEmpty)
+    }
+
+    func testTrashRejectsSymlinksOutsideTheProjectLibrary() throws {
+        let original = makeStore().current
+        let external = base.appendingPathComponent("Fora da biblioteca")
+        try FileManager.default.moveItem(at: original.folder, to: external)
+        try FileManager.default.createSymbolicLink(at: original.folder, withDestinationURL: external)
+        let store = makeStore()
+        XCTAssertThrowsError(try store.moveToTrash(store.current))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: external.appendingPathComponent("projeto.json").path))
+    }
+
 }

@@ -12,6 +12,18 @@ public enum CanvasFolder {
         public var y: Double
         public var width: Double
         public var height: Double
+        /// Text boxes (the app's `TextStyle`): kept so rewriting `board.json` from here never drops them.
+        public var text: String? = nil
+        public var style: Style? = nil
+
+        public struct Style: Codable, Equatable, Sendable {
+            public var size: Double
+            public var weight: String?
+            public var color: String?
+            public var background: String?
+            public var padding: Double?
+            public var radius: Double?
+        }
     }
 
     public enum CanvasError: LocalizedError {

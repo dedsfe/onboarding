@@ -36,308 +36,474 @@ struct InputPickerHost: View {
     }
 }
 
-/// Photos or references from the Mac (folders and loose files) and/or the project's canvas, picked one by one.
+/// The visible library is independent of the selection: deselecting a photo never hides it.
+@MainActor @Observable
+final class InputPickerLibrary {
+    let kind: InputKind
+    var sources: InputSources
+    var canvas: [(item: CanvasItem, url: URL)]
+    private(set) var folderFiles: [String: [URL]] = [:]
+    private(set) var loading = false
+    private var revision = UUID()
+
+    init(kind: InputKind, sources: InputSources = .init(), canvas: [(item: CanvasItem, url: URL)] = []) {
+        self.kind = kind
+        self.sources = sources
+        self.canvas = Self.imageItems(canvas)
+        let ids = Set(self.canvas.map(\.item.id))
+        self.sources.canvasItems.removeAll { !ids.contains($0) }
+    }
+
+    static func imageItems(_ items: [(item: CanvasItem, url: URL)]) -> [(item: CanvasItem, url: URL)] {
+        items.filter {
+            !$0.item.isText && !$0.item.file.isEmpty && InputAssembler.isImage($0.url)
+                && (try? $0.url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+        }
+    }
+
+    var macFiles: [URL] {
+        var seen = Set<String>()
+        return (sources.folders.flatMap { folderFiles[$0] ?? [] } + sources.files.map { URL(fileURLWithPath: $0) })
+            .filter { seen.insert($0.standardizedFileURL.path).inserted }
+    }
+    var selectedMacFiles: [URL] { macFiles.filter(isSelected) }
+    var total: Int {
+        let selected = Set(sources.canvasItems)
+        return Set((selectedMacFiles + canvas.filter { selected.contains($0.item.id) }.map(\.url))
+            .map { $0.standardizedFileURL.path }).count
+    }
+    var allMacSelected: Bool { !macFiles.isEmpty && selectedMacFiles.count == macFiles.count }
+    var allCanvasSelected: Bool { !canvas.isEmpty && sources.canvasItems.count == canvas.count }
+
+    func isSelected(_ file: URL) -> Bool { !sources.excludedFiles.contains(file.standardizedFileURL.path) }
+
+    func toggle(_ file: URL) {
+        let key = file.standardizedFileURL.path
+        if isSelected(file) { sources.excludedFiles.append(key) }
+        else { sources.excludedFiles.removeAll { $0 == key } }
+    }
+
+    func selectMac(_ selected: Bool) {
+        let paths = Set(macFiles.map { $0.standardizedFileURL.path })
+        sources.excludedFiles.removeAll { paths.contains($0) }
+        if !selected { sources.excludedFiles += paths.sorted() }
+    }
+
+    func toggleCanvas(_ id: UUID) {
+        if sources.canvasItems.contains(id) { sources.canvasItems.removeAll { $0 == id } }
+        else if canvas.contains(where: { $0.item.id == id }) { sources.canvasItems.append(id) }
+    }
+
+    func refresh() async {
+        let id = UUID()
+        revision = id
+        loading = true
+        let folders = sources.folders, kind = kind
+        let found = await Task.detached(priority: .userInitiated) {
+            Dictionary(uniqueKeysWithValues: folders.map { ($0, InputAssembler.files(in: URL(fileURLWithPath: $0), kind: kind)) })
+        }.value
+        guard revision == id else { return }
+        folderFiles = found
+        let known = Set(macFiles.map { $0.standardizedFileURL.path })
+        sources.excludedFiles.removeAll { !known.contains($0) }
+        loading = false
+    }
+
+    func add(_ urls: [URL]) async {
+        for raw in urls {
+            let url = raw.standardizedFileURL
+            guard let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isRegularFileKey]) else { continue }
+            if values.isDirectory == true {
+                if !sources.folders.contains(url.path) { sources.folders.append(url.path) }
+            } else if values.isRegularFile == true, kind.acceptsAnyFile || InputAssembler.isImage(url) {
+                if !sources.files.contains(url.path) { sources.files.append(url.path) }
+                sources.excludedFiles.removeAll { $0 == url.path }
+            }
+        }
+        await refresh()
+    }
+
+    func removeFolder(_ path: String) {
+        sources.folders.removeAll { $0 == path }
+        folderFiles.removeValue(forKey: path)
+        let remaining = Set(macFiles.map { $0.standardizedFileURL.path })
+        sources.excludedFiles.removeAll { !remaining.contains($0) }
+    }
+}
+
+/// Both sources share the same thumbnail grid and selection controls, on the app's native glass panel.
 struct InputSourcePicker: View {
     let request: InputPickerCenter.Request
     let close: () -> Void
-
-    @State private var sources = InputSources()
-    @State private var canvas: [(item: CanvasItem, url: URL)] = []
-    /// Files each chosen Finder folder brings, counted once when it is added.
-    @State private var counts: [String: Int] = [:]
+    private let store: ProjectStore
+    private let suppliedLibrary: Bool
+    private let selectionCompletion: (([URL]) -> Void)?
+    private let actionTitle: String
+    var onControlFrame: ((String, CGRect) -> Void)?
+    @State private var library: InputPickerLibrary
     @State private var isSaving = false
     @State private var error: String?
-    @State private var appeared = false
+    @State private var sourceTab = 0
+
+    init(request: InputPickerCenter.Request, store: ProjectStore? = nil, library: InputPickerLibrary? = nil,
+         onControlFrame: ((String, CGRect) -> Void)? = nil,
+         initialSourceTab: Int = 0, actionTitle: String = "Usar no lote", selectionCompletion: (([URL]) -> Void)? = nil,
+         close: @escaping () -> Void) {
+        self.request = request
+        self.close = close
+        self.store = store ?? .shared
+        self.suppliedLibrary = library != nil
+        self.onControlFrame = onControlFrame
+        self.actionTitle = actionTitle
+        self.selectionCompletion = selectionCompletion
+        _sourceTab = State(initialValue: initialSourceTab)
+        _library = State(initialValue: library ?? InputPickerLibrary(kind: request.kind))
+    }
 
     private var kind: InputKind { request.kind }
-    private var total: Int {
-        sources.folders.reduce(0) { $0 + (counts[$1] ?? 0) } + sources.files.count + sources.canvasItems.count
-    }
+    private var columns: [GridItem] { [GridItem(.adaptive(minimum: 96, maximum: 160), spacing: 12)] }
 
     var body: some View {
-        ZStack {
-            // Just dimmed, no blur: the batch cards stay readable behind the picker.
-            Rectangle().fill(.black.opacity(0.3))
-                .ignoresSafeArea()
-                .onTapGesture(perform: close)
-            VStack(spacing: 0) {
-                ModalHeader(title: kind.title, subtitle: error, subtitleIsError: true, done: apply)
-                HStack(alignment: .top, spacing: 16) {
-                    macColumn.frame(width: 240)
-                    canvasColumn
+        GeometryReader { geometry in
+            let width = min(920, max(320, geometry.size.width - 48))
+            let height = min(640, max(280, geometry.size.height - 48))
+            ZStack {
+                Color.black.opacity(0.3).ignoresSafeArea().onTapGesture { dismiss() }
+                VStack(spacing: 0) {
+                    header
+                    if width >= 720 {
+                        HStack(alignment: .top, spacing: 28) {
+                            macColumn.frame(maxWidth: .infinity)
+                            canvasColumn.frame(maxWidth: .infinity)
+                        }
+                        .padding(.horizontal, 24)
+                    } else {
+                        Picker("Origem das imagens", selection: $sourceTab) {
+                            Text("Do Mac").tag(0)
+                            Text("Do canvas").tag(1)
+                        }
+                        .pickerStyle(.segmented).labelsHidden().padding(.horizontal, 24).padding(.bottom, 16)
+                        Group { if sourceTab == 0 { macColumn } else { canvasColumn } }
+                            .padding(.horizontal, 24)
+                    }
+                    footer(compact: width < 480)
                 }
-                .padding(.horizontal, 18)
-                .frame(maxHeight: .infinity, alignment: .top)
-                footer
+                .frame(width: width, height: height)
+                .modalPanel()
+                .reportPickerControl("panel", to: onControlFrame)
             }
-            .frame(width: 700, height: 480)
-            .modalPanel()
-            .modalAppearance(appeared)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .coordinateSpace(name: "input-picker")
         }
-        .onAppear {
-            load()
-            withAnimation(.modalAppear) { appeared = true }
+        .task {
+            if !suppliedLibrary { load() }
+            await library.refresh()
         }
-        .onExitCommand(perform: close)
+        .onExitCommand { dismiss() }
     }
 
-    // MARK: - Mac
+    private var header: some View {
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(kind.title).font(.system(size: 20, weight: .semibold))
+                Text("Escolha as imagens que vão entrar no lote.")
+                    .font(.system(size: 13)).foregroundStyle(.white.opacity(0.65))
+            }
+            Spacer()
+            Button(action: dismiss) {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.appIcon)
+            .disabled(isSaving).help("Fechar")
+            .accessibilityLabel("Fechar seletor de imagens")
+            .reportPickerControl("close", to: onControlFrame)
+        }
+        .padding(24)
+    }
 
     private var macColumn: some View {
         VStack(alignment: .leading, spacing: 12) {
-            columnTitle("Do Mac", symbol: "laptopcomputer")
-            ScrollView {
-                VStack(spacing: 6) {
-                    ForEach(sources.folders, id: \.self) { path in
-                        sourceRow(symbol: "folder.fill", name: URL(fileURLWithPath: path).lastPathComponent,
-                                  badge: "\(counts[path] ?? 0)") { sources.folders.removeAll { $0 == path } }
-                    }
-                    ForEach(sources.files, id: \.self) { path in
-                        sourceRow(symbol: "photo", name: URL(fileURLWithPath: path).lastPathComponent, badge: nil) {
-                            sources.files.removeAll { $0 == path }
-                        }
-                    }
-                    if sources.folders.isEmpty && sources.files.isEmpty {
-                        Text("Nada do Mac ainda")
-                            .font(.system(size: 14, weight: .medium))
-                            .frame(maxWidth: .infinity).frame(height: 64)
-                            .background(RoundedRectangle(cornerRadius: 12)
-                                .strokeBorder(.white.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [5, 4])))
+            HStack(spacing: 8) {
+                Label("Do Mac", systemImage: "laptopcomputer").font(.system(size: 14, weight: .semibold))
+                Spacer(minLength: 0)
+                if !library.macFiles.isEmpty {
+                    selectionButton(library.allMacSelected ? "Limpar" : "Todas", id: "mac-all") {
+                        library.selectMac(!library.allMacSelected)
                     }
                 }
+                Menu {
+                    Button("Adicionar pasta…", systemImage: "folder.badge.plus") { choose(folders: true) }
+                    Button(kind.acceptsAnyFile ? "Adicionar arquivos…" : "Adicionar imagens…", systemImage: "photo.badge.plus") { choose(folders: false) }
+                } label: {
+                    Label("Adicionar", systemImage: "plus")
+                }
+                .menuStyle(.button).buttonStyle(.appSecondary).controlSize(.small)
+                .disabled(isSaving || library.loading)
+                .accessibilityLabel("Adicionar do Mac")
+                .reportPickerControl("add", to: onControlFrame)
             }
-            .scrollIndicators(.never)
-            HStack(spacing: 8) {
-                pillButton("Pasta", symbol: "folder.badge.plus", action: addFolders)
-                pillButton(kind.acceptsAnyFile ? "Arquivos" : "Imagens", symbol: "photo.badge.plus", action: addFiles)
+            .frame(height: 32)
+            Text("\(library.selectedMacFiles.count) de \(library.macFiles.count) selecionadas")
+                .font(.system(size: 12)).foregroundStyle(.white.opacity(0.6)).monospacedDigit()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 24) {
+                    if library.macFiles.isEmpty && library.sources.folders.isEmpty && !library.loading {
+                        emptyState("Suas fotos aparecem aqui", detail: "Adicione uma pasta ou arraste imagens do Finder.", symbol: "photo.on.rectangle")
+                    }
+                    ForEach(library.sources.folders, id: \.self) { path in
+                        VStack(alignment: .leading, spacing: 12) {
+                            groupHeader(URL(fileURLWithPath: path).lastPathComponent, symbol: "folder",
+                                        count: library.folderFiles[path]?.count ?? 0, folder: path)
+                            if let files = library.folderFiles[path], !files.isEmpty {
+                                macGrid(files)
+                            } else if !library.loading {
+                                Text("Nenhuma imagem compatível nesta pasta.")
+                                    .font(.system(size: 12)).foregroundStyle(.secondary).padding(.vertical, 16)
+                            }
+                        }
+                    }
+                    if !library.sources.files.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Imagens adicionadas").font(.system(size: 13, weight: .medium))
+                            macGrid(library.sources.files.map { URL(fileURLWithPath: $0) })
+                        }
+                    }
+                }
+                .padding(.bottom, 12).padding(.horizontal, 2)
+            }
+            .contentMargins(.all, 0, for: .scrollContent)
+            .defaultScrollAnchor(.top)
+            .scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
+            .overlay { if library.loading { ProgressView("Abrindo imagens…").controlSize(.small) } }
+            .dropDestination(for: URL.self) { urls, _ in
+                guard !isSaving, !urls.isEmpty else { return false }
+                Task { await library.add(urls) }
+                return true
             }
         }
-        .padding(.bottom, 14)
     }
 
-    private func sourceRow(symbol: String, name: String, badge: String?, remove: @escaping () -> Void) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: symbol).font(.system(size: 14, weight: .semibold)).frame(width: 18)
-            Text(name).font(.system(size: 14, weight: .medium)).lineLimit(1).truncationMode(.middle)
-            Spacer(minLength: 6)
-            if let badge {
-                Text(badge).font(.system(size: 13, weight: .semibold)).monospacedDigit()
-                    .padding(.horizontal, 8).frame(height: 22)
-                    .background(Capsule().fill(.white.opacity(0.12)))
+    private func macGrid(_ files: [URL]) -> some View {
+        LazyVGrid(columns: columns, spacing: 12) {
+            ForEach(files, id: \.path) { file in
+                imageCell(url: file, selected: library.isSelected(file), title: file.lastPathComponent,
+                          control: "mac-\(file.path)") { library.toggle(file) }
             }
-            Button(action: { withAnimation(.snappy(duration: 0.2)) { remove() } }) {
-                Image(systemName: "xmark").font(.system(size: 11, weight: .bold)).frame(width: 22, height: 22)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .help("Tirar do lote")
         }
-        .padding(.horizontal, 12).frame(height: 42)
-        .background(RoundedRectangle(cornerRadius: 12).fill(.white.opacity(0.08)))
-        .transition(.opacity.combined(with: .move(edge: .leading)))
     }
-
-    // MARK: - Canvas
 
     private var canvasColumn: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                columnTitle("Do canvas", symbol: "square.dashed")
-                Spacer()
-                if !canvas.isEmpty {
-                    Button(allCanvasSelected ? "Nenhuma" : "Todas") {
-                        withAnimation(.snappy(duration: 0.2)) {
-                            sources.canvasItems = allCanvasSelected ? [] : canvas.map(\.item.id)
+            HStack(spacing: 8) {
+                Label("Do canvas", systemImage: "square.dashed").font(.system(size: 14, weight: .semibold))
+                Spacer(minLength: 0)
+                if !library.canvas.isEmpty {
+                    selectionButton(library.allCanvasSelected ? "Limpar" : "Todas", id: "canvas-all") {
+                        library.sources.canvasItems = library.allCanvasSelected ? [] : library.canvas.map(\.item.id)
+                    }
+                }
+            }
+            .frame(height: 32)
+            Text("\(library.sources.canvasItems.count) de \(library.canvas.count) selecionadas")
+                .font(.system(size: 12)).foregroundStyle(.white.opacity(0.6)).monospacedDigit()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 24) {
+                    if library.canvas.isEmpty {
+                        emptyState("O canvas está vazio", detail: "Cole ou arraste imagens para o canvas do projeto.", symbol: "square.dashed")
+                    } else {
+                        VStack(alignment: .leading, spacing: 12) {
+                            groupHeader("Imagens do projeto")
+                            LazyVGrid(columns: columns, spacing: 12) {
+                                ForEach(Array(library.canvas.enumerated()), id: \.element.item.id) { index, entry in
+                                    imageCell(url: entry.url, selected: library.sources.canvasItems.contains(entry.item.id),
+                                              title: "Imagem \(index + 1)", control: "canvas-\(entry.item.id)") {
+                                        library.toggleCanvas(entry.item.id)
+                                    }
+                                }
+                            }
                         }
                     }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 13, weight: .semibold))
-                    .padding(.horizontal, 12).frame(height: 28)
-                    .background(Capsule().fill(.white.opacity(0.12)))
                 }
+                .padding(.bottom, 12).padding(.horizontal, 2)
             }
-            if canvas.isEmpty {
-                SlidiMessage(state: .curious, title: "Cadê as imagens?",
-                             detail: "Cole imagens no canvas (⌘V) e volte aqui.", width: 52, stacked: true)
-                .padding(20)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 84), spacing: 8)], spacing: 8) {
-                        ForEach(canvas, id: \.item.id) { entry in canvasCell(entry) }
-                    }
-                    .padding(4)
-                }
-                .scrollIndicators(.never)
-            }
+            .contentMargins(.all, 0, for: .scrollContent)
+            .defaultScrollAnchor(.top)
+            .scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
         }
-        .padding(.bottom, 14)
     }
 
-    private var allCanvasSelected: Bool { !canvas.isEmpty && sources.canvasItems.count == canvas.count }
-
-    private func canvasCell(_ entry: (item: CanvasItem, url: URL)) -> some View {
-        let order = sources.canvasItems.firstIndex(of: entry.item.id)
-        let isOn = order != nil
-        return Button {
-            withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
-                if isOn { sources.canvasItems.removeAll { $0 == entry.item.id } } else { sources.canvasItems.append(entry.item.id) }
-            }
-        } label: {
-            SourceThumbnail(url: entry.url)
-                .aspectRatio(1, contentMode: .fit)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(isOn ? Color.accentColor : .white.opacity(0.1), lineWidth: isOn ? 3 : 1))
-                .overlay(alignment: .topTrailing) {
-                    // The number is the order the images go into the batch.
-                    ZStack {
-                        Circle().fill(isOn ? Color.accentColor : .black.opacity(0.35))
-                        Circle().strokeBorder(.white, lineWidth: 1.5)
-                        if let order { Text("\(order + 1)").font(.system(size: 12, weight: .bold)).monospacedDigit() }
-                    }
-                    .frame(width: 24, height: 24)
-                    .padding(7)
+    private func groupHeader(_ title: String, symbol: String? = nil, count: Int? = nil, folder: String? = nil) -> some View {
+        HStack(spacing: 8) {
+            if let symbol { Image(systemName: symbol).foregroundStyle(.white.opacity(0.65)) }
+            Text(title).font(.system(size: 13, weight: .medium)).lineLimit(1).truncationMode(.middle)
+                .help(folder ?? title)
+            Spacer(minLength: 0)
+            if let count { Text("\(count)").font(.system(size: 12)).foregroundStyle(.white.opacity(0.6)).monospacedDigit() }
+            if let folder {
+                Button { library.removeFolder(folder) } label: {
+                    Image(systemName: "xmark")
                 }
-                .scaleEffect(isOn ? 0.95 : 1)
-                .contentShape(Rectangle())
+                .buttonStyle(.appIcon).controlSize(.small).disabled(isSaving).help("Remover pasta do lote")
+                .accessibilityLabel("Remover pasta \(title)")
+                .reportPickerControl("remove-\(folder)", to: onControlFrame)
+            }
         }
-        .buttonStyle(.plain)
+        .frame(height: 32)
     }
 
-    // MARK: - Footer
-
-    private var footer: some View {
-        HStack {
-            SlidiMessage(state: isSaving ? .thinking : error != nil ? .concerned : total > 0 ? .happy : .idle,
-                         title: isSaving ? "Juntando arquivos" : total == 1 ? "1 arquivo no lote" : "\(total) arquivos no lote",
-                         width: 28)
-                .monospacedDigit()
-            Spacer()
-            Button(action: close) {
-                Text("Cancelar").font(.system(size: 14, weight: .semibold)).padding(.horizontal, 16).frame(height: 36)
+    private func imageCell(url: URL, selected: Bool, title: String, control: String, toggle: @escaping () -> Void) -> some View {
+        Button(action: toggle) {
+            VStack(alignment: .leading, spacing: 7) {
+                SourceThumbnail(url: url)
+                    .aspectRatio(1, contentMode: .fit)
+                    .clipShape(.rect(cornerRadius: 12))
+                    .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(selected ? 0.9 : 0.12), lineWidth: selected ? 2 : 1) }
+                    .overlay(alignment: .topTrailing) {
+                        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                            .font(.system(size: 21, weight: .medium))
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(selected ? .black : .white, .white)
+                            .padding(8)
+                    }
+                Text(title).font(.system(size: 11)).foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1).truncationMode(.middle)
             }
-            .buttonStyle(.plain)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain).disabled(isSaving || library.loading)
+        .accessibilityLabel(title).accessibilityValue(selected ? "Selecionada" : "Não selecionada")
+        .help(title)
+        .reportPickerControl(control, to: onControlFrame)
+    }
+
+    private var selectionSummary: String {
+        let noun = kind.acceptsAnyFile ? (library.total == 1 ? "arquivo selecionado" : "arquivos selecionados")
+                                      : (library.total == 1 ? "imagem selecionada" : "imagens selecionadas")
+        return isSaving ? "Preparando lote…" : "\(library.total) \(noun)"
+    }
+
+    private var selectedCount: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(selectionSummary).font(.system(size: 13, weight: .semibold)).monospacedDigit()
+        }
+    }
+
+    private var footerActions: some View {
+        HStack(spacing: 12) {
+            Button("Cancelar", action: dismiss)
+                .buttonStyle(.appSecondary).disabled(isSaving)
+                .keyboardShortcut(.cancelAction)
+                .reportPickerControl("cancel", to: onControlFrame)
             Button(action: apply) {
                 HStack(spacing: 8) {
                     if isSaving { ProgressView().controlSize(.small) }
-                    Text("Usar no lote").font(.system(size: 14, weight: .bold))
+                    Text(actionTitle)
                 }
-                .padding(.horizontal, 18).frame(height: 36)
-                .background(Capsule().fill(.white))
-                .foregroundStyle(.black)
             }
-            .buttonStyle(.plain)
-            .disabled(isSaving)
+            .buttonStyle(.appPrimary)
+            .keyboardShortcut(.defaultAction)
+            .disabled(isSaving || library.loading || library.total == 0)
+            .reportPickerControl("apply", to: onControlFrame)
         }
-        .padding(.horizontal, 18).padding(.vertical, 14)
-        .overlay(alignment: .top) { Rectangle().fill(.white.opacity(0.1)).frame(height: 1) }
     }
 
-    private func columnTitle(_ title: String, symbol: String) -> some View {
-        Label(title.uppercased(), systemImage: symbol)
-            .font(.system(size: 12, weight: .bold)).tracking(1.2)
-            .foregroundStyle(.white.opacity(0.7))
-    }
-
-    private func pillButton(_ title: String, symbol: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: symbol)
-                .font(.system(size: 13, weight: .semibold))
-                .frame(maxWidth: .infinity).frame(height: 36)
-                .background(RoundedRectangle(cornerRadius: 12).fill(.white.opacity(0.12)))
-                .contentShape(Rectangle())
+    private func footer(compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let error {
+                Text(error).font(.system(size: 12)).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            }
+            if compact {
+                selectedCount
+                HStack { Spacer(minLength: 0); footerActions }
+            } else {
+                HStack(spacing: 16) { selectedCount; Spacer(minLength: 8); footerActions }
+            }
         }
-        .buttonStyle(.plain)
+        .padding(24)
     }
 
-    // MARK: - Actions
+    private func selectionButton(_ title: String, id: String, action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .buttonStyle(.appSecondary).controlSize(.small).disabled(isSaving || library.loading)
+            .reportPickerControl(id, to: onControlFrame)
+    }
+
+    private func emptyState(_ title: String, detail: String, symbol: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: symbol).font(.system(size: 24, weight: .light))
+            Text(title).font(.system(size: 14, weight: .medium))
+            Text(detail).font(.system(size: 12)).foregroundStyle(.white.opacity(0.65))
+        }
+        .multilineTextAlignment(.center).frame(maxWidth: .infinity).padding(.horizontal, 16).padding(.vertical, 44)
+    }
+
+    private func dismiss() { if !isSaving { close() } }
 
     private func load() {
-        let project = ProjectStore.shared.current
-        canvas = CanvasBoard.savedItems(in: project.canvasDirectory)
-            .filter { FileManager.default.fileExists(atPath: $0.url.path) }
+        let project = store.current
+        library.canvas = InputPickerLibrary.imageItems(CanvasBoard.savedItems(in: project.canvasDirectory))
         let selection = (try? Data(contentsOf: BatchSelectionBridge.fileURL)).flatMap { try? BatchSelectionBridge.decode($0) }
         let chosen = kind == .photos ? selection?.photos : selection?.desired
         let assembled = project.inputsFolder(kind).standardizedFileURL.path
         let chosenPath = chosen.map { URL(fileURLWithPath: $0).standardizedFileURL.path }
         if let stored = project.project.sources(for: kind),
            chosenPath == assembled || stored.singleFolder?.standardizedFileURL.path == chosenPath {
-            sources = stored
-        } else if let chosen {
-            // A folder dropped straight on the card (or picked before sources existed) is the truth.
-            sources = InputSources(folders: [chosen])
-        }
-        let ids = Set(canvas.map(\.item.id))
-        sources.canvasItems.removeAll { !ids.contains($0) }
-        for folder in sources.folders { count(folder) }
+            library.sources = stored
+        } else if let chosen { library.sources = InputSources(folders: [chosen]) }
+        let ids = Set(library.canvas.map(\.item.id))
+        library.sources.canvasItems.removeAll { !ids.contains($0) }
     }
 
-    private func count(_ folder: String) {
-        counts[folder] = InputAssembler.files(in: URL(fileURLWithPath: folder, isDirectory: true), kind: kind).count
-    }
-
-    private func addFolders() {
+    private func choose(folders: Bool) {
         let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
+        panel.canChooseDirectories = folders
+        panel.canChooseFiles = !folders
         panel.allowsMultipleSelection = true
+        if !folders && !kind.acceptsAnyFile { panel.allowedContentTypes = [.image, .pdf] }
         panel.prompt = "Adicionar"
-        guard panel.runModal() == .OK else { return }
-        withAnimation(.snappy(duration: 0.2)) {
-            for url in panel.urls where !sources.folders.contains(url.path) {
-                sources.folders.append(url.path)
-                count(url.path)
-            }
-        }
-    }
-
-    private func addFiles() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = false
-        panel.allowsMultipleSelection = true
-        if !kind.acceptsAnyFile { panel.allowedContentTypes = [.image, .pdf] }
-        panel.prompt = "Adicionar"
-        guard panel.runModal() == .OK else { return }
-        withAnimation(.snappy(duration: 0.2)) {
-            for url in panel.urls where !sources.files.contains(url.path) { sources.files.append(url.path) }
+        panel.begin { response in
+            guard response == .OK else { return }
+            Task { @MainActor in await library.add(panel.urls) }
         }
     }
 
     private func apply() {
-        guard !sources.isEmpty else {
-            error = "Escolha uma pasta, uma imagem ou fotos do canvas."
+        guard !isSaving, !library.loading, library.total > 0 else { return }
+        if let selectionCompletion {
+            let selected = Set(library.sources.canvasItems)
+            var seen = Set<String>()
+            let files = (library.selectedMacFiles + library.canvas.filter { selected.contains($0.item.id) }.map(\.url))
+                .filter { seen.insert($0.standardizedFileURL.path).inserted }
+            selectionCompletion(files)
+            close()
             return
         }
-        guard !isSaving else { return }
         isSaving = true
         error = nil
-        let project = ProjectStore.shared.current
-        let chosen = sources, kind = kind, target = project.inputsFolder(kind)
-        let media = Dictionary(uniqueKeysWithValues: canvas.map { ($0.item.id, $0.url) })
+        let project = store.current, chosen = library.sources, kind = kind, target = project.inputsFolder(kind)
+        let media = Dictionary(uniqueKeysWithValues: library.canvas.map { ($0.item.id, $0.url) })
         Task {
             let result = await Task.detached(priority: .userInitiated) {
                 Result { try InputAssembler.assemble(chosen, kind: kind, into: target, canvasMedia: media) }
             }.value
             isSaving = false
+            guard store.current.id == project.id else { error = "O projeto mudou. Abra novamente o seletor neste projeto."; return }
             switch result {
             case .success(let folder):
-                ProjectStore.shared.setSources(chosen, for: kind)
+                store.setSources(chosen, for: kind)
                 request.completion(folder)
                 close()
-            case .failure(let failure):
-                error = "Não deu pra juntar os arquivos: \(failure.localizedDescription)"
+            case .failure(let failure): error = "Não deu pra juntar os arquivos: \(failure.localizedDescription)"
             }
         }
     }
 }
 
-/// A square thumbnail decoded off the main thread and kept in memory.
+/// Full-image thumbnails share one decoder and one bounded cache across both sources.
 struct SourceThumbnail: View {
     let url: URL
     @State private var image: NSImage?
-
+    @State private var failed = false
     private static let cache: NSCache<NSURL, NSImage> = {
         let cache = NSCache<NSURL, NSImage>()
         cache.countLimit = 300
@@ -345,23 +511,37 @@ struct SourceThumbnail: View {
     }()
 
     var body: some View {
-        Color.white.opacity(0.06)
+        Color.black.opacity(0.12)
             .overlay {
-                if let image = image ?? Self.cache.object(forKey: url as NSURL) {
-                    Image(nsImage: image).resizable().scaledToFill()
-                }
+                if !InputAssembler.isImage(url) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "doc.text").font(.system(size: 24))
+                        Text(url.pathExtension.uppercased()).font(.system(size: 11, weight: .medium))
+                    }.foregroundStyle(.white.opacity(0.7))
+                } else if let image = image ?? Self.cache.object(forKey: url as NSURL) {
+                    Image(nsImage: image).resizable().scaledToFit()
+                } else if failed {
+                    Image(systemName: "photo.badge.exclamationmark").font(.system(size: 22)).foregroundStyle(.secondary)
+                } else { ProgressView().controlSize(.small) }
             }
             .clipped()
             .task(id: url) {
-                guard Self.cache.object(forKey: url as NSURL) == nil else { return }
-                let url = url
-                let decoded = await Task.detached(priority: .utility) {
-                    CanvasBoard.displayImage(of: url, maxPixel: 280)
-                }.value
-                guard let decoded else { return }
+                image = nil
+                failed = false
+                guard InputAssembler.isImage(url), Self.cache.object(forKey: url as NSURL) == nil else { return }
+                let file = url
+                let decoded = await Task.detached(priority: .utility) { CanvasBoard.displayImage(of: file, maxPixel: 320) }.value
+                guard !Task.isCancelled else { return }
+                guard let decoded else { failed = true; return }
                 let loaded = NSImage(cgImage: decoded, size: .zero)
-                Self.cache.setObject(loaded, forKey: url as NSURL)
-                withAnimation(.easeOut(duration: 0.15)) { image = loaded }
+                Self.cache.setObject(loaded, forKey: file as NSURL)
+                image = loaded
             }
+    }
+}
+
+private extension View {
+    func reportPickerControl(_ id: String, to report: ((String, CGRect) -> Void)?) -> some View {
+        onGeometryChange(for: CGRect.self) { $0.frame(in: .named("input-picker")) } action: { report?(id, $0) }
     }
 }

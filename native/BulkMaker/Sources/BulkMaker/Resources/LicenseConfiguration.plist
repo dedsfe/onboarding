@@ -6,5 +6,7 @@
     <key>storeID</key><integer>0</integer>
     <key>productID</key><integer>0</integer>
     <key>variantIDs</key><array/>
+    <key>siteURL</key><string>https://carousel-maker.the-carousel-maker-site.workers.dev</string>
+    <key>checkoutURL</key><string>https://carousel-maker.the-carousel-maker-site.workers.dev/#lista-de-espera</string>
 </dict>
 </plist>

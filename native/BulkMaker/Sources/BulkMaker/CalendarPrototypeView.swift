@@ -3,6 +3,10 @@ import ImageIO
 import CarouselEngine
 import SwiftUI
 
+extension Notification.Name {
+    static let calendarReturnToOverview = Notification.Name("calendarReturnToOverview")
+}
+
 /// Posting calendar. Shows what the AI scheduled in `.bulk-maker/agenda.json`; with nothing scheduled
 /// yet it keeps the visual preview built from the output folder.
 struct CalendarPrototypeView: View {
@@ -47,10 +51,8 @@ struct CalendarPrototypeView: View {
                     .padding(.top, navInset).padding(.bottom, margin)
 
                 if isCarouselOpen {
-                    CalendarCarouselViewer(slides: openSlides, onSlideChange: reportOpenPost) {
-                        reportOpenPost(nil)
-                        withAnimation(.easeOut(duration: 0.2)) { isCarouselOpen = false }
-                    }
+                    CalendarCarouselViewer(slides: openSlides, onSlideChange: reportOpenPost, close: closeCarousel)
+                    .onDisappear { reportOpenPost(nil) }
                     .transition(.opacity)
                     .zIndex(20)
                 }
@@ -59,19 +61,54 @@ struct CalendarPrototypeView: View {
             .clipped()
         }
         .onAppear {
+            if CalendarPostCenter.shared.lastScheduledProject == ProjectStore.shared.current.id,
+               let added = CalendarPostCenter.shared.lastScheduledDate { month = added }
             preview = CalendarPreview.load(from: outputFolder)
             reloadAgenda()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .showPostingCalendar)) { note in
+            if let date = note.object as? Date { month = date }
+            agendaStamp = nil
+            reloadAgenda()
+        }
         .onChange(of: outputFolder) { _, folder in preview = CalendarPreview.load(from: folder) }
-        // The AI schedules from the terminal while this page is open.
-        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in reloadAgenda() }
-        .alert("Não deu pra enviar", isPresented: Binding(get: { shareError != nil }, set: { if !$0 { shareError = nil } })) {
-            Button("OK") { shareError = nil }
-        } message: { Text(shareError ?? "") }
+        .onReceive(NotificationCenter.default.publisher(for: .calendarReturnToOverview)) { _ in closeCarousel() }
+        .overlay(alignment: .top) {
+            if let shareError {
+                HStack(spacing: 10) {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                    Text(shareError).font(.system(size: 13, weight: .medium)).lineLimit(2)
+                    Button {
+                        withAnimation(.snappy(duration: 0.2)) { self.shareError = nil }
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                    .buttonStyle(.appIcon)
+                    .controlSize(.small)
+                }
+                .padding(.horizontal, 16).padding(.vertical, 10)
+                .glassEffect(.regular, in: .capsule)
+                .shadow(color: .black.opacity(0.3), radius: 10, y: 4)
+                .padding(.top, 84)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .task(id: shareError) {
+                    try? await Task.sleep(for: .seconds(5))
+                    withAnimation(.snappy(duration: 0.2)) { self.shareError = nil }
+                }
+                .zIndex(30)
+            }
+        }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: shareError)
     }
 
     private static var agendaFile: URL {
         TerminalHandoff.projectDirectory.appendingPathComponent(".bulk-maker/agenda.json")
+    }
+
+    private func closeCarousel() {
+        guard isCarouselOpen else { return }
+        reportOpenPost(nil)
+        withAnimation(.easeOut(duration: 0.2)) { isCarouselOpen = false }
     }
 
     private func reloadAgenda() {
@@ -151,6 +188,15 @@ struct CalendarPrototypeView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                Menu {
+                    Button("Do Mac…", systemImage: "laptopcomputer") { CalendarPostCenter.shared.present(.mac) }
+                    Button("Do canvas…", systemImage: "square.dashed") { CalendarPostCenter.shared.present(.canvas) }
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .menuStyle(.button).menuIndicator(.hidden).buttonStyle(.appIcon)
+                .accessibilityLabel("Adicionar ao calendário").help("Adicionar do Mac ou do canvas")
+                .padding(.trailing, 8)
                 if agenda.posts.isEmpty {
                     Text("Prévia visual")
                         .font(.system(size: 12, weight: .medium))
@@ -160,22 +206,16 @@ struct CalendarPrototypeView: View {
                 if !todayPosts.isEmpty {
                     Button { airDrop(todayPosts) } label: {
                         Label("Enviar hoje", systemImage: "square.and.arrow.up")
-                            .font(.system(size: 13, weight: .medium))
-                            .padding(.horizontal, 6)
-                            .frame(height: 30)
                     }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.appSecondary)
                     .help("Manda os carrosséis de hoje pro iPhone por AirDrop")
                     .padding(.trailing, 8)
                     .transition(.opacity)
                 }
                 Button { showRules = true } label: {
                     Label("\(agenda.rules.maxPerDay) por dia", systemImage: "slider.horizontal.3")
-                        .font(.system(size: 13, weight: .medium))
-                        .padding(.horizontal, 6)
-                        .frame(height: 30)
                 }
-                .buttonStyle(.glass)
+                .buttonStyle(.appSecondary)
                 .help("Quantos carrosséis por dia, em que horários e dias")
                 .popover(isPresented: $showRules, arrowEdge: .bottom) {
                     AgendaRulesEditor(rules: agenda.rules, update: updateRules)
@@ -220,25 +260,24 @@ struct CalendarPrototypeView: View {
         let monthKey = String(PostAgenda.dayFormatter.string(from: monthStart).prefix(7))
         let count = agenda.posts.filter { $0.date.hasPrefix(monthKey) }.count
         let hasPreview = agenda.posts.isEmpty && preview.coverURL != nil
-        return SlidiMessage(state: count > 0 ? .happy : hasPreview ? .curious : .resting,
-                            title: count > 0 ? "\(count) \(count == 1 ? "carrossel agendado" : "carrosséis agendados") neste mês"
+        return AppStatusMessage(title: count > 0 ? "\(count) \(count == 1 ? "carrossel agendado" : "carrosséis agendados") neste mês"
                                 : hasPreview ? "Prévia do seu carrossel" : "Agenda livre neste mês",
                             detail: count > 0 ? "Abra um post para revisar seus slides."
-                                : hasPreview ? "Peça à IA para agendar quando estiver pronto."
-                                : "Os carrosséis agendados pela IA aparecem aqui.", width: 28)
+                                : hasPreview ? "Use o + para adicionar do Mac ou do canvas."
+                                : "Adicione pelo + ou envie as imagens selecionadas no canvas.")
     }
 
     private var monthControls: some View {
         HStack(spacing: 4) {
             Button("Hoje") { withAnimation(.snappy(duration: 0.25)) { month = Date() } }
-                .font(.system(size: 13, weight: .medium))
-                .padding(.horizontal, 8)
-            Button { shiftMonth(-1) } label: { Image(systemName: "chevron.left").frame(width: 28, height: 30) }
+                .buttonStyle(.appSecondary)
+            Button { shiftMonth(-1) } label: { Image(systemName: "chevron.left") }
+                .buttonStyle(.appIcon)
                 .help("Mês anterior")
-            Button { shiftMonth(1) } label: { Image(systemName: "chevron.right").frame(width: 28, height: 30) }
+            Button { shiftMonth(1) } label: { Image(systemName: "chevron.right") }
+                .buttonStyle(.appIcon)
                 .help("Próximo mês")
         }
-        .buttonStyle(.glass)
     }
 
     private func dayCell(_ day: Int?, height: CGFloat) -> some View {
@@ -451,13 +490,15 @@ struct CalendarPrototypeView: View {
     }
 }
 
-private struct CalendarCarouselViewer: View {
+struct CalendarCarouselViewer: View {
     let slides: [URL]
     var onSlideChange: (Int) -> Void = { _ in }
     let close: () -> Void
+    var onControlFrame: ((String, CGRect) -> Void)? = nil
 
     @State private var selectedIndex = 0
     @State private var dragOffset: CGFloat = 0
+    @State private var contentBounds: CGRect = .zero
     /// The open post's plan, edited from the panel beside the phone.
     @State private var session: SlideEditSession?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -466,18 +507,15 @@ private struct CalendarCarouselViewer: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let phoneHeight = max(180, min(geometry.size.height - 132, 700,
+            let phoneHeight = max(180, min(geometry.size.height - 148, 700,
                                            (geometry.size.width - 184 - Self.editorWidth) * 19.5 / 9))
             let phoneWidth = phoneHeight * 9 / 19.5
 
             ZStack {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                    .overlay(.black.opacity(0.22))
-                    .onTapGesture(perform: close)
-
+                Rectangle().fill(.ultraThinMaterial).overlay(.black.opacity(0.22))
+                    .allowsHitTesting(false)
                 VStack(spacing: 0) {
-                    Color.clear.frame(height: 100)
+                    Color.clear.frame(height: 116).allowsHitTesting(false)
                     HStack(spacing: 24) {
                         navigationButton("chevron.left", direction: -1, label: "Slide anterior")
                         phone(width: phoneWidth, height: phoneHeight)
@@ -487,27 +525,39 @@ private struct CalendarCarouselViewer: View {
                                 .frame(width: Self.editorWidth, height: phoneHeight)
                         }
                     }
-                    .overlay(alignment: .topTrailing) {
-                        // With the editor open, its ✓ closes the preview.
-                        if session == nil {
-                            Button(action: close) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .frame(width: 18, height: 18)
-                            }
-                            .buttonStyle(.glass)
-                            .buttonBorderShape(.circle)
-                            .controlSize(.small)
-                            .help("Fechar prévia")
-                            .accessibilityLabel("Fechar prévia")
-                        }
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    Color.clear.frame(height: 32)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("post-viewer")) } action: { contentBounds = $0 }
+                    Color.clear.frame(height: 32).allowsHitTesting(false)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                 .environment(\.colorScheme, .dark)
             }
+            .overlay {
+                // Catch only clicks outside the phone and editor; their controls keep their own events.
+                Button(action: close) {
+                    Color.clear.frame(width: geometry.size.width, height: geometry.size.height)
+                        .contentShape(PostViewerOutsideShape(content: contentBounds), eoFill: true)
+                }
+                .buttonStyle(.plain).accessibilityHidden(true)
+            }
+            .overlay(alignment: .topLeading) {
+                Button(action: close) {
+                    Label("Voltar ao calendário", systemImage: "chevron.left")
+                }
+                .buttonStyle(.appSecondary).keyboardShortcut(.cancelAction)
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("post-viewer")) } action: { onControlFrame?("back", $0) }
+                .padding(.leading, 24).padding(.top, 76)
+            }
+            .overlay(alignment: .topTrailing) {
+                Button(action: close) {
+                    Image(systemName: "xmark")
+                }
+                .buttonStyle(.appIcon)
+                .accessibilityLabel("Fechar post").help("Voltar ao calendário (Esc)")
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .named("post-viewer")) } action: { onControlFrame?("close", $0) }
+                .padding(.trailing, 24).padding(.top, 76)
+            }
             .frame(width: geometry.size.width, height: geometry.size.height)
+            .coordinateSpace(name: "post-viewer")
         }
         .onChange(of: selectedIndex, initial: true) { _, index in onSlideChange(index) }
         .onAppear {
@@ -573,11 +623,8 @@ private struct CalendarCarouselViewer: View {
             }
         } label: {
             Image(systemName: symbol)
-                .font(.system(size: 14, weight: .semibold))
-                .frame(width: 18, height: 18)
         }
-        .buttonStyle(.glass)
-        .buttonBorderShape(.circle)
+        .buttonStyle(.appIcon)
         .controlSize(.small)
         .disabled(!available)
         .opacity(available ? 1 : 0.35)
@@ -609,6 +656,15 @@ private struct CalendarCarouselViewer: View {
         }
         .frame(width: width, height: height)
         .clipped()
+    }
+}
+
+private struct PostViewerOutsideShape: Shape {
+    let content: CGRect
+    func path(in rect: CGRect) -> Path {
+        var path = Path(rect)
+        path.addRect(content)
+        return path
     }
 }
 

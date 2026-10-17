@@ -2,6 +2,41 @@
 
 Este guia complementa `sessao.md`. O objetivo é entregar slides prontos para publicar, não apenas um plano de design. Compare cada decisão com os exemplos em "Resultados desejados". Se os exemplos forem inconsistentes, mantenha uma direção visual por variação.
 
+## O que faz um carrossel converter
+
+Design aqui não é estética de portfólio: é parar o dedo no slide 1 e fazer a pessoa arrastar até o fim. Um carrossel bonito que ninguém arrasta falhou. Estas regras vêm de criadores que viralizaram com slideshows (base em `~/Conhecimento-Slideshow`) e valem acima do gosto pessoal de quem desenha.
+
+**Slide 1 (a capa) decide 90% do resultado**
+- A foto da capa pesa tanto quanto o texto. O mesmo texto foi de 650 mil a 3,3 milhões de views só trocando a foto por um rosto chorando. Na capa vai uma **pessoa com emoção visível** (choro, alívio, riso nervoso), olhando pra câmera, em selfie ou foto caseira. Nunca use objeto, paisagem ou silhueta na capa.
+- O gancho é um estado emocional que a pessoa reconhece, ou uma lacuna de curiosidade ("o dia 1 foi assim:", "eu aprendi da pior forma..."), não uma promessa genérica. "Como eu fiz" ganha de "como fazer".
+- Uma palavra em CAIXA ALTA dá peso à frase (NÃO, ANTES, METADE). Só uma por slide.
+- Tem que ser lido e entendido em menos de 2 segundos: 5 a 12 palavras.
+
+**Cara de post de gente, não de anúncio**
+- Fotos com cara de celular: luz quente de abajur, quarto real, lençol bagunçado, mão segurando o celular, café, Bíblia aberta. Cor viva e quente. **Nada de preto e branco, granulado artístico, foto de banco posada ou estética minimalista de designer.** Isso parece anúncio ou portfólio e a pessoa pula.
+- Texto no estilo nativo do TikTok: fonte TikTok Sans (ou a mais próxima), branca com contorno preto, centralizada, no meio da tela ou acima do rosto. É o que o usuário já lê o dia todo e por isso não parece propaganda.
+- O produto só aparece perto do fim, como parte da história ("baixei um app que..."), e de preferência numa foto real: mão segurando o celular com a tela do app, notificação, tempo de tela. A pessoa precisa sentir que **ela descobriu** o app.
+
+**Sequência que segura o swipe**
+- Uma ideia por slide. Cada slide deixa uma ponta solta pro próximo.
+- Formatos que mais funcionam: diário com datas ("dia 1 / dia 7 / dia 30"), antes → o que fiz → depois (mesmo cenário nas duas pontas pra obrigar a voltar e comparar), lista salvável, desabafo em primeira pessoa.
+- Variar o enquadramento entre slides (rosto → mãos → objeto → tela → rosto) pra cada swipe parecer novo. Mesma persona e mesma luz do começo ao fim.
+- Fechamento: a virada emocional (a mesma pessoa melhor) e o CTA como final da história: "se quiser o nome do app comenta QUERO".
+- 6 a 8 slides. Menos slides = mais gente chega no CTA.
+
+**Formato**
+- TikTok: 1080×1920 (9:16), tela cheia, respeitando os botões laterais e a legenda.
+- Instagram feed: 1080×1350 (4:5). Carrossel com música aparece também na aba Reels.
+- Gerar fotos sempre **sem texto**; o texto entra pelo renderizador.
+
+**Checklist antes de entregar** (se algum item falhar, refaça)
+1. A capa tem um rosto emocionado e o texto dá pra ler em 2 segundos?
+2. Isso parece post de uma pessoa real ou parece anúncio? Tem que parecer pessoa.
+3. As fotos são coloridas, quentes e da mesma persona e lugar?
+4. Cada slide tem uma ideia só e puxa pro próximo?
+5. O app aparece só no fim, numa foto real de celular?
+6. O texto não cobre olhos nem boca?
+
 ## Antes de desenhar
 
 1. Inspecione fotos, referências, textos e formato. Identifique assunto, público, tom, sequência e área livre nas fotos.

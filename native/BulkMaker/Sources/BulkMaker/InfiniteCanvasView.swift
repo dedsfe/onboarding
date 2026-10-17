@@ -20,11 +20,18 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
     private let groupOutline = CAShapeLayer()
     private let handles = CAShapeLayer()
     private let sizeBadge = BadgeLayer()
+    /// One-line status at the bottom ("Lendo texto…", "Texto copiado").
+    private let notice = BadgeLayer()
+    private var noticeTimer: Timer?
     private let guides = CAShapeLayer()
     private let marquee = CAShapeLayer()
     private let dropGlow = DropGlowLayer()
     private var layers: [UUID: ItemLayer] = [:]
     private var decoded: [UUID: Int] = [:]
+    /// What each text box was last drawn from, so an edit (here or by the AI) redraws it.
+    private var textSignatures: [UUID: String] = [:]
+    /// The text box being typed into, over its layer.
+    private var editor: (id: UUID, view: CanvasTextEditor, before: [CanvasItem])?
     private(set) var selection: Set<UUID> = [] {
         didSet {
             guard selection != oldValue else { return }
@@ -55,6 +62,19 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         case marquee(start: CGPoint, base: Set<UUID>)
     }
     private var drag = Drag.none
+    static weak var controlView: InfiniteCanvasView?
+    static let controlViews = NSHashTable<InfiniteCanvasView>.weakObjects()
+
+    func prepareForAppCommand() throws {
+        guard case .none = drag, editor == nil else {
+            throw AppControlError("O canvas está sendo editado. Tente de novo após terminar o gesto ou a edição de texto.")
+        }
+    }
+
+    func finishAppCommand(before: [CanvasItem]) {
+        selection.formIntersection(board.items.map(\.id))
+        if before != board.items { registerUndo(before: before, name: "Editar pelo chat") }
+    }
 
     static let zoomRange: ClosedRange<CGFloat> = 0.05...8
     private static let handleSize: CGFloat = 11
@@ -90,11 +110,12 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         marquee.lineWidth = 1
         marquee.isHidden = true
         dropGlow.opacity = 0
-        for sublayer in [grid, world, groupOutline, guides, handles, sizeBadge, marquee, dropGlow] as [CALayer] {
+        for sublayer in [grid, world, groupOutline, guides, handles, sizeBadge, marquee, dropGlow, notice] as [CALayer] {
             layer?.addSublayer(sublayer)
         }
         registerForDraggedTypes(Self.dropTypes)
         board.onChange = { [weak self] in self?.syncLayers(animated: true) }
+        ImageTextReader.warmUp()
         syncLayers(animated: false)
     }
 
@@ -106,6 +127,12 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
     override var mouseDownCanMoveWindow: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        // Navigating away, switching projects or closing the window must save the active text editor.
+        if newWindow == nil { endEditing() }
+        super.viewWillMove(toWindow: newWindow)
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         window?.makeFirstResponder(self)
@@ -114,9 +141,11 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         guard window != nil else { return }
         // The AI adds images with `carousel-render --canvas-add`; they show up here within a second.
         diskWatch = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
-            guard let self, case .none = self.drag else { return }
-            let added = self.board.reloadIfChangedOnDisk()
-            if !added.isEmpty { self.onExternalAdd?(added) }
+            MainActor.assumeIsolated {
+                guard let self, case .none = self.drag, self.editor == nil else { return }
+                let added = self.board.reloadIfChangedOnDisk()
+                if !added.isEmpty { self.onExternalAdd?(added) }
+            }
         }
     }
 
@@ -131,7 +160,7 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
     override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
         let backing = window?.backingScaleFactor ?? 2
-        for sublayer in [grid, sizeBadge, dropGlow] as [CALayer] { sublayer.contentsScale = backing }
+        for sublayer in [grid, sizeBadge, dropGlow, notice] as [CALayer] { sublayer.contentsScale = backing }
         dropGlow.updateScale(backing)
     }
 
@@ -278,6 +307,7 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         for (id, layer) in layers where !ids.contains(id) {
             layers[id] = nil
             decoded[id] = nil
+            textSignatures[id] = nil
             if animated { layer.vanish() } else { layer.removeFromSuperlayer() }
         }
         selection.formIntersection(ids)
@@ -304,6 +334,8 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
                 layer.place(item.frame)
             }
             layer.zPosition = CGFloat(index)
+            // Bare text (no background) floats on the page: no card shadow or glass edge.
+            layer.plain = item.isText && CanvasText.color(item.style?.background) == nil
         }
         CATransaction.commit()
         refreshResolution()
@@ -339,6 +371,18 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
             let onScreen = bounds.isEmpty || item.frame.intersects(visible)
             let needed = onScreen ? min(max(item.width, item.height) * Double(scale) * Double(backing), 2048) : 256
             let wanted = max(256, Int(pow(2, ceil(log2(max(needed, 1))))))
+            if let text = item.text {
+                // Text is drawn here, not decoded: redraw when it grows on screen or its words, style or box change.
+                let style = item.style ?? TextStyle()
+                let signature = "\(text)|\(style)|\(item.width)x\(item.height)"
+                if let have = decoded[item.id], have >= wanted, textSignatures[item.id] == signature { continue }
+                decoded[item.id] = wanted
+                textSignatures[item.id] = signature
+                if let image = CanvasText.render(text, style: style, size: item.frame.size, maxPixel: wanted) {
+                    layers[item.id]?.show(image)
+                }
+                continue
+            }
             if let have = decoded[item.id], have >= wanted { continue }
             decoded[item.id] = wanted
             let url = board.url(of: item), id = item.id
@@ -375,7 +419,7 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         if let first = selected.first {
             let union = selected.dropFirst().reduce(first.frame) { $0.union($1.frame) }
             let label = selected.count == 1 ? "\(Int(union.width.rounded())) × \(Int(union.height.rounded()))"
-                : "\(selected.count) imagens"
+                : "\(selected.count) itens"
             let box = toView(union)
             sizeBadge.show(label, centeredAt: CGPoint(x: box.midX, y: box.maxY + 22), emphasized: isResizing)
             sizeBadge.isHidden = moving && !isResizing
@@ -383,6 +427,7 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
             sizeBadge.isHidden = true
         }
         CATransaction.commit()
+        positionEditor()
     }
 
     private func point(of corner: Corner, in rect: CGRect) -> CGPoint {
@@ -520,9 +565,10 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
             updateOverlay()
             return
         }
+        if editor != nil { endEditing() }
         if let hit = item(at: point) {
             if event.clickCount == 2 {
-                focus(on: hit.frame, maxScale: 4, animated: true)
+                if hit.isText { beginEditing(hit) } else { focus(on: hit.frame, maxScale: 4, animated: true) }
                 return
             }
             if event.modifierFlags.contains(.shift) || event.modifierFlags.contains(.command) {
@@ -635,7 +681,10 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
             if board.items.contains(where: { item in frames[item.id].map { $0 != item.frame } ?? false }) {
                 commit(before: before, name: "Mover")
             }
-        case .resize(_, _, _, _, let before):
+        case .resize(_, _, _, let frames, let before):
+            for item in board.items {
+                if let old = frames[item.id], old.width > 0 { board.scaleText(of: item.id, by: item.width / old.width) }
+            }
             commit(before: before, name: "Redimensionar")
             refreshResolution()
         case .pan:
@@ -685,9 +734,17 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         }
         if let hit = item(at: point) {
             if !selection.contains(hit.id) { selection = [hit.id] }
+            if hit.isText {
+                add("Editar texto", #selector(editSelectedText(_:)), "character.cursor.ibeam")
+                menu.addItem(.separator())
+            } else {
+                add("Extrair texto (E)", #selector(extractText(_:)), "text.viewfinder")
+                menu.addItem(.separator())
+            }
             add("Copiar", #selector(copy(_:)), "doc.on.doc")
             add("Recortar", #selector(cut(_:)), "scissors")
             add("Duplicar", #selector(duplicate(_:)), "plus.square.on.square")
+            add("Enviar ao calendário…", #selector(sendToCalendar(_:)), "calendar.badge.plus")
             menu.addItem(.separator())
             add("Aumentar", #selector(growSelection(_:)), "arrow.up.left.and.arrow.down.right")
             add("Diminuir", #selector(shrinkSelection(_:)), "arrow.down.right.and.arrow.up.left")
@@ -706,6 +763,7 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
             add("Apagar", #selector(delete(_:)), "trash")
         } else {
             add("Colar", #selector(paste(_:)), "doc.on.clipboard")
+            add("Adicionar texto", #selector(addTextAction(_:)), "textformat")
             add("Importar imagens…", #selector(importImages(_:)), "photo.badge.plus")
             menu.addItem(.separator())
             add("Selecionar tudo", #selector(selectAll(_:)), "checkmark.circle")
@@ -730,6 +788,9 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         case 2 where event.modifierFlags.contains(.command): duplicate(nil) // ⌘D
         case 24 where !event.modifierFlags.contains(.command): growSelection(nil) // =
         case 27 where !event.modifierFlags.contains(.command): shrinkSelection(nil) // -
+        case 17 where !event.modifierFlags.contains(.command): addTextAction(nil) // T: new text box
+        case 14 where !event.modifierFlags.contains(.command): extractText(nil) // E: words of the selected images
+        case 36 where selectedItems.count == 1 && selectedItems[0].isText: editSelectedText(nil) // ↩ edits
         default: super.keyDown(with: event)
         }
     }
@@ -754,6 +815,13 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
 
     private var selectedItems: [CanvasItem] { board.items.filter { selection.contains($0.id) } }
 
+    @objc func sendToCalendar(_ sender: Any?) {
+        let images = InputPickerLibrary.imageItems(selectedItems.map { ($0, board.url(of: $0)) })
+            .sorted { ($0.item.y, $0.item.x) < ($1.item.y, $1.item.x) }
+        guard !images.isEmpty, board.directory.standardizedFileURL == ProjectStore.shared.current.canvasDirectory.standardizedFileURL else { return }
+        CalendarPostCenter.shared.present(.selection, files: images.map(\.url))
+    }
+
     @objc func copy(_ sender: Any?) {
         board.copy(selectedItems)
         for id in selection { layers[id]?.pulse() }
@@ -766,22 +834,142 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
 
     @objc func paste(_ sender: Any?) {
         let before = board.items
-        let added = board.importImages(from: .general, around: pastePoint)
+        let added = board.importItems(from: .general, around: pastePoint)
         guard !added.isEmpty else { NSSound.beep(); return }
         selection = Set(added.map(\.id))
         registerUndo(before: before, name: "Colar")
     }
 
     @objc func duplicate(_ sender: Any?) {
-        let source = selectedItems
-        guard let first = source.first else { return }
+        guard !selection.isEmpty else { return }
         let before = board.items
-        let pasteboard = NSPasteboard(name: .init("canvas-duplicate"))
-        board.copy(source, to: pasteboard)
-        let union = source.dropFirst().reduce(first.frame) { $0.union($1.frame) }
-        let added = board.importImages(from: pasteboard, around: CGPoint(x: union.midX + 40, y: union.midY + 40))
-        selection = Set(added.map(\.id))
-        registerUndo(before: before, name: "Duplicar")
+        do {
+            let added = try board.duplicateItems(selection)
+            selection = Set(added.map(\.id))
+            registerUndo(before: before, name: "Duplicar")
+        } catch {
+            showNotice("Não foi possível duplicar: \(error.localizedDescription)", for: 4)
+        }
+    }
+
+    // MARK: - Text boxes
+
+    @objc func addTextAction(_ sender: Any?) {
+        let before = board.items
+        let item = board.addText("Texto", at: pastePoint)
+        selection = [item.id]
+        // One undo step for adding and typing: saved when the editing ends.
+        beginEditing(item, before: before)
+    }
+
+    /// The words written in each selected image become a text box right under it, and go to the clipboard.
+    @objc func extractText(_ sender: Any?) {
+        let images = selectedItems.filter { !$0.isText }.sorted { ($0.y, $0.x) < ($1.y, $1.x) }
+        guard !images.isEmpty else { return }
+        let sources = images.map { ($0, board.url(of: $0)) }
+        for item in images { layers[item.id]?.setScanning(true) }
+        showNotice(images.count == 1 ? "Lendo texto…" : "Lendo texto de \(images.count) imagens…", for: nil)
+        // Usually under a second; the first read after a restart waits for macOS to prepare the model.
+        let slow = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.showNotice("Preparando o leitor de texto (só na primeira vez)…", for: nil) }
+        }
+        Task { @MainActor [weak self] in
+            let texts = await ImageTextReader.readAll(sources.map(\.1))
+            slow.invalidate()
+            let found = zip(sources.map(\.0), texts).compactMap { item, text in text.map { (item, $0) } }
+            guard let self else { return }
+            for (item, _) in sources { self.layers[item.id]?.setScanning(false) }
+            guard !found.isEmpty else {
+                self.showNotice("Nenhum texto encontrado", for: 2)
+                NSSound.beep()
+                return
+            }
+            let before = self.board.items
+            var added: [UUID] = []
+            for (item, text) in found {
+                let style = TextStyle(size: 18, weight: "regular")
+                let box = self.board.addText(text, style: style, at: CGPoint(x: item.x, y: item.y + item.height + 12))
+                let fitted = CanvasText.measure(text, style: style, maxWidth: max(item.width, 320))
+                self.board.setFrame(CGRect(x: box.x, y: box.y, width: fitted.width, height: fitted.height), of: box.id)
+                added.append(box.id)
+            }
+            self.commit(before: before, name: "Extrair texto")
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(found.map(\.1).joined(separator: "\n\n"), forType: .string)
+            self.selection = Set(added)
+            for id in added { self.layers[id]?.pulse() }
+            self.showNotice(found.count == 1 ? "Texto copiado ✓" : "Texto de \(found.count) imagens copiado ✓", for: 2)
+        }
+    }
+
+    /// A status line at the bottom of the canvas; `seconds` nil keeps it until the next one.
+    private func showNotice(_ text: String, for seconds: TimeInterval?) {
+        noticeTimer?.invalidate()
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        // Above the bottom row of controls (20pt padding + 38pt bar), so the selection bar never covers it.
+        notice.show(text, centeredAt: CGPoint(x: bounds.midX, y: bounds.maxY - 80), emphasized: true)
+        CATransaction.commit()
+        guard let seconds else { return }
+        noticeTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.notice.isHidden = true }
+        }
+    }
+
+    @objc func editSelectedText(_ sender: Any?) {
+        guard let item = selectedItems.first(where: \.isText) else { return }
+        beginEditing(item)
+    }
+
+    /// Types right on the canvas: a text view over the box, drawn like it, following pan and zoom.
+    private func beginEditing(_ item: CanvasItem, before: [CanvasItem]? = nil) {
+        endEditing()
+        let style = item.style ?? TextStyle()
+        let view = CanvasTextEditor(frame: .zero)
+        view.string = item.text ?? ""
+        view.isRichText = false
+        view.allowsUndo = true
+        view.drawsBackground = true
+        view.backgroundColor = CanvasText.color(style.background) ?? NSColor(white: 0.08, alpha: 0.85)
+        view.insertionPointColor = CanvasText.color(style.color) ?? .white
+        view.textContainer?.lineFragmentPadding = 0
+        view.onDone = { [weak self] in self?.endEditing() }
+        view.delegate = view
+        addSubview(view)
+        editor = (item.id, view, before ?? board.items)
+        layers[item.id]?.opacity = 0
+        positionEditor()
+        window?.makeFirstResponder(view)
+        view.selectAll(nil)
+    }
+
+    private func positionEditor() {
+        guard let editor, let item = board.items.first(where: { $0.id == editor.id }) else { return }
+        let style = item.style ?? TextStyle()
+        editor.view.frame = toView(item.frame)
+        let padding = (style.padding ?? 0) * scale
+        editor.view.textContainerInset = NSSize(width: padding, height: padding)
+        editor.view.typingAttributes = CanvasText.attributes(style, scale: scale)
+        editor.view.textStorage?.setAttributes(CanvasText.attributes(style, scale: scale),
+                                               range: NSRange(location: 0, length: editor.view.string.utf16.count))
+    }
+
+    /// Saves what was typed and fits the box's height to it (width stays, so it wraps where it did).
+    private func endEditing() {
+        guard let current = editor else { return }
+        editor = nil
+        current.view.onDone = nil
+        current.view.removeFromSuperview()
+        layers[current.id]?.opacity = 1
+        guard let item = board.items.first(where: { $0.id == current.id }) else { return }
+        let text = current.view.string
+        if text != item.text {
+            board.setText(text, of: item.id)
+            let size = CanvasText.measure(text, style: item.style ?? TextStyle(), maxWidth: item.width)
+            board.setFrame(CGRect(x: item.x, y: item.y, width: item.width, height: size.height), of: item.id)
+        }
+        if board.items != current.before { commit(before: current.before, name: "Editar texto") }
+        window?.makeFirstResponder(self)
     }
 
     @objc func importImages(_ sender: Any?) {
@@ -823,7 +1011,10 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         let selected = selectedItems
         guard !selected.isEmpty else { return }
         let before = board.items
-        for (id, frame) in change(selected) { board.setFrame(frame, of: id) }
+        for (id, frame) in change(selected) {
+            if let old = selected.first(where: { $0.id == id }), old.width > 0 { board.scaleText(of: id, by: frame.width / old.width) }
+            board.setFrame(frame, of: id)
+        }
         glideNextSync = true
         commit(before: before, name: name)
     }
@@ -867,10 +1058,12 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
         focus(on: selectedItems.dropFirst().reduce(first.frame) { $0.union($1.frame) }, maxScale: 4, animated: true)
     }
 
-    @objc func openSelection(_ sender: Any?) { selectedItems.forEach { NSWorkspace.shared.open(board.url(of: $0)) } }
+    @objc func openSelection(_ sender: Any?) {
+        selectedItems.filter { !$0.isText }.forEach { NSWorkspace.shared.open(board.url(of: $0)) }
+    }
 
     @objc func revealSelection(_ sender: Any?) {
-        NSWorkspace.shared.activateFileViewerSelecting(selectedItems.map { board.url(of: $0) })
+        NSWorkspace.shared.activateFileViewerSelecting(selectedItems.filter { !$0.isText }.map { board.url(of: $0) })
     }
 
     @objc func fitAllAction(_ sender: Any?) { fitAll() }
@@ -912,10 +1105,11 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
         switch item.action {
         case #selector(copy(_:)), #selector(cut(_:)), #selector(delete(_:)), #selector(duplicate(_:)),
-             #selector(bringToFront(_:)), #selector(sendToBack(_:)), #selector(openSelection(_:)),
-             #selector(revealSelection(_:)), #selector(focusSelection(_:)),
+             #selector(bringToFront(_:)), #selector(sendToBack(_:)), #selector(focusSelection(_:)),
              #selector(growSelection(_:)), #selector(shrinkSelection(_:)):
             return !selection.isEmpty
+        case #selector(openSelection(_:)), #selector(revealSelection(_:)), #selector(sendToCalendar(_:)):
+            return selectedItems.contains { !$0.isText }
         case #selector(matchHeights(_:)), #selector(arrangeInRow(_:)):
             return selection.count > 1
         case #selector(selectAll(_:)):
@@ -964,7 +1158,7 @@ final class InfiniteCanvasView: NSView, NSDraggingSource, NSMenuItemValidation {
     // MARK: - Drag out
 
     private func beginExport(of ids: [UUID], event: NSEvent) {
-        let items = board.items.filter { ids.contains($0.id) }
+        let items = board.items.filter { ids.contains($0.id) && !$0.isText }
         let writers = board.pasteboardItems(for: items)
         let dragging = zip(items, writers).map { item, writer -> NSDraggingItem in
             let entry = NSDraggingItem(pasteboardWriter: writer)
@@ -1001,9 +1195,21 @@ private final class ItemLayer: CALayer {
     private let picture = CALayer()
     private let sheen = CALayer()
     private let ring = CALayer()
+    /// A band of light sweeping down the image while its words are being read.
+    private let scan = CAGradientLayer()
     private(set) var image: CGImage?
     private var state = State()
     private var zoom: CGFloat = 1
+    /// No shadow, glass edge or placeholder tint: for text drawn straight on the page.
+    var plain = false {
+        didSet {
+            guard plain != oldValue else { return }
+            card.shadowColor = plain ? nil : CGColor(gray: 0, alpha: 1)
+            sheen.isHidden = plain
+            picture.masksToBounds = !plain
+            if plain { picture.backgroundColor = nil }
+        }
+    }
 
     override init() {
         super.init()
@@ -1026,6 +1232,18 @@ private final class ItemLayer: CALayer {
         card.addSublayer(picture)
         card.addSublayer(sheen)
         card.addSublayer(ring)
+        scan.colors = [NSColor.controlAccentColor.withAlphaComponent(0).cgColor,
+                       NSColor.controlAccentColor.withAlphaComponent(0.55).cgColor,
+                       NSColor.controlAccentColor.withAlphaComponent(0).cgColor]
+        scan.locations = [0, 0.1, 0.2]
+        scan.startPoint = CGPoint(x: 0.5, y: 0)
+        scan.endPoint = CGPoint(x: 0.5, y: 1)
+        scan.cornerRadius = Self.radius
+        scan.cornerCurve = .continuous
+        scan.masksToBounds = true
+        scan.backgroundColor = NSColor.controlAccentColor.withAlphaComponent(0.12).cgColor
+        scan.isHidden = true
+        card.addSublayer(scan)
         addSublayer(card)
     }
 
@@ -1039,6 +1257,7 @@ private final class ItemLayer: CALayer {
         card.position = CGPoint(x: frame.width / 2, y: frame.height / 2)
         picture.frame = card.bounds
         sheen.frame = card.bounds
+        scan.frame = card.bounds
         layoutRing()
         card.shadowPath = CGPath(roundedRect: card.bounds, cornerWidth: Self.radius, cornerHeight: Self.radius, transform: nil)
     }
@@ -1096,6 +1315,19 @@ private final class ItemLayer: CALayer {
         bounce.duration = 0.32
         bounce.timingFunctions = Array(repeating: CAMediaTimingFunction(name: .easeInEaseOut), count: 3)
         card.add(bounce, forKey: "pop")
+    }
+
+    func setScanning(_ on: Bool) {
+        scan.removeAllAnimations()
+        scan.isHidden = !on
+        guard on else { return }
+        let sweep = CABasicAnimation(keyPath: "locations")
+        sweep.fromValue = [-0.3, -0.15, 0]
+        sweep.toValue = [1, 1.15, 1.3]
+        sweep.duration = 1.1
+        sweep.repeatCount = .infinity
+        sweep.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        scan.add(sweep, forKey: "scan")
     }
 
     /// Copied: a quick flash of light across the image.

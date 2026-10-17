@@ -1,4 +1,5 @@
 import AppKit
+import SwiftTerm
 import SwiftUI
 
 /// Lets a trackpad pan the canvas in both axes without imposing scroll bounds.
@@ -12,12 +13,8 @@ struct CanvasScrollMonitor: NSViewRepresentable {
         view.onScroll = onScroll
         view.isEnabled = isEnabled
         view.monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak view] event in
-            guard let view, view.isEnabled, let window = view.window, event.window === window,
-                  view.bounds.contains(view.convert(event.locationInWindow, from: nil)) else {
-                return event
-            }
-            view.onScroll?(CGSize(width: event.scrollingDeltaX, height: event.scrollingDeltaY))
-            return nil
+            guard let view else { return event }
+            return view.handleScroll(event)
         }
         return view
     }
@@ -36,6 +33,24 @@ struct CanvasScrollMonitor: NSViewRepresentable {
         var monitor: Any?
         var onScroll: ((CGSize) -> Void)?
         var isEnabled = true
+
+        func handleScroll(_ event: NSEvent) -> NSEvent? {
+            guard isEnabled, let window, event.window === window,
+                  bounds.contains(convert(event.locationInWindow, from: nil)) else {
+                return event
+            }
+            // Local monitors run before normal hit testing, even when another view covers us.
+            // Let native/SwiftUI scroll views receive their own wheel and trackpad events.
+            if let content = window.contentView {
+                var target = content.hitTest(content.convert(event.locationInWindow, from: nil))
+                while let view = target {
+                    if view is NSScrollView || view is TerminalView { return event }
+                    target = view.superview
+                }
+            }
+            onScroll?(CGSize(width: event.scrollingDeltaX, height: event.scrollingDeltaY))
+            return nil
+        }
 
         override func hitTest(_ point: NSPoint) -> NSView? { nil }
     }

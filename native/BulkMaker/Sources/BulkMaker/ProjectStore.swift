@@ -13,6 +13,23 @@ struct Project: Codable, Equatable {
     /// Where photos and references come from when they mix Finder and canvas.
     var photoSources: InputSources?
     var desiredSources: InputSources?
+    /// What the project sells, from onboarding: the site and a one-line description.
+    var site: String?
+    var about: String?
+    /// Everything onboarding learned about the product (also written as `perfil-produto.md`).
+    var profile: ProductProfile?
+    /// Soft deletion keeps every project path stable until restoration or permanent removal.
+    var trashedAt: Date?
+
+    /// The onboarding's facts, including the description typed before AI enrichment finishes.
+    var productContext: String? {
+        guard profile != nil || site != nil || about != nil else { return nil }
+        var facts = profile ?? ProductProfile()
+        if facts.name.isEmpty { facts.name = name }
+        if facts.site.isEmpty { facts.site = site ?? "" }
+        if facts.whatItDoes.isEmpty { facts.whatItDoes = about ?? "" }
+        return facts.markdown
+    }
 
     func sources(for kind: InputKind) -> InputSources? {
         switch kind {
@@ -29,11 +46,14 @@ struct ProjectFolder: Identifiable, Equatable {
 
     var id: UUID { project.id }
     var name: String { project.name }
+    var trashExpiresAt: Date? { project.trashedAt?.addingTimeInterval(ProjectStore.trashRetention) }
     var canvasDirectory: URL { folder.appendingPathComponent("Canvas", isDirectory: true) }
     var defaultOutput: URL { folder.appendingPathComponent("Saída", isDirectory: true) }
     var file: URL { folder.appendingPathComponent("projeto.json") }
     /// The project's posting calendar, saved here while another project is open.
     var agendaFile: URL { folder.appendingPathComponent("agenda.json") }
+    /// The brand's icon, read from its site in onboarding.
+    var iconFile: URL { folder.appendingPathComponent("icone.png") }
     /// Where mixed sources are gathered for the batch (`Entradas/Fotos`, `Entradas/Resultado desejado`).
     func inputsFolder(_ kind: InputKind) -> URL {
         folder.appendingPathComponent("Entradas", isDirectory: true).appendingPathComponent(kind.title, isDirectory: true)
@@ -48,19 +68,24 @@ struct ProjectFolder: Identifiable, Equatable {
 final class ProjectStore {
     static let shared = ProjectStore(movingFrom: ProjectStore.documentsRoot)
 
+    nonisolated static let trashRetention: TimeInterval = 30 * 24 * 60 * 60
+
     nonisolated static let currentKey = "currentProject"
     /// Name and folder of the open project, readable off the main actor (the AI state is written there).
     nonisolated static let summaryKey = "currentProjectSummary"
     nonisolated static let canvasKey = "currentProjectCanvas"
+    nonisolated static let productContextKey = "currentProjectProductContext"
 
     let root: URL
     private let selectionFile: URL
     /// The live calendar everything reads and writes: always the open project's.
-    private var liveAgenda: URL { selectionFile.deletingLastPathComponent().appendingPathComponent("agenda.json") }
+    var liveAgenda: URL { selectionFile.deletingLastPathComponent().appendingPathComponent("agenda.json") }
     private let legacyCanvas: URL
     private let defaults: UserDefaults
     private(set) var projects: [ProjectFolder] = []
     private(set) var current: ProjectFolder
+    private(set) var trashedProjects: [ProjectFolder] = []
+    private(set) var trashCleanupError: String?
 
     /// In the home folder, not Documents: Documents syncs with iCloud, and "Optimize Mac Storage" takes files
     /// off the Mac when the disk fills up, exactly when a batch needs its photos, canvas and slides.
@@ -76,6 +101,7 @@ final class ProjectStore {
 
     nonisolated static var currentSummary: String? { UserDefaults.standard.string(forKey: summaryKey) }
     nonisolated static var currentCanvas: String? { UserDefaults.standard.string(forKey: canvasKey) }
+    nonisolated static var currentProductContext: String? { UserDefaults.standard.string(forKey: productContextKey) }
 
     /// `oldRoot`: a folder of projects to move here first (only the shared store passes it, so tests never
     /// touch the user's real projects).
@@ -91,8 +117,11 @@ final class ProjectStore {
             let live = selectionFile.deletingLastPathComponent().appendingPathComponent("agenda.json")
             Self.moveProjects(from: oldRoot, to: root, alsoRewriting: [selectionFile, live])
         }
-        var found = Self.scan(root)
-        if found.isEmpty {
+        let libraryMarker = root.appendingPathComponent(".library-initialized")
+        let all = Self.scan(root)
+        trashedProjects = all.filter { $0.project.trashedAt != nil }
+        var found = all.filter { $0.project.trashedAt == nil }
+        if all.isEmpty && !FileManager.default.fileExists(atPath: libraryMarker.path) {
             // First launch with projects: what the app had becomes the first one, canvas included.
             let first = Self.makeProject(named: "Meu primeiro projeto", in: root,
                                          selection: Self.readSelection(selectionFile))
@@ -104,8 +133,10 @@ final class ProjectStore {
         }
         projects = found
         let saved = defaults.string(forKey: Self.currentKey).flatMap(UUID.init(uuidString:))
-        current = found.first { $0.id == saved } ?? found[0]
+        current = found.first { $0.id == saved } ?? found.first ?? Self.emptyWorkspace(in: root)
+        try? Data().write(to: libraryMarker, options: .atomic)
         remember()
+        maintainTrash()
     }
 
     // MARK: - Actions
@@ -123,8 +154,47 @@ final class ProjectStore {
         return made
     }
 
+    /// Save the product before activating the workspace, so the AI never sees a blank new project.
+    @discardableResult
+    func createProduct(_ profile: ProductProfile) throws -> ProjectFolder {
+        let made = Self.makeProject(named: profile.name, in: root, selection: nil)
+        var ready = made
+        ready.project.profile = profile
+        ready.project.site = profile.site
+        ready.project.about = profile.whatItDoes
+        ready.project.selection = BatchSelection(photos: nil, desired: nil, csv: nil, output: ready.defaultOutput)
+        do {
+            try FileManager.default.createDirectory(at: ready.defaultOutput, withIntermediateDirectories: true)
+            try Self.persist(ready)
+            try profile.markdown.write(to: ready.folder.appendingPathComponent("perfil-produto.md"), atomically: true, encoding: .utf8)
+        } catch {
+            try? FileManager.default.removeItem(at: made.folder)
+            throw error
+        }
+        projects.append(ready)
+        open(ready)
+        return ready
+    }
+
+    /// Editing a card must not change the selected project or another project's AI context.
+    func updateProduct(_ profile: ProductProfile, in target: ProjectFolder) throws {
+        guard var updated = projects.first(where: { $0.id == target.id }) else { throw TrashError.notFound }
+        updated.project.name = profile.name
+        updated.project.site = profile.site
+        updated.project.about = profile.whatItDoes
+        updated.project.profile = profile
+        try Self.persist(updated)
+        try profile.markdown.write(to: updated.folder.appendingPathComponent("perfil-produto.md"), atomically: true, encoding: .utf8)
+        replace(updated)
+        if current.id == updated.id { current = updated; remember() }
+    }
+
     func open(_ target: ProjectFolder) {
         guard target.id != current.id, let fresh = projects.first(where: { $0.id == target.id }) else { return }
+        activate(fresh)
+    }
+
+    private func activate(_ fresh: ProjectFolder) {
         // Keep what the batch screen had for the project being left.
         var leaving = current
         leaving.project.selection = Self.readSelection(selectionFile) ?? leaving.project.selection
@@ -170,8 +240,140 @@ final class ProjectStore {
         current = updated
     }
 
+    /// The open project's site and description, as typed in onboarding; blanks are dropped.
+    func setProfile(site: String, about: String) {
+        var updated = current
+        let site = site.trimmingCharacters(in: .whitespacesAndNewlines)
+        let about = about.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.project.site = site.isEmpty ? nil : site
+        updated.project.about = about.isEmpty ? nil : about
+        Self.save(updated)
+        replace(updated)
+        current = updated
+        remember()
+    }
+
+    func setProductProfile(_ profile: ProductProfile) {
+        var updated = current
+        updated.project.profile = profile
+        updated.project.site = profile.site.isEmpty ? updated.project.site : profile.site
+        updated.project.about = profile.whatItDoes.isEmpty ? updated.project.about : profile.whatItDoes
+        Self.save(updated)
+        replace(updated)
+        current = updated
+        try? profile.markdown.write(to: updated.folder.appendingPathComponent("perfil-produto.md"), atomically: true, encoding: .utf8)
+        remember()
+    }
+
+    /// Stored as PNG whatever the site served (ico, png, jpg), so the home can show it.
+    func saveIcon(_ data: Data?) {
+        guard let data, let image = NSImage(data: data), let tiff = image.tiffRepresentation,
+              let png = NSBitmapImageRep(data: tiff)?.representation(using: .png, properties: [:]) else { return }
+        try? png.write(to: current.iconFile, options: .atomic)
+    }
+
+    /// The carousel chosen in onboarding becomes the open project's "desired result"; the batch screen
+    /// picks the change up on its next poll.
+    func setReference(_ folder: URL) {
+        let previous = Self.readSelection(selectionFile)
+        let output = previous?.output.map { URL(fileURLWithPath: $0) } ?? current.defaultOutput
+        let photos = previous?.photos.map { URL(fileURLWithPath: $0) }
+        let selection = BatchSelection(photos: photos, desired: folder, csv: nil, output: output)
+        guard let data = try? BatchSelectionBridge.data(for: selection) else { return }
+        try? FileManager.default.createDirectory(at: selectionFile.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: selectionFile, options: .atomic)
+        var updated = current
+        updated.project.selection = selection
+        Self.save(updated)
+        replace(updated)
+        current = updated
+    }
+
     func reveal(_ target: ProjectFolder) {
         NSWorkspace.shared.activateFileViewerSelecting([target.folder])
+    }
+
+    // MARK: - Trash
+
+    /// Keeps the project folder in place so references and imported media survive a restore.
+    func moveToTrash(_ target: ProjectFolder, at date: Date = Date()) throws {
+        guard var removed = projects.first(where: { $0.id == target.id }) else { throw TrashError.notFound }
+        try validateManagedFolder(removed.folder)
+        if removed.id == current.id {
+            removed.project.selection = Self.readSelection(selectionFile) ?? removed.project.selection
+            if let data = try? Data(contentsOf: liveAgenda) { try data.write(to: removed.agendaFile, options: .atomic) }
+        }
+        removed.project.trashedAt = date
+        try Self.persist(removed)
+        projects.removeAll { $0.id == removed.id }
+        trashedProjects.append(removed)
+        if removed.id == current.id {
+            // activate saves the old workspace too, so give it the deletion marker first.
+            current = removed
+            activate(projects.first ?? Self.emptyWorkspace(in: root))
+        }
+    }
+
+    func restore(_ target: ProjectFolder) throws {
+        guard var restored = trashedProjects.first(where: { $0.id == target.id }) else { throw TrashError.notFound }
+        try validateManagedFolder(restored.folder)
+        restored.project.trashedAt = nil
+        try Self.persist(restored)
+        trashedProjects.removeAll { $0.id == restored.id }
+        projects.append(restored)
+        if !projects.contains(where: { $0.id == current.id }) { activate(restored) }
+    }
+
+    /// Only the project's own folder is removed. External input/output folders are never followed.
+    func deletePermanently(_ target: ProjectFolder) throws {
+        guard let removed = trashedProjects.first(where: { $0.id == target.id }) else { throw TrashError.notFound }
+        try validateManagedFolder(removed.folder)
+        try FileManager.default.removeItem(at: removed.folder)
+        trashedProjects.removeAll { $0.id == removed.id }
+    }
+
+    func purgeExpiredTrash(now: Date = Date()) throws {
+        var firstError: Error?
+        for project in trashedProjects where (project.trashExpiresAt ?? .distantFuture) <= now {
+            do { try deletePermanently(project) } catch { if firstError == nil { firstError = error } }
+        }
+        if let firstError { throw firstError }
+    }
+
+    /// On launch and periodically while running; failed removals remain visible and can be retried.
+    func maintainTrash() {
+        do { try purgeExpiredTrash(); trashCleanupError = nil }
+        catch { trashCleanupError = "Não foi possível limpar alguns projetos: \(error.localizedDescription)" }
+    }
+
+    private func validateManagedFolder(_ folder: URL) throws {
+        guard folder.standardizedFileURL.deletingLastPathComponent() == root.standardizedFileURL,
+              folder.resolvingSymlinksInPath().deletingLastPathComponent() == root.resolvingSymlinksInPath() else {
+            throw TrashError.outsideLibrary
+        }
+    }
+
+    private enum TrashError: LocalizedError {
+        case notFound, outsideLibrary
+        var errorDescription: String? {
+            switch self {
+            case .notFound: return "Este projeto não está mais nesta lista."
+            case .outsideLibrary: return "A pasta do projeto está fora da biblioteca do app."
+            }
+        }
+    }
+
+    /// A hidden, empty workspace lets the user trash the last project without creating a new card.
+    private static func emptyWorkspace(in root: URL) -> ProjectFolder {
+        let folder = root.appendingPathComponent(".empty-workspace", isDirectory: true)
+        if let data = try? Data(contentsOf: folder.appendingPathComponent("projeto.json")),
+           let project = try? decoder.decode(Project.self, from: data) {
+            return ProjectFolder(folder: folder, project: project)
+        }
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let empty = ProjectFolder(folder: folder, project: Project(name: "Nenhum projeto"))
+        save(empty)
+        return empty
     }
 
     // MARK: - Disk
@@ -184,6 +386,11 @@ final class ProjectStore {
         defaults.set(current.id.uuidString, forKey: Self.currentKey)
         defaults.set("\(current.name) (`\(current.folder.path)`)", forKey: Self.summaryKey)
         defaults.set(current.canvasDirectory.path, forKey: Self.canvasKey)
+        defaults.set(current.project.productContext, forKey: Self.productContextKey)
+        AgentSession.updateProductContext(current.project.productContext,
+                                          project: "\(current.name) (`\(current.folder.path)`)",
+                                          canvas: current.canvasDirectory.path,
+                                          workspace: selectionFile.deletingLastPathComponent())
     }
 
     /// Moves every project folder from `oldRoot` into `root` (only when `root` has none yet) and points every
@@ -230,7 +437,8 @@ final class ProjectStore {
 
     private static func makeProject(named name: String, in root: URL, selection: BatchSelection?) -> ProjectFolder {
         // Folder names stay readable in Finder and never collide: "Nome", "Nome 2", "Nome 3"…
-        let base = name.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+        let cleaned = name.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-")
+        let base = [".", "..", ""].contains(cleaned) ? "Projeto" : cleaned
         var folder = root.appendingPathComponent(base, isDirectory: true)
         var suffix = 2
         while FileManager.default.fileExists(atPath: folder.path) {
@@ -243,11 +451,13 @@ final class ProjectStore {
         return made
     }
 
-    private static func save(_ project: ProjectFolder) {
+    private static func save(_ project: ProjectFolder) { try? persist(project) }
+
+    private static func persist(_ project: ProjectFolder) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         encoder.dateEncodingStrategy = .iso8601
-        try? encoder.encode(project.project).write(to: project.file, options: .atomic)
+        try encoder.encode(project.project).write(to: project.file, options: .atomic)
     }
 
     private static let decoder: JSONDecoder = {

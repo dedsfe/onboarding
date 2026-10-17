@@ -2,7 +2,7 @@ import SwiftUI
 
 private var licenseSecondaryInk: Color { Color.primary.opacity(0.76) }
 
-/// This is a native account screen, using the app's existing Slidi and macOS controls.
+/// This is a native account screen, using the app's native macOS controls.
 struct LicenseActivationView: View {
   @ObservedObject var license: License
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -19,17 +19,13 @@ struct LicenseActivationView: View {
           ModalHeader(title: "Conta e assinatura", done: close)
           ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-              HStack(spacing: 24) {
-                SlidiView(state: license.isBusy ? .thinking : .curious)
-                  .frame(width: 60, height: 108)
-                VStack(alignment: .leading, spacing: 8) {
-                  Text("The Carousel Maker").font(.system(size: 25, weight: .semibold))
-                  Text(
-                    license.access.isAllowed
-                      ? "Tudo pronto para criar." : "Seu próximo carrossel começa aqui."
-                  )
-                  .font(.title3)
-                }
+              VStack(alignment: .leading, spacing: 8) {
+                Text("The Carousel Maker").font(.system(size: 25, weight: .semibold))
+                Text(
+                  license.access.isAllowed
+                    ? "Tudo pronto para criar." : "Seu próximo carrossel começa aqui."
+                )
+                .font(.title3)
               }
 
               if license.canStartTrial {
@@ -40,8 +36,7 @@ struct LicenseActivationView: View {
                   )
                   .foregroundStyle(licenseSecondaryInk).fixedSize(horizontal: false, vertical: true)
                   Button("Começar teste grátis") { license.startTrial() }
-                    .buttonStyle(.glassProminent).tint(.white).foregroundStyle(.black)
-                    .controlSize(.large)
+                    .buttonStyle(.appPrimary)
                     .disabled(license.isBusy)
                     .accessibilityIdentifier("license.startTrial")
                 }
@@ -62,6 +57,7 @@ struct LicenseActivationView: View {
                     return .handled
                   }
                   Button(license.isBusy ? "Ativando…" : "Ativar neste Mac", action: activate)
+                    .buttonStyle(.appPrimary)
                     .disabled(
                       key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || license.isBusy
                     )
@@ -71,10 +67,12 @@ struct LicenseActivationView: View {
                     enteringKey = true
                     keyFocused = true
                   }
+                  .buttonStyle(.appSecondary)
                   .accessibilityIdentifier("license.enterKey")
                 }
                 if let checkout = license.configuration.checkoutURL, checkout.scheme == "https" {
-                  Button("Ver opções de assinatura") { license.openCheckout() }
+                  Button("Entrar na lista de espera") { license.openCheckout() }
+                    .buttonStyle(.appSecondary)
                 }
               }
 
@@ -85,6 +83,7 @@ struct LicenseActivationView: View {
               }
               if license.storageFailed {
                 Button("Tentar novamente") { Task { await license.retryStorage() } }
+                  .buttonStyle(.appSecondary)
                   .disabled(license.isBusy)
               }
               HStack {
@@ -97,6 +96,7 @@ struct LicenseActivationView: View {
                 Button(license.access.isAllowed ? "Continuar" : "Abrir meus arquivos") {
                   license.showsActivation = false
                 }
+                .buttonStyle(license.access.isAllowed && !license.canStartTrial ? .appPrimary : .appSecondary)
                 .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("license.openExisting")
               }
@@ -114,7 +114,6 @@ struct LicenseActivationView: View {
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    .buttonStyle(.glass)
     .onAppear { withAnimation(reduceMotion ? nil : .modalAppear) { appeared = true } }
     .onDisappear { key = "" }
   }
@@ -143,7 +142,7 @@ struct LicenseStatusView: View {
           "Sem conexão com o serviço. Acesso disponível até \(end.formatted(date: .abbreviated, time: .shortened))."
         )
       case .locked(let reason): Text(reason)
-      case .notStarted: Text("Comece o teste ou ative sua chave para gerar, pesquisar e postar.")
+      case .notStarted: Text("Comece o teste ou ative sua chave para gerar, pesquisar e organizar.")
       case .active: Text("Licença validada para este Mac. Até 2 Macs por assinatura.")
       }
     }
@@ -163,7 +162,6 @@ struct LicenseStatusView: View {
 
 struct LicenseAccountView: View {
   @ObservedObject var license: License
-  @State private var confirmingDeactivation = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 20) {
@@ -187,38 +185,31 @@ struct LicenseAccountView: View {
           Button(license.isBusy ? "Validando…" : "Validar agora") {
             Task { await license.revalidate() }
           }
+          .buttonStyle(.appSecondary)
           .disabled(license.isBusy || license.storageFailed)
           Button("Gerenciar assinatura") { license.openPortal() }
+            .buttonStyle(.appSecondary)
             .disabled(license.configuration.portalURL == nil)
         }
-        Button("Desativar neste Mac", role: .destructive) { confirmingDeactivation = true }
+        Button("Desativar neste Mac", role: .destructive) { Task { await license.deactivate() } }
+          .buttonStyle(.appSecondary)
           .disabled(license.isBusy)
       } else {
         Button(license.canStartTrial ? "Começar teste ou ativar chave" : "Ativar uma chave") {
           license.showsActivation = true
         }
+        .buttonStyle(.appPrimary)
       }
       if let message = license.message {
         Text(message).font(.callout).fixedSize(horizontal: false, vertical: true)
       }
       if license.storageFailed {
-        Button("Tentar novamente") { Task { await license.retryStorage() } }.disabled(
-          license.isBusy)
+        Button("Tentar novamente") { Task { await license.retryStorage() } }
+          .buttonStyle(.appSecondary)
+          .disabled(license.isBusy)
       }
     }
     .frame(maxWidth: .infinity, alignment: .leading)
-    .buttonStyle(.glass)
-    .confirmationDialog(
-      "Desativar a licença neste Mac?", isPresented: $confirmingDeactivation,
-      titleVisibility: .visible
-    ) {
-      Button("Desativar neste Mac", role: .destructive) { Task { await license.deactivate() } }
-      Button("Cancelar", role: .cancel) {}
-    } message: {
-      Text(
-        "A vaga será liberada para outro Mac. Seus projetos e arquivos exportados serão preservados."
-      )
-    }
   }
 
   private func row(_ label: String, value: String) -> some View {

@@ -21,12 +21,28 @@ struct InputSources: Codable, Equatable {
     var folders: [String] = []
     var files: [String] = []
     var canvasItems: [UUID] = []
+    /// Individual opt-outs keep the folder visible while only chosen files enter the batch.
+    var excludedFiles: [String] = []
 
-    var isEmpty: Bool { folders.isEmpty && files.isEmpty && canvasItems.isEmpty }
+    var isEmpty: Bool { folders.isEmpty && files.allSatisfy { excludedFiles.contains($0) } && canvasItems.isEmpty }
 
     /// One Finder folder and nothing else is used in place, exactly like before sources could mix.
     var singleFolder: URL? {
-        folders.count == 1 && files.isEmpty && canvasItems.isEmpty ? URL(fileURLWithPath: folders[0], isDirectory: true) : nil
+        folders.count == 1 && files.isEmpty && canvasItems.isEmpty && excludedFiles.isEmpty
+            ? URL(fileURLWithPath: folders[0], isDirectory: true) : nil
+    }
+}
+
+extension InputSources {
+    enum CodingKeys: String, CodingKey { case folders, files, canvasItems, excludedFiles }
+
+    /// Projects saved before per-photo selection had no exclusion list.
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        folders = try values.decodeIfPresent([String].self, forKey: .folders) ?? []
+        files = try values.decodeIfPresent([String].self, forKey: .files) ?? []
+        canvasItems = try values.decodeIfPresent([UUID].self, forKey: .canvasItems) ?? []
+        excludedFiles = try values.decodeIfPresent([String].self, forKey: .excludedFiles) ?? []
     }
 }
 
@@ -54,7 +70,8 @@ enum InputAssembler {
     /// the old folder itself can still be read).
     static func assemble(_ sources: InputSources, kind: InputKind, into target: URL,
                          canvasMedia: [UUID: URL]) throws -> URL {
-        if let single = sources.singleFolder { return single }
+        if let single = sources.singleFolder,
+           files(in: single, kind: kind).allSatisfy({ !isImage($0) || batchImageTypes.contains($0.pathExtension.lowercased()) }) { return single }
         let fileManager = FileManager.default
         let building = target.deletingLastPathComponent().appendingPathComponent(".\(target.lastPathComponent)-montando",
                                                                                isDirectory: true)
@@ -62,7 +79,11 @@ enum InputAssembler {
         try fileManager.createDirectory(at: building, withIntermediateDirectories: true)
 
         var used = Set<String>()
+        var included = Set<String>()
+        let excluded = Set(sources.excludedFiles.map { URL(fileURLWithPath: $0).standardizedFileURL.path })
         func add(_ source: URL, name preferred: String) throws {
+            let key = source.standardizedFileURL.path
+            guard included.insert(key).inserted else { return }
             let ext = source.pathExtension.lowercased()
             let convert = !batchImageTypes.contains(ext) && isImage(source)
             let base = (preferred as NSString).deletingPathExtension
@@ -84,11 +105,14 @@ enum InputAssembler {
         }
 
         for folder in sources.folders {
-            for file in files(in: URL(fileURLWithPath: folder), kind: kind) { try add(file, name: file.lastPathComponent) }
+            for file in files(in: URL(fileURLWithPath: folder), kind: kind) where !excluded.contains(file.standardizedFileURL.path) {
+                try add(file, name: file.lastPathComponent)
+            }
         }
         for path in sources.files {
             let url = URL(fileURLWithPath: path)
-            guard fileManager.fileExists(atPath: path), kind.acceptsAnyFile || isImage(url) else { continue }
+            guard !excluded.contains(url.standardizedFileURL.path), fileManager.fileExists(atPath: path),
+                  kind.acceptsAnyFile || isImage(url) else { continue }
             try add(url, name: url.lastPathComponent)
         }
         for (index, id) in sources.canvasItems.enumerated() {

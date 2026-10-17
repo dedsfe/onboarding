@@ -50,9 +50,11 @@
 		D0E6093FBBD597CF78383528 /* AsciiArt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0758A121C0C41744AB9D2801 /* AsciiArt.swift */; };
 		DE5039B4CEE89A9F98F4A329 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDA5879D78679A109377C4C7 /* main.swift */; };
 		E649DB89A88C48C1119658D1 /* SlideEditSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B92EC0834393056C2C5407F6 /* SlideEditSession.swift */; };
-		E98E7142B68FCBBF318BF45D /* Slidi.swift in Sources */ = {isa = PBXBuildFile; fileRef = 216A2EF7116F967747952035 /* Slidi.swift */; };
+		E98E7142B68FCBBF318BF45D /* AppStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 216A2EF7116F967747952035 /* AppStatus.swift */; };
 		EF9FCEE3EA08245D2846AA69 /* libCarouselEngine.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 56DA2B272397F8F9113234F9 /* libCarouselEngine.a */; };
 		F76A8D1FBE7A33C5C80BA337 /* ProjectStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9299CF955D5B6756982D60A9 /* ProjectStore.swift */; };
+		B149D6F9871144F398BAF1EE /* CalendarPostImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75A8640064BF438DBE42C0AE /* CalendarPostImport.swift */; };
+		2FA1A5DCCF454AB88FBF4EB7 /* CalendarPostComposer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6EB444BBB34DE68F708D56 /* CalendarPostComposer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -98,7 +100,7 @@
 		0758A121C0C41744AB9D2801 /* AsciiArt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsciiArt.swift; sourceTree = "<group>"; };
 		1479B8C06159DD83EE7CEC30 /* SlidePlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlidePlan.swift; sourceTree = "<group>"; };
 		1B62A6B9B70800A123145A99 /* fundo-canvas.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; path = "fundo-canvas.jpg"; sourceTree = "<group>"; };
-		216A2EF7116F967747952035 /* Slidi.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Slidi.swift; sourceTree = "<group>"; };
+		216A2EF7116F967747952035 /* AppStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppStatus.swift; sourceTree = "<group>"; };
 		24624077DA0A4C8DEA8F456B /* InfiniteCanvasView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InfiniteCanvasView.swift; sourceTree = "<group>"; };
 		25C05CC9B712466662F36E01 /* carousel-render */ = {isa = PBXFileReference; includeInIndex = 0; path = "carousel-render"; sourceTree = BUILT_PRODUCTS_DIR; };
 		31BEEA0F60878B6A007F1C98 /* TerminalShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalShortcuts.swift; sourceTree = "<group>"; };
@@ -139,6 +141,8 @@
 		E3F15EC703965CEE6D119F5E /* BulkMakerApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkMakerApp.swift; sourceTree = "<group>"; };
 		EB1D3CC7A073F997E8C16642 /* CanvasPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CanvasPage.swift; sourceTree = "<group>"; };
 		EDA5879D78679A109377C4C7 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		75A8640064BF438DBE42C0AE /* CalendarPostImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarPostImport.swift; sourceTree = "<group>"; };
+		4A6EB444BBB34DE68F708D56 /* CalendarPostComposer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarPostComposer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -235,6 +239,8 @@
 				680B5DC2E15C3573876FB31D /* BatchSelectionBridge.swift */,
 				E3F15EC703965CEE6D119F5E /* BulkMakerApp.swift */,
 				36F3F3CA046E84F3A5853EC5 /* CalendarPrototypeView.swift */,
+				4A6EB444BBB34DE68F708D56 /* CalendarPostComposer.swift */,
+				75A8640064BF438DBE42C0AE /* CalendarPostImport.swift */,
 				543990C7B96D24B9B1F5CAA9 /* CanvasBackground.swift */,
 				C4E79BE585068590DE27F1EC /* CanvasBoard.swift */,
 				EB1D3CC7A073F997E8C16642 /* CanvasPage.swift */,
@@ -253,7 +259,7 @@
 				8FC04EB2D22E27FDDD98F195 /* ProjectSwitcher.swift */,
 				DA17650753683D61153E93C3 /* SlideEditorPanel.swift */,
 				B92EC0834393056C2C5407F6 /* SlideEditSession.swift */,
-				216A2EF7116F967747952035 /* Slidi.swift */,
+				216A2EF7116F967747952035 /* AppStatus.swift */,
 				8B41A0088228FA064B0CB061 /* StyleControls.swift */,
 				78DECE481410886878E05A9D /* TemplateCatalog.swift */,
 				31F5787D2124D5B88F9E0F5C /* TerminalHandoff.swift */,
@@ -422,6 +428,8 @@
 				C38CF5592577E97951C13D68 /* BundleModule.swift in Sources */,
 				42220422D1F356BAD69425F0 /* CSVDocument.swift in Sources */,
 				5321E0F053B4F4A8076C3D69 /* CalendarPrototypeView.swift in Sources */,
+				2FA1A5DCCF454AB88FBF4EB7 /* CalendarPostComposer.swift in Sources */,
+				B149D6F9871144F398BAF1EE /* CalendarPostImport.swift in Sources */,
 				7A1D8DE980C902BE69BF4CFF /* CanvasBackground.swift in Sources */,
 				1C7395638E8BD01916C2A38E /* CanvasBoard.swift in Sources */,
 				CFD0014346F31C59DE20DFB4 /* CanvasPage.swift in Sources */,
@@ -439,7 +447,7 @@
 				751F2C175C8D5305982BB8DC /* ProjectSwitcher.swift in Sources */,
 				E649DB89A88C48C1119658D1 /* SlideEditSession.swift in Sources */,
 				BD12A9B2303ADF84E06095FD /* SlideEditorPanel.swift in Sources */,
-				E98E7142B68FCBBF318BF45D /* Slidi.swift in Sources */,
+				E98E7142B68FCBBF318BF45D /* AppStatus.swift in Sources */,
 				B98E7BF77E92252CAFB7CF3F /* StyleControls.swift in Sources */,
 				308F87113EB7807E82E54B8A /* TemplateCatalog.swift in Sources */,
 				A12BF75EAE7745753CF03B87 /* TerminalHandoff.swift in Sources */,

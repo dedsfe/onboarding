@@ -23,6 +23,8 @@ func fail(_ message: String) -> Never {
 
 let usage = """
 uso:
+  carousel-render --app '<JSON>'
+      executa uma ação no app aberto. Use {"action":"status"} para consultar ações e projeto atual.
   carousel-render --folha <pasta de fotos> --saida <pasta>
       folhas de miniaturas numeradas (21 fotos por imagem) pra escolher fotos lendo poucas imagens.
   carousel-render <plano.json>... --saida <pasta> [--lote] [--estilo <estilo.json>] [--revisao <pasta>]
@@ -53,6 +55,21 @@ plano.json:
 }
 """
 
+if arguments.contains("--app") {
+    guard let json = value(of: "--app") else { fail(usage) }
+    do {
+        let command = try JSONDecoder().decode(AppCommand.self, from: Data(json.utf8))
+        // The installed renderer lives at <workspace>/bin/carousel-render, independent of the shell's cwd.
+        let workspace = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let reply = try AppControlWire.send(command, workspace: workspace)
+        if let result = reply.result { print(result) }
+        if !reply.ok { fail(reply.message) }
+        if reply.result == nil { print(reply.message) }
+    } catch { fail(error.localizedDescription) }
+    exit(0)
+}
+
 let positional = arguments.indices.filter { index in
     !arguments[index].hasPrefix("--") && !(index > 0 && valueFlags.contains(arguments[index - 1]))
 }.map { arguments[$0] }
@@ -65,10 +82,10 @@ if arguments.contains("--canvas-gerando") || arguments.contains("--canvas-finali
     do {
         if arguments.contains("--canvas-gerando") {
             try CanvasFolder.beginGeneration(in: canvas, session: session)
-            print("Slidi: gerando imagens")
+            print("Canvas: gerando imagens")
         } else {
             try CanvasFolder.endGeneration(in: canvas, session: session)
-            print("Slidi: geração encerrada")
+            print("Canvas: geração encerrada")
         }
     } catch { fail(error.localizedDescription) }
     exit(0)

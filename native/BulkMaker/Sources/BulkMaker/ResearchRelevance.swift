@@ -15,9 +15,13 @@ struct ResearchAssessment: Codable, Equatable {
     var format = ""
     /// What slide 1 says to stop the scroll, in the post's own words.
     var hook = ""
+    /// The product the post shows ("" when none), so one app can't fill the whole result.
+    var product = ""
+    /// 1–5: a clear, well-made post a founder would want to copy; weird, spammy or unreadable ones score low.
+    var quality = 3
 
     /// A niche product shown off is what the user hunts, even as a plain list; a story needs a real person.
-    var qualifies: Bool { nicheMatch && (productPromotion || (personalStory && creatorLed)) }
+    var qualifies: Bool { nicheMatch && quality >= 3 && (productPromotion || (personalStory && creatorLed)) }
 
     /// Quotes must come from the post itself. Slide text comes from fast OCR, so punctuation, emoji and a
     /// misread word don't sink a real quote: most of its words have to be there.
@@ -57,6 +61,8 @@ extension ResearchAssessment {
         reason = (try? c.decodeIfPresent(String.self, forKey: .reason)) ?? nil ?? ""
         format = (try? c.decodeIfPresent(String.self, forKey: .format)) ?? nil ?? ""
         hook = (try? c.decodeIfPresent(String.self, forKey: .hook)) ?? nil ?? ""
+        product = (try? c.decodeIfPresent(String.self, forKey: .product)) ?? nil ?? ""
+        quality = min(5, max(1, (try? c.decodeIfPresent(Int.self, forKey: .quality)) ?? nil ?? 3))
     }
 }
 
@@ -80,7 +86,7 @@ enum ResearchRelevance {
 
         Para CADA candidato devolva um item em {"assessments":[...]} com estas chaves obrigatórias:
         id (copie o id), nicheMatch, productPromotion, personalStory, creatorLed (booleanos),
-        nicheEvidence, angleEvidence, creatorEvidence, reason, format e hook (strings).
+        nicheEvidence, angleEvidence, creatorEvidence, reason, format, hook, product (strings) e quality (inteiro 1 a 5).
 
         nicheMatch: o conteúdo REAL do post pertence ao público, problema e nicho do produto.
         Uma busca que trouxe o post, o número de views ou uma palavra genérica não bastam.
@@ -107,6 +113,10 @@ enum ResearchRelevance {
         "lista de produtos" = vários apps/produtos enumerados; "relato com produto" = a pessoa conta a história
         dela e o produto aparece como a virada; "review ou demonstração" = mostra um produto só, como usa.
         hook: o texto do slide 1 que segura o dedo, copiado do candidato (até 120 caracteres).
+        product: o nome do produto/app principal que o post mostra ou recomenda ("" se nenhum; numa lista, o primeiro).
+        quality: 1 a 5, quanto um fundador gostaria de copiar este post. 5 = gancho claro, texto legível,
+        história ou demonstração que prende até o fim. 1-2 = esquisito, spam, texto quebrado/ilegível,
+        repost de print, propaganda genérica ou sem sentido. Seja exigente: a média deve ficar perto de 3.
 
         CANDIDATOS (texto de TODOS os slides baixados, na ordem):
         \(String(decoding: data, as: UTF8.self))

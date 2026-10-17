@@ -12,11 +12,27 @@ struct CanvasItem: Codable, Identifiable, Equatable {
     var y: Double
     var width: Double
     var height: Double
+    /// A text box instead of an image (`file` stays empty): the string stays real text, editable and copyable.
+    var text: String?
+    var style: TextStyle?
+
+    var isText: Bool { text != nil }
 
     var frame: CGRect {
         get { CGRect(x: x, y: y, width: width, height: height) }
         set { x = newValue.minX; y = newValue.minY; width = newValue.width; height = newValue.height }
     }
+}
+
+/// How a text box draws. Sizes are canvas units; colors are `#RRGGBB` or `#RRGGBBAA`.
+struct TextStyle: Codable, Equatable {
+    var size: Double = 32
+    /// `regular`, `medium`, `semibold`, `bold` or `heavy`.
+    var weight: String? = "medium"
+    var color: String? = "#FFFFFF"
+    var background: String? = "#141418E6"
+    var padding: Double? = 18
+    var radius: Double? = 18
 }
 
 /// The canvas's content on disk: `board.json` plus a `media` folder. Images come in and go out through the
@@ -69,6 +85,77 @@ final class CanvasBoard {
     func setFrame(_ frame: CGRect, of id: UUID) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
         items[index].frame = frame
+    }
+
+    func setText(_ text: String, of id: UUID) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        items[index].text = text
+    }
+
+    /// Scaling a text box scales its letters with it, so it keeps looking the same, only bigger.
+    func scaleText(of id: UUID, by factor: Double) {
+        guard let index = items.firstIndex(where: { $0.id == id }), items[index].isText, factor != 1 else { return }
+        var style = items[index].style ?? TextStyle()
+        style.size *= factor
+        style.padding = style.padding.map { $0 * factor }
+        style.radius = style.radius.map { $0 * factor }
+        items[index].style = style
+    }
+
+    /// A new text box with its top-left corner at `origin`, sized to its text.
+    func addText(_ text: String, style: TextStyle = TextStyle(), at origin: CGPoint) -> CanvasItem {
+        let size = CanvasText.measure(text, style: style, maxWidth: 900)
+        let item = CanvasItem(file: "", x: origin.x, y: origin.y, width: size.width, height: size.height, text: text, style: style)
+        items.append(item)
+        knownIDs.insert(item.id)
+        changed()
+        return item
+    }
+
+    /// Copies of text boxes (no file to copy), offset so they do not cover the originals.
+    func duplicateTexts(_ source: [CanvasItem], offset: CGFloat) -> [CanvasItem] {
+        let copies = source.filter(\.isText).map { item -> CanvasItem in
+            var copy = item
+            copy.id = UUID()
+            copy.x += offset
+            copy.y += offset
+            return copy
+        }
+        guard !copies.isEmpty else { return [] }
+        items.append(contentsOf: copies)
+        knownIDs.formUnion(copies.map(\.id))
+        changed()
+        return copies
+    }
+
+    /// Duplicate the composition, including resized images, text styles and stacking order.
+    /// Stage all media first: a missing/unreadable file must not leave half a selection duplicated.
+    func duplicateItems(_ ids: Set<UUID>, offset: Double = 40) throws -> [CanvasItem] {
+        var copies: [CanvasItem] = []
+        var staged: [URL] = []
+        do {
+            for original in items where ids.contains(original.id) {
+                var copy = original
+                copy.id = UUID()
+                copy.x += offset; copy.y += offset
+                if !original.isText {
+                    let ext = URL(fileURLWithPath: original.file).pathExtension
+                    copy.file = UUID().uuidString + (ext.isEmpty ? "" : "." + ext)
+                    let destination = url(of: copy)
+                    try FileManager.default.copyItem(at: url(of: original), to: destination)
+                    staged.append(destination)
+                }
+                copies.append(copy)
+            }
+        } catch {
+            for file in staged { try? FileManager.default.removeItem(at: file) }
+            throw error
+        }
+        guard !copies.isEmpty else { return [] }
+        items.append(contentsOf: copies)
+        knownIDs.formUnion(copies.map(\.id))
+        changed()
+        return copies
     }
 
     func remove(_ ids: Set<UUID>) {
@@ -204,19 +291,75 @@ final class CanvasBoard {
 
     // MARK: - Going out
 
+    private static let canvasItemType = NSPasteboard.PasteboardType("com.andrefelipe.carouselmaker.canvas-item")
+
+    /// Each clipboard entry can be an image or text. The private metadata keeps the composition when
+    /// copying within the app; ordinary Finder/browser/text clipboard formats still work without it.
+    func importItems(from pasteboard: NSPasteboard, around center: CGPoint) -> [CanvasItem] {
+        let temporary = NSPasteboard(name: .init("canvas-paste-\(UUID().uuidString)"))
+        defer { temporary.releaseGlobally() }
+        var ids: [UUID] = []
+        var keepsLayout = true
+        for source in pasteboard.pasteboardItems ?? [] {
+            let metadata = source.data(forType: Self.canvasItemType)
+                .flatMap { try? JSONDecoder().decode(CanvasItem.self, from: $0) }
+                .flatMap { item -> CanvasItem? in
+                    let values = [item.x, item.y, item.width, item.height]
+                    guard values.allSatisfy({ $0.isFinite && abs($0) < 1_000_000 }), item.width > 0, item.height > 0 else { return nil }
+                    if let style = item.style {
+                        guard style.size.isFinite, (1...1000).contains(style.size),
+                              [style.padding, style.radius].compactMap({ $0 }).allSatisfy({ $0.isFinite && (0...10_000).contains($0) }) else { return nil }
+                    }
+                    return item
+                }
+            // NSPasteboardItem instances cannot be owned by two pasteboards. Copy their representations.
+            let entry = NSPasteboardItem()
+            for type in source.types { if let data = source.data(forType: type) { entry.setData(data, forType: type) } }
+            temporary.clearContents(); temporary.writeObjects([entry])
+            var added = importImages(from: temporary, around: .zero)
+            if added.isEmpty, let text = source.string(forType: .string),
+               !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                added = [addText(text, style: metadata?.style ?? TextStyle(), at: .zero)]
+            }
+            guard let item = added.first else { continue }
+            ids.append(item.id)
+            if let metadata, metadata.isText == item.isText, metadata.text == item.text {
+                setFrame(metadata.frame, of: item.id)
+            } else { keepsLayout = false }
+        }
+        guard !ids.isEmpty else { return [] }
+        let selected = items.filter { ids.contains($0.id) }
+        if keepsLayout, let first = selected.first {
+            let bounds = selected.dropFirst().reduce(first.frame) { $0.union($1.frame) }
+            for item in selected { setFrame(item.frame.offsetBy(dx: center.x - bounds.midX, dy: center.y - bounds.midY), of: item.id) }
+        } else {
+            var x = center.x - (selected.map(\.width).reduce(0, +) + Double(selected.count - 1) * 24) / 2
+            for item in selected {
+                setFrame(CGRect(x: x, y: center.y - item.height / 2, width: item.width, height: item.height), of: item.id)
+                x += item.width + 24
+            }
+        }
+        changed()
+        return items.filter { ids.contains($0.id) }
+    }
+
     /// One pasteboard item per image: the file (Finder, Slack, uploads), its original bytes and a PNG.
+    /// A text box goes out as plain text.
     func pasteboardItems(for items: [CanvasItem]) -> [NSPasteboardItem] {
         items.map { item in
-            let url = url(of: item)
             let entry = NSPasteboardItem()
-            entry.setString(url.absoluteString, forType: .fileURL)
-            let type = UTType(filenameExtension: url.pathExtension)
-            if let type, let data = try? Data(contentsOf: url) {
-                entry.setData(data, forType: NSPasteboard.PasteboardType(type.identifier))
+            if let text = item.text {
+                entry.setString(text, forType: .string)
+            } else {
+                let url = url(of: item)
+                entry.setString(url.absoluteString, forType: .fileURL)
+                let type = UTType(filenameExtension: url.pathExtension)
+                if let type, let data = try? Data(contentsOf: url) {
+                    entry.setData(data, forType: NSPasteboard.PasteboardType(type.identifier))
+                }
+                if type != .png, let png = Self.pngData(of: url) { entry.setData(png, forType: .png) }
             }
-            if type != .png, let png = Self.pngData(of: url) {
-                entry.setData(png, forType: .png)
-            }
+            if let metadata = try? JSONEncoder().encode(item) { entry.setData(metadata, forType: Self.canvasItemType) }
             return entry
         }
     }

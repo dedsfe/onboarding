@@ -38,6 +38,15 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         /// Viralizing now, not years ago: what a founder can still ride.
         var isRecent: Bool { ageDays <= TikTokResearcher.recentDays }
         var viewsPerDay: Int { ageDays == .max ? 0 : views / max(1, ageDays) }
+        /// Likes, comments, saves and shares per view: people acted on it, not just scrolled past.
+        var engagement: Double { views > 0 ? Double(likes + comments + saves + shares) / Double(views) : 0 }
+        var quality: Int { assessment?.quality ?? 0 }
+        /// The product it shows, folded, so "FitFolio" and "fitfolio app" count as the same.
+        var productKey: String {
+            let name = (assessment?.product ?? "").folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            return name.components(separatedBy: CharacterSet.alphanumerics.inverted)
+                .filter { !$0.isEmpty && !["app", "o", "a", "the", "ai", "de"].contains($0) }.joined(separator: " ")
+        }
         var mentionsApp: Bool { TikTokResearcher.mentionsApp(caption) }
         /// Sells an app: said in the caption, or found in the slides' text (the "part 2: download this app" slide).
         var sellsApp = false
@@ -91,6 +100,13 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
     func start() {
         guard timer == nil else { return }
         try? FileManager.default.createDirectory(at: Self.requests, withIntermediateDirectories: true)
+        // Nothing is in progress at launch: a ".processando" left by a quit or crash is answered, not left hanging.
+        for name in (try? FileManager.default.contentsOfDirectory(atPath: Self.requests.path)) ?? [] where name.hasSuffix(".processando") {
+            let taken = Self.requests.appendingPathComponent(name)
+            try? "ERRO o app fechou no meio da pesquisa. Rode de novo.".write(
+                to: taken.deletingPathExtension().appendingPathExtension("resultado"), atomically: true, encoding: .utf8)
+            try? FileManager.default.removeItem(at: taken)
+        }
         // Also installed with every session update; here so the command exists from the first launch.
         let command = Self.workspace.deletingLastPathComponent().appendingPathComponent("bin/pesquisar-tiktok")
         try? FileManager.default.createDirectory(at: command.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -220,6 +236,9 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
     }
 
     private func hunt(_ queries: [String], appNames: [String], count: Int) async throws -> URL {
+        // A locked screen or a hidden window must not put the search to sleep halfway.
+        let activity = ProcessInfo.processInfo.beginActivity(options: .userInitiated, reason: "Pesquisa no TikTok")
+        defer { ProcessInfo.processInfo.endActivity(activity) }
         // Capture before the first await: a project switch cannot redirect the downloaded references.
         let project = ProjectStore.shared.current
         guard let context = project.project.productContext else {
@@ -228,18 +247,27 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         var posts: [String: Post] = [:]
         var searched: [String] = []
         var perSearch: [String] = []
-        for (index, term) in Self.shortQueries(queries).enumerated() where !searched.contains(where: { $0.lowercased() == term.lowercased() }) {
+        let terms = Self.shortQueries(queries)
+        // TikTok's photo search ignores its "date posted" filter, so freshness is ranked here, after the fact.
+        for (index, term) in terms.enumerated() {
             searched.append(term)
             let results = (try? await search(term, want: index == 0 ? 60 : 40)) ?? []
-            perSearch.append("\(term): \(results.count)")
+            perSearch.append("\(term): \(results.count), \(results.filter(\.isRecent).count) dos últimos 90 dias")
             for post in results { posts[post.id] = post }
-            #if DEBUG
-            print("[hunt] searched \"\(term)\": \(posts.count) posts so far")
-            #endif
         }
+        #if DEBUG
+        print("[hunt] \(perSearch.joined(separator: " | "))")
+        #endif
         guard !posts.isEmpty else {
             throw Failure("o TikTok não devolveu carrosséis pra \"\(queries.first ?? "")\" (sem resultado ou pediu verificação). Tente outro termo daqui a pouco.")
         }
+        // A post already brought into this project never comes back, even if it was deleted from the canvas.
+        let alreadyImported = Self.importedIDs(in: project)
+        let fresh = posts.filter { !alreadyImported.contains($0.key) }
+        guard !fresh.isEmpty else {
+            throw Failure("todos os \(posts.count) posts que o TikTok mostrou já foram importados neste projeto. Tente outro termo.")
+        }
+        posts = fresh
         let staged = FileManager.default.temporaryDirectory.appendingPathComponent("reference-review-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: staged, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: staged) }
@@ -276,8 +304,9 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             inspected[index].assessment = assessment
             inspected[index].sellsApp = assessment.productPromotion
         }
-        Self.logReview(inspected, assessments: assessments, searched: perSearch, seen: posts.count)
         let accounts = Self.mixFormats(Self.judge(inspected))
+        let picked = Set(accounts.prefix(count).flatMap { $0.posts.prefix(3).map(\.id) })
+        Self.logReview(inspected, assessments: assessments, searched: perSearch, seen: posts.count, picked: picked)
         guard !accounts.isEmpty else {
             throw Failure("os resultados não passaram na validação: preciso de carrossel viral do seu nicho com produto recomendado ou relato pessoal concreto. Não importei os posts fora do critério")
         }
@@ -286,13 +315,40 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
                               project: project, productContext: context)
     }
 
+    /// Posts ever imported into the project: its ledger plus any TikTok post link already on its canvas.
+    static func importedIDs(in project: ProjectFolder) -> Set<String> {
+        var ids = Set((try? JSONDecoder().decode([String].self, from: Data(contentsOf: importedLedger(project)))) ?? [])
+        if let board = try? String(contentsOf: project.canvasDirectory.appendingPathComponent("board.json"), encoding: .utf8),
+           let pattern = try? NSRegularExpression(pattern: #"/(?:photo|video)/(\d{8,})"#) {
+            for match in pattern.matches(in: board, range: NSRange(board.startIndex..., in: board)) {
+                if let range = Range(match.range(at: 1), in: board) { ids.insert(String(board[range])) }
+            }
+        }
+        return ids
+    }
+
+    static func rememberImported(_ id: String, in project: ProjectFolder) {
+        let file = importedLedger(project)
+        var ids = (try? JSONDecoder().decode([String].self, from: Data(contentsOf: file))) ?? []
+        guard !ids.contains(id) else { return }
+        ids.append(id)
+        try? JSONEncoder().encode(ids).write(to: file, options: .atomic)
+    }
+
+    private static func importedLedger(_ project: ProjectFolder) -> URL {
+        project.folder.appendingPathComponent("referencias-importadas.json")
+    }
+
     /// `ultima-avaliacao.json`: every candidate of the last research and why it got in or out, so an empty
     /// result can be explained instead of guessed.
-    private static func logReview(_ posts: [Post], assessments: [String: ResearchAssessment], searched: [String], seen: Int) {
+    private static func logReview(_ posts: [Post], assessments: [String: ResearchAssessment], searched: [String], seen: Int,
+                                  picked: Set<String>) {
         let rows: [[String: Any]] = posts.map { post in
             let assessment = assessments[post.id]
             return ["url": post.url, "views": post.views, "slides": post.images.count,
                     "legenda": String(post.caption.prefix(200)), "aprovado": post.assessment != nil,
+                    // Approved but left out: another post of the same product or account was better.
+                    "escolhido": picked.contains(post.id),
                     "nicho": assessment?.nicheMatch ?? false, "produto": assessment?.productPromotion ?? false,
                     "relato": assessment?.personalStory ?? false, "pessoa": assessment?.creatorLed ?? false,
                     "evidencias_conferem": assessment.map { $0.isSupported(by: post.inspectionText) } ?? false,
@@ -300,6 +356,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
                     "texto_lido": String(post.inspectionText.prefix(1500)),
                     "formato": assessment?.format ?? "", "gancho": assessment?.hook ?? "",
                     "dias": post.ageDays == .max ? -1 : post.ageDays,
+                    "qualidade": assessment?.quality ?? 0, "produto_mostrado": assessment?.product ?? "",
                     "motivo": assessment?.reason ?? "a IA não avaliou este post"]
         }
         let log: [String: Any] = ["buscas": searched, "posts_vistos": seen, "candidatos": rows]
@@ -332,15 +389,13 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
     /// then an app in the niche with 1M+ views, then any 1M+ views, then the rest. Within each, like a person scouting the niche would: 2+
     /// carousels past 50K views (a pattern, not luck) first, then typical views. Top 10% in views per follower get ★.
     static func judge(_ posts: [Post], profile: ProductProfile? = nil) -> [Account] {
-        let eligible = posts.filter {
+        let approved = posts.filter {
             $0.images.count >= 2 && $0.views >= viralViews && !$0.unavailableMetrics.contains("playCount")
                 && ($0.assessment?.isSupported(by: $0.inspectionText) == true)
         }
+        let eligible = onePerProduct(approved)
         var accounts = Dictionary(grouping: eligible, by: \.author).map { handle, list -> Account in
-            let sorted = list.sorted {
-                if $0.isRecent != $1.isRecent { return $0.isRecent }
-                return $0.priority != $1.priority ? $0.priority < $1.priority : $0.views > $1.views
-            }
+            let sorted = list.sorted(by: better)
             let views = sorted.map(\.views).sorted()
             let median = views.count % 2 == 1 ? views[views.count / 2]
                 : (views[views.count / 2 - 1] + views[views.count / 2]) / 2
@@ -361,8 +416,28 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         return accounts.sorted {
             if $0.recent != $1.recent { return $0.recent }
             if $0.priority != $1.priority { return $0.priority < $1.priority }
+            let leftQuality = $0.posts.first?.quality ?? 0, rightQuality = $1.posts.first?.quality ?? 0
+            if leftQuality != rightQuality { return leftQuality > rightQuality }
             if $0.proven != $1.proven { return $0.proven }
             return $0.medianViews > $1.medianViews
+        }
+    }
+
+    /// Fresh first, then the fixed rule, then the AI's quality, then how much people acted on it, then views.
+    nonisolated static func better(_ a: Post, _ b: Post) -> Bool {
+        if a.isRecent != b.isRecent { return a.isRecent }
+        if a.priority != b.priority { return a.priority < b.priority }
+        if a.quality != b.quality { return a.quality > b.quality }
+        if abs(a.engagement - b.engagement) > 0.01 { return a.engagement > b.engagement }
+        return a.views > b.views
+    }
+
+    /// The same app shown by five creators is one reference, not five: only its best post stays.
+    nonisolated static func onePerProduct(_ posts: [Post]) -> [Post] {
+        var seen = Set<String>()
+        return posts.sorted(by: better).filter { post in
+            let key = post.productKey
+            return key.isEmpty || seen.insert(key).inserted
         }
     }
 
@@ -396,7 +471,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
         var components = URLComponents(string: "https://www.tiktok.com/search/photo")!
         components.queryItems = [URLQueryItem(name: "q", value: query)]
         view.load(URLRequest(url: components.url!))
-        let deadline = Date().addingTimeInterval(45)
+        let deadline = Date().addingTimeInterval(30)
         var lastCount = -1, still = 0
         while Date() < deadline {
             try await Task.sleep(for: .seconds(2.5))
@@ -404,7 +479,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             _ = try? await view.evaluateJavaScript(Self.scrollToEnd)
             // Nothing new for a while: TikTok is done or is asking for a check we don't do.
             if found.count == lastCount { still += 1 } else { still = 0 }
-            if still >= 6 { break }
+            if still >= 4 { break }
             lastCount = found.count
         }
         tearDown()
@@ -540,6 +615,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             let best = account.posts.sorted {
                 if $0.isRecent != $1.isRecent { return $0.isRecent }
                 if $0.priority != $1.priority { return $0.priority < $1.priority }
+                if $0.quality != $1.quality { return $0.quality > $1.quality }
                 if ($0.images.count > 1) != ($1.images.count > 1) { return $0.images.count > 1 }
                 return $0.views > $1.views
             }.prefix(3)
@@ -569,6 +645,7 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
                 try ResearchCanvas.add(title: Self.referenceTitle(post), details: details,
                                        slides: slides, to: project.canvasDirectory)
                 postRows.append(Self.referenceRecord(post, folder: postFolder, slides: slides, canvas: project.canvasDirectory))
+                Self.rememberImported(post.id, in: project)
                 let tags: String = (post.isRecent ? "🔥 " : "") + (post.priority == 1 ? "📱 app · " : "")
                     + (post.assessment.map { "[\($0.format)] " } ?? "")
                 let hook: String = post.assessment.map { $0.hook.isEmpty ? "" : "     Gancho: \"\($0.hook)\"\n" } ?? ""
@@ -649,6 +726,8 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
             "motivo_selecao": post.assessment?.reason ?? "Não validado",
             "formato": post.assessment?.format ?? "", "gancho": post.assessment?.hook ?? "",
             "recente": post.isRecent, "views_por_dia": post.viewsPerDay,
+            "qualidade": post.assessment?.quality ?? NSNull(), "produto": post.assessment?.product ?? "",
+            "engajamento": post.views > 0 ? post.engagement : NSNull(),
             "evidencia_nicho": post.assessment?.nicheEvidence ?? "",
             "evidencia_formato": post.assessment?.angleEvidence ?? "",
             "conta": post.author.isEmpty ? NSNull() : "@" + post.author,
@@ -682,8 +761,10 @@ final class TikTokResearcher: NSObject, WKScriptMessageHandler {
 
     /// "há 12 dias · 40K views/dia": how fresh it is and how fast it's still going.
     static func age(_ post: Post) -> String {
-        guard post.ageDays != .max else { return "data não informada" }
-        return "há \(post.ageDays) dias · \(short(post.viewsPerDay)) views/dia"
+        let quality = post.assessment.map { " · qualidade \($0.quality)/5" } ?? ""
+        let engagement = post.views > 0 ? String(format: " · engajamento %.1f%%", post.engagement * 100) : ""
+        guard post.ageDays != .max else { return "data não informada" + quality + engagement }
+        return "há \(post.ageDays) dias · \(short(post.viewsPerDay)) views/dia" + quality + engagement
     }
 
     private static func short(_ value: Int) -> String {

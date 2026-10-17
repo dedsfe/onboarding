@@ -274,12 +274,15 @@ struct SettingsPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 Text("Configurações").font(.system(size: 30, weight: .bold))
+                section(title: "Contas conectadas", icon: "link") {
+                    ConnectedAccountsView()
+                }
                 section(title: "Fundo do app", icon: "photo") {
                     wallpaperGrid
                     Button(action: openArtworks) {
                         Label("Explorar obras de arte", systemImage: "building.columns")
                     }
-                    .buttonStyle(.glass)
+                    .buttonStyle(.appSecondary)
                     .help("Pinturas em domínio público da National Gallery of Art")
                     Divider()
                     HStack {
@@ -310,7 +313,7 @@ struct SettingsPage: View {
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                     Button("Abrir biblioteca no Finder", action: openBackgroundLibrary)
-                        .buttonStyle(.glass)
+                        .buttonStyle(.appSecondary)
                 }
                 section(title: "Conta e assinatura", icon: "person.crop.circle") {
                     LicenseAccountView(license: .shared)

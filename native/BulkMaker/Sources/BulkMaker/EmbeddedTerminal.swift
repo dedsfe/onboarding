@@ -23,7 +23,7 @@ enum AgentCLI: String {
         case .codex:
             let quoted = String(decoding: (try? JSONEncoder().encode(AgentSession.codexInstructions)) ?? Data(), as: UTF8.self)
             let home = TerminalHandoff.shellQuote(AgentSession.codexHome().path)
-            return reset + "CODEX_HOME=\(home) exec codex \(AgentSession.codexCostFlags.map(TerminalHandoff.shellQuote).joined(separator: " ")) -c \(TerminalHandoff.shellQuote("developer_instructions=" + quoted)) \(TerminalHandoff.shellQuote(prompt))"
+            return reset + "CODEX_HOME=\(home) exec codex --no-alt-screen \(AgentSession.codexCostFlags.map(TerminalHandoff.shellQuote).joined(separator: " ")) -c \(TerminalHandoff.shellQuote("developer_instructions=" + quoted)) \(TerminalHandoff.shellQuote(prompt))"
         }
     }
 }
@@ -36,7 +36,7 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
     var onExit: ((TerminalSession) -> Void)?
     private(set) var view: LocalProcessTerminalView?
     @Published private(set) var generation = 0
-    /// Changes on restart, so an interrupted run cannot leave Slidi spinning in a new session.
+    /// Changes on restart, so an interrupted run cannot leave the generation indicator running in a new session.
     private(set) var activityID = UUID()
     private var pendingCLI: AgentCLI?
     private var pendingPrompt = ""
@@ -57,7 +57,8 @@ final class TerminalSession: NSObject, ObservableObject, Identifiable, LocalProc
 
     func terminalView() -> LocalProcessTerminalView {
         if let view { return view }
-        let view = LocalProcessTerminalView(frame: .zero)
+        let view = ScrollableTerminalView(frame: .zero)
+        view.getTerminal().changeHistorySize(10_000)
         view.processDelegate = self
         view.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         view.nativeBackgroundColor = .textBackgroundColor
@@ -183,5 +184,77 @@ struct EmbeddedTerminal: NSViewRepresentable {
             terminal.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -8)
         ])
         DispatchQueue.main.async { terminal.window?.makeFirstResponder(terminal) }
+    }
+}
+
+/// Routes wheel gestures to the terminal or its running full-screen application.
+class ScrollableTerminalView: LocalProcessTerminalView {
+    private var pendingWheelLines: CGFloat = 0
+    private var wheelMonitor: Any?
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        installWheelMonitor()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        installWheelMonitor()
+    }
+
+    deinit {
+        if let wheelMonitor { NSEvent.removeMonitor(wheelMonitor) }
+    }
+
+    private func installWheelMonitor() {
+        // SwiftTerm's macOS wheel handler is not open to overrides. Route the native event
+        // before it reaches that handler; hidden/detached tabs cannot intercept another tab.
+        wheelMonitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            guard let self, let window = self.window, event.window === window,
+                  !self.isHiddenOrHasHiddenAncestor,
+                  self.bounds.contains(self.convert(event.locationInWindow, from: nil)),
+                  let content = window.contentView,
+                  let hit = content.hitTest(content.convert(event.locationInWindow, from: nil)),
+                  hit === self || hit.isDescendant(of: self) else { return event }
+            self.handleScrollWheel(event)
+            return nil
+        }
+    }
+
+    func handleScrollWheel(_ event: NSEvent) {
+        let terminal = getTerminal()
+        let reportsWheel = allowMouseReporting && terminal.mouseMode != .off && terminal.mouseMode != .x10
+        // Shift explicitly requests local scrollback, including when a CLI captures the mouse.
+        guard !event.modifierFlags.contains(.shift), reportsWheel || terminal.isCurrentBufferAlternate else {
+            pendingWheelLines = 0
+            super.scrollWheel(with: event)
+            return
+        }
+        if event.phase == .began { pendingWheelLines = 0 }
+        let cellHeight = max(1, getOptimalFrameSize().height / CGFloat(max(1, terminal.rows)))
+        let delta = event.scrollingDeltaY
+        guard delta != 0 else { return }
+        if pendingWheelLines * delta < 0 { pendingWheelLines = 0 }
+        pendingWheelLines += event.hasPreciseScrollingDeltas ? delta / cellHeight : delta
+        let lines = min(20, Int(abs(pendingWheelLines)))
+        guard lines > 0 else { return }
+        let upward = pendingWheelLines > 0
+        pendingWheelLines -= CGFloat(lines) * (upward ? 1 : -1)
+        if reportsWheel {
+            let point = convert(event.locationInWindow, from: nil)
+            let cellWidth = max(1, ("W" as NSString).size(withAttributes: [.font: font]).width)
+            let x = min(max(0, Int(point.x / cellWidth)), terminal.cols - 1)
+            let pixelY = max(0, bounds.height - point.y)
+            let y = min(max(0, Int(pixelY / cellHeight)), terminal.rows - 1)
+            let flags = terminal.encodeButton(button: upward ? 4 : 5, release: false,
+                shift: false, meta: event.modifierFlags.contains(.option), control: event.modifierFlags.contains(.control))
+            for _ in 0..<lines {
+                terminal.sendEvent(buttonFlags: flags, x: x, y: y,
+                                   pixelX: max(0, Int(point.x)), pixelY: Int(pixelY))
+            }
+        } else {
+            // Alternate buffers have no scrollback: let the application navigate its own pages.
+            if upward { pageUp() } else { pageDown() }
+        }
     }
 }

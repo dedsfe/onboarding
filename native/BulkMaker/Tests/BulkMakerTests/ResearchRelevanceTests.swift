@@ -96,6 +96,36 @@ final class ResearchRelevanceTests: XCTestCase {
         XCTAssertTrue(TikTokResearcher.age(fresh).hasPrefix("há 12 dias"))
     }
 
+    func testOneProductIsOneReferenceAndQualityWins() {
+        func shown(_ id: String, product: String, quality: Int, views: Int) -> TikTokResearcher.Post {
+            var p = post(id, author: id, caption: "", views: views, slides: 4)
+            p.assessment = ResearchAssessment(id: id, nicheMatch: true, productPromotion: true, personalStory: false,
+                creatorLed: true, nicheEvidence: "", angleEvidence: "", creatorEvidence: "", reason: "",
+                product: product, quality: quality)
+            return p
+        }
+        let kept = TikTokResearcher.onePerProduct([
+            shown("a", product: "FitFolio", quality: 3, views: 900_000),
+            shown("b", product: "fitfolio app", quality: 5, views: 100_000),
+            shown("c", product: "Cal AI", quality: 4, views: 200_000),
+            shown("d", product: "", quality: 4, views: 80_000)])
+        XCTAssertEqual(Set(kept.map(\.id)), ["b", "c", "d"])
+        let weak = ResearchAssessment(id: "w", nicheMatch: true, productPromotion: true, personalStory: false, creatorLed: true,
+            nicheEvidence: "contar calorias por foto", angleEvidence: "esse app conta calorias", creatorEvidence: "", reason: "", quality: 2)
+        XCTAssertFalse(weak.qualifies, "Post esquisito ou ilegível não vira referência")
+    }
+
+    func testAPostImportedOnceNeverComesBack() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("dedupe-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: folder.appendingPathComponent("Canvas"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let project = ProjectFolder(folder: folder, project: Project(name: "Teste"))
+        try #"[{"text":"https://www.tiktok.com/@a/photo/7542922344050789688"}]"#
+            .write(to: folder.appendingPathComponent("Canvas/board.json"), atomically: true, encoding: .utf8)
+        TikTokResearcher.rememberImported("7300000000000000001", in: project)
+        XCTAssertEqual(TikTokResearcher.importedIDs(in: project), ["7542922344050789688", "7300000000000000001"])
+    }
+
     func testOCRNoiseDoesNotSinkARealQuote() {
         let assessment = ResearchAssessment(id: "ocr", nicheMatch: true, productPromotion: true, personalStory: false,
             creatorLed: true, nicheEvidence: "apps católicos para rezar todo dia", angleEvidence: "Hallow: terço guiado e liturgia diária",

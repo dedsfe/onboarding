@@ -88,7 +88,7 @@ final class CanvasFolderTests: XCTestCase {
                                        design: DesignPreferences(), custom: false, canvas: "/tmp/P/Canvas")
         XCTAssertTrue(state.contains("- Canvas do projeto: `/tmp/P/Canvas`"))
         XCTAssertTrue(AgentSession.instructions.contains("--canvas-add <imagem>... --canvas"))
-        XCTAssertTrue(AgentSession.instructions.contains("Toda imagem que você gerar"))
+        XCTAssertTrue(AgentSession.instructions.contains("Toda imagem que você buscar, baixar ou gerar"))
         XCTAssertTrue(AgentSession.instructions.contains("--canvas-gerando"))
         XCTAssertTrue(AgentSession.instructions.contains("--canvas-finalizar"))
     }
