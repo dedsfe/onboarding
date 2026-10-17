@@ -13,6 +13,18 @@ Para exportar a lista, use `npm run --silent export:waitlist > waitlist.csv`. Gu
 
 Para hospedar, use um servidor com Node e armazenamento persistente. Configure `HOST=0.0.0.0`, `PORT` e, se necessário, `DATA_DIR` para o volume persistente e `SITE_ORIGIN` para a origem pública. Uma hospedagem apenas estática não salva inscrições. O servidor limita o cadastro a 10 pedidos por minuto por IP; atrás de um proxy, configure também o limite no proxy, pois o servidor não confia em cabeçalhos de IP enviados pelo cliente.
 
+## Lista de espera no ar (Cloudflare D1)
+
+No Worker publicado, as inscrições vão para o banco D1 `carousel-waitlist` (binding `WAITLIST_DB` em `wrangler.jsonc`,
+tabela em `migrations/0001_waitlist.sql`). O mesmo e-mail não entra duas vezes. Ver/exportar a lista:
+
+```sh
+npx wrangler d1 execute carousel-waitlist --remote --command "SELECT * FROM waitlist ORDER BY created_at"
+```
+
+Em 17/10/2026 o projeto Supabase antigo (`uknarv…supabase.co`) não existia mais, por isso a troca. Se o D1 não
+estiver ligado, o Worker volta a usar o Supabase abaixo.
+
 ## Supabase
 
 A integração está pronta, mas só é ativada com as credenciais do projeto.

@@ -71,6 +71,12 @@ async function saveSignup(request, env) {
   if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(400, { error: 'Confira seu email.', field: 'email' });
   if (!/^[A-Za-z0-9_]{1,15}$/.test(xHandle)) return json(400, { error: 'Confira seu @ do X.', field: 'xHandle' });
 
+  // D1 first: the list lives in the same Cloudflare account as the site. Supabase stays as the alternative.
+  if (env.WAITLIST_DB) {
+    await env.WAITLIST_DB.prepare('INSERT OR IGNORE INTO waitlist (email, x_handle) VALUES (?, ?)').bind(email, xHandle).run();
+    if (contentType === 'application/x-www-form-urlencoded') return new Response(null, { status: 303, headers: { Location: '/thanks.html', 'Cache-Control': 'no-store' } });
+    return json(200, { ok: true });
+  }
   const base = env.SUPABASE_URL, secret = env.SUPABASE_SECRET_KEY || env.SUPABASE_SERVICE_ROLE_KEY;
   if (!base || !secret) return json(503, { error: 'A lista ainda não está aberta. Tente mais tarde.' });
   const endpoint = new URL('/rest/v1/carousel_waitlist', base);
