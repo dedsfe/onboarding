@@ -45,7 +45,7 @@ form.addEventListener('submit', async (event) => {
       throw new Error(result.error || 'Não foi possível salvar. Tente de novo.');
     }
     message.dataset.state = 'success';
-    message.textContent = 'Vamos avisar por email.';
+    message.textContent = 'Você está na lista. Vamos avisar por e-mail quando o acesso estiver disponível.';
     submit.textContent = 'Você está na lista';
     emailInput.readOnly = true;
     handleInput.readOnly = true;
@@ -55,7 +55,7 @@ form.addEventListener('submit', async (event) => {
       ? 'A conexão demorou. Tente de novo.'
       : error instanceof TypeError ? 'Sem conexão. Tente de novo.' : error.message;
     submit.disabled = false;
-    submit.textContent = 'Quero acesso';
+    submit.textContent = 'Entrar na lista de espera';
   } finally {
     clearTimeout(timeout);
     form.removeAttribute('aria-busy');

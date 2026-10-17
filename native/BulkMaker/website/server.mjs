@@ -3,6 +3,7 @@ import { createReadStream } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import { createCommerce, readCommerceConfig, CommerceError } from './commerce.mjs';
 import { latestRelease } from './release-store.mjs';
+import { renderSitePage } from './site-page.mjs';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, dirname, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,25 +17,8 @@ catch (error) { if (error.code !== 'ENOENT') throw error; }
 const store = await createWaitlistStore();
 const commerce = createCommerce({ config: await readCommerceConfig() });
 const releaseRoot = resolve(process.env.RELEASES_DIR || resolve(root, 'releases'));
-const escapeHTML = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 async function page(path) {
-  let html = await readFile(path, 'utf8');
-  const release = await latestRelease(releaseRoot);
-  const email = commerce.config.supportEmail;
-  const contact = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(email)
-    ? `<a href="mailto:${escapeHTML(email)}">${escapeHTML(email)}</a>` : 'Contato de suporte em preparação';
-  const values = {
-    MONTHLY_PRICE: escapeHTML(commerce.plans.monthly.formattedPrice), ANNUAL_PRICE: escapeHTML(commerce.plans.annual.formattedPrice),
-    MONTHLY_DISABLED: commerce.plans.monthly.available ? '' : 'disabled', ANNUAL_DISABLED: commerce.plans.annual.available ? '' : 'disabled',
-    ANNUAL_OFFER: commerce.annualSaving > 0 ? `Economize ${commerce.annualSaving}% em relação ao mensal.` : 'Desconto anual a definir antes do lançamento.',
-    COMMERCE_NOTE: commerce.plans.monthly.available ? (commerce.test ? 'Checkout de teste: nenhuma cobrança real.' : 'Pagamento seguro pelo Lemon Squeezy. Impostos calculados no checkout.') : 'As assinaturas estão em preparação. Entre na lista para receber o aviso.',
-    SUPPORT_CONTACT: contact, LEGAL_NOTE: commerce.config.legalApproved ? '' : '<p class="review-note">Documento em revisão antes da abertura das vendas.</p>',
-    DOWNLOAD_ACTION: release ? `<a class="submit download-action" href="/download/latest">Baixar para Mac</a>` : '<button class="submit" disabled>Download em preparação</button>',
-    RELEASE_INFO: release ? `Versão ${escapeHTML(release.version)} · Apple Silicon · macOS 26 ou posterior` : 'A versão de distribuição será disponibilizada aqui.',
-    RELEASE_HASH: release ? `<p class="checksum">SHA-256: <code>${release.sha256}</code></p>` : '',
-  };
-  for (const [key, value] of Object.entries(values)) html = html.replaceAll(`{{${key}}}`, value);
-  return Buffer.from(html);
+  return Buffer.from(renderSitePage(await readFile(path, 'utf8'), commerce.config));
 }
 
 function sameOrigin(req) {

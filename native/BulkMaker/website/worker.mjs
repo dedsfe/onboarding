@@ -1,7 +1,7 @@
-// The site on Cloudflare Workers: the same pages, waitlist and checkout as server.mjs, which stays for local
-// development and tests. Files come from ./public through the ASSETS binding; HTML pages get the same
-// {{PLACEHOLDERS}} filled in. App releases (DMG, appcast) are not hosted here yet.
-import config from './commerce.config.json';
+// Site de lista de espera no Cloudflare Worker. Compartilha as páginas e o renderizador com server.mjs.
+// O checkout permanece implementado, sem links na interface pública. Assets vêm de ./public via ASSETS.
+import config from './commerce.config.json' with { type: 'json' };
+import { renderSitePage } from './site-page.mjs';
 import { createCommerce, CommerceError } from './commerce.mjs';
 
 const SECURITY_HEADERS = {
@@ -11,7 +11,6 @@ const SECURITY_HEADERS = {
 };
 const ALIASES = { '/': '/index.html', '/download': '/download.html', '/termos': '/terms.html', '/privacidade': '/privacy.html', '/reembolso': '/refund.html' };
 const NO_RELEASE = 'A versão de distribuição ainda não foi publicada.';
-const escapeHTML = value => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // Per isolate, like the Node server's map: enough to slow a burst, not a hard global limit.
 const attempts = new Map();
 
@@ -50,24 +49,6 @@ async function readBody(request) {
   const text = await request.text();
   if (text.length > 2048) throw new CommerceError('Pedido muito grande.', 413);
   return text;
-}
-
-async function page(html, commerce, env) {
-  const email = config.supportEmail;
-  const contact = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/.test(email)
-    ? `<a href="mailto:${escapeHTML(email)}">${escapeHTML(email)}</a>` : 'Contato de suporte em preparação';
-  const values = {
-    MONTHLY_PRICE: escapeHTML(commerce.plans.monthly.formattedPrice), ANNUAL_PRICE: escapeHTML(commerce.plans.annual.formattedPrice),
-    MONTHLY_DISABLED: commerce.plans.monthly.available ? '' : 'disabled', ANNUAL_DISABLED: commerce.plans.annual.available ? '' : 'disabled',
-    ANNUAL_OFFER: commerce.annualSaving > 0 ? `Economize ${commerce.annualSaving}% em relação ao mensal.` : 'Desconto anual a definir antes do lançamento.',
-    COMMERCE_NOTE: commerce.plans.monthly.available ? (commerce.test ? 'Checkout de teste: nenhuma cobrança real.' : 'Pagamento seguro pelo Lemon Squeezy. Impostos calculados no checkout.') : 'As assinaturas estão em preparação. Entre na lista para receber o aviso.',
-    SUPPORT_CONTACT: contact, LEGAL_NOTE: config.legalApproved ? '' : '<p class="review-note">Documento em revisão antes da abertura das vendas.</p>',
-    DOWNLOAD_ACTION: '<button class="submit" disabled>Download em preparação</button>',
-    RELEASE_INFO: 'A versão de distribuição será disponibilizada aqui.',
-    RELEASE_HASH: '',
-  };
-  for (const [key, value] of Object.entries(values)) html = html.replaceAll(`{{${key}}}`, value);
-  return html;
 }
 
 async function saveSignup(request, env) {
@@ -133,7 +114,7 @@ async function serveFile(request, env, commerce, pathname) {
   const headers = new Headers(response.headers);
   let body = response.body;
   if (type.startsWith('text/html')) {
-    body = await page(await response.text(), commerce, env);
+    body = renderSitePage(await response.text(), config);
     headers.set('Content-Type', 'text/html; charset=utf-8');
     headers.set('Cache-Control', status === 404 ? 'no-store' : 'no-cache');
     headers.delete('Content-Length'); headers.delete('ETag');
