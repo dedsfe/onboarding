@@ -1376,47 +1376,6 @@ private struct ShimmerGrid: View {
 
 // MARK: - Buttons
 
-/// Every onboarding button is one of two glass capsules: the primary one tinted with the brand (before there
-/// is one, the stage's colors spin under its glass), the secondary one clear.
-private struct GlassButtonStyle: ButtonStyle {
-    var prominent: Bool
-    var small = false
-    var glassID: String?
-    var namespace: Namespace.ID?
-    @Environment(\.compactSteps) private var compact
-    @Environment(\.brandTint) private var brand
-    @Environment(\.isEnabled) private var enabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        let tint = brand ?? .onboardingAccent
-        let height: CGFloat = small ? 30 : prominent ? (compact ? 44 : 50) : (compact ? 40 : 44)
-        let aura = prominent && brand == nil
-        let glass: Glass = aura ? .regular.tint(.black.opacity(0.14)).interactive()
-            : prominent ? .regular.tint(tint.opacity(enabled ? 0.88 : 0.35)).interactive() : .regular.interactive()
-        configuration.label
-            .font(.system(size: small ? 12.5 : compact ? 14 : 15, weight: .semibold))
-            .labelStyle(TrailingIconLabelStyle())
-            .foregroundStyle(aura ? .white : prominent ? tint.label : .white.opacity(0.88))
-            .shadow(color: .black.opacity(aura ? 0.35 : 0), radius: 3, y: 1)
-            .padding(.horizontal, small ? 14 : prominent ? (compact ? 24 : 30) : 20)
-            .frame(height: height)
-            .contentShape(.capsule)
-            .glassEffect(glass, in: .capsule)
-            .background {
-                if aura {
-                    // Behind the glass, so it's refracted: the colors inside, and their glow around the capsule.
-                    ZStack {
-                        SpinningAura().clipShape(.capsule).blur(radius: 12).opacity(enabled ? 0.55 : 0)
-                        SpinningAura().clipShape(.capsule).opacity(enabled ? 1 : 0.35)
-                    }
-                }
-            }
-            .modifier(OptionalGlassID(id: glassID, namespace: namespace))
-            .opacity(enabled ? 1 : 0.6)
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.smooth(duration: 0.18), value: configuration.isPressed)
-    }
-}
 
 /// The stage's colors, turning slowly: what fills the primary button until the brand takes over.
 private struct SpinningAura: View {
@@ -1448,14 +1407,6 @@ private struct OptionalGlassID: ViewModifier {
     }
 }
 
-private struct TrailingIconLabelStyle: LabelStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: 7) {
-            configuration.title
-            configuration.icon.font(.system(size: 12, weight: .bold))
-        }
-    }
-}
 
 @MainActor
 private func primaryButton(_ title: String, icon: String? = "arrow.right", glassID: String? = nil, in namespace: Namespace.ID? = nil,
